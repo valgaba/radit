@@ -1,0 +1,36 @@
+# Archivos generados durante la compilación
+*.o
+*.obj
+*.so
+*.a
+*.exe
+*.dll
+*.pdb
+
+# Archivos generados por moc (Qt Meta-Object Compiler)
+moc_*
+
+# Archivos temporales de Qt
+*.pro.user
+*.pro.user.*
+*.qmake.cache
+Makefile
+*.qmake.stash
+
+# Archivos de configuración de Qt Creator y otros IDEs
+*.user
+*.user*
+*.cmake
+CMakeLists.txt.user
+
+# Archivos de logs
+*.log
+
+# Carpeta de build (carpetas generadas durante la compilación)
+build/
+debug/
+release/
+
+# Archivos de backends de Qt Creator
+*.qmlc
+*.js
