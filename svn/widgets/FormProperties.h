@@ -48,7 +48,6 @@ class FormProperties : public QDialog {
     public:
        explicit FormProperties(QWidget *parent = nullptr);
 
-
       ~ FormProperties();
 
        void setItembase(AudioItem *itembase);

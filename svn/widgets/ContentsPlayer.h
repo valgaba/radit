@@ -39,11 +39,8 @@ private:
 
 
 public:
-  //  QVBoxLayout *layout;
-    void AddItem(QWidget * item);
+
     Clipboard &clipboard=Clipboard::instance();
-
-
     explicit ContentsPlayer(QWidget *parent = 0);
     ~ContentsPlayer();
 
@@ -51,9 +48,6 @@ public:
 
 
 protected:
-    void dragEnterEvent(QDragEnterEvent *event) override;
-    void dropEvent(QDropEvent *event) override;
-    void dragMoveEvent(QDragMoveEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
 

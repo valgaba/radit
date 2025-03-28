@@ -42,7 +42,7 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
     this->setObjectName("Contents"); // para el archivo qss
-    this->setAcceptDrops(true);
+   // this->setAcceptDrops(true);
 
     this->isCut=false;
 
@@ -71,15 +71,6 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     deleteAction->setIcon(QIcon(":/icons/Remove.svg"));
     propertiesAction->setIcon(QIcon(":/icons/properties.svg"));
 
-    /* addAction->setIcon(QIcon(":/icons/Add.svg"));
-    cutAction->setIcon(QIcon::fromTheme("edit-cut"));
-    copyAction->setIcon(QIcon::fromTheme("edit-copy"));
-    pasteAction->setIcon(QIcon::fromTheme("edit-paste"));
-    deleteAction->setIcon(QIcon::fromTheme("edit-delete"));
-    propertiesAction->setIcon(QIcon(":/icons/properties.svg"));*/
-
-
-
     // Crear el submenú
     Menu *submenu = new Menu(this);
     QAction *addAudiofile = new QAction("Add file", this);
@@ -104,17 +95,19 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     //**********************************************
 
     // aciones **************************************
-    connect(addAudiofile, &QAction::triggered,this, [=]{
+    connect(addAudiofile, &QAction::triggered,this, [this]{
 
-        this->AddItem(new AudioItemFile);
+
+        layout->addWidget(new AudioItemFile);
     });
 
 
 
-    connect(propertiesAction, &QAction::triggered,this, [=]{
+    connect(propertiesAction, &QAction::triggered,this, [this]{
         QWidget *widget = childAt(mousePos);
-        AudioItem *audioitem = qobject_cast<AudioItem*>(widget->parentWidget());
+        if (!widget) return;
 
+        AudioItem *audioitem = qobject_cast<AudioItem*>(widget->parentWidget());
 
         if(audioitem){
             FormProperties *formproperties= new FormProperties(this);
@@ -125,7 +118,7 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     });
 
 
-    connect(deleteAction, &QAction::triggered,this, [=]{
+    connect(deleteAction, &QAction::triggered,this, [this]{
         if (QWidget *widget = childAt(mousePos)) {
             if (QWidget *parent = widget->parentWidget()) {
                 parent->deleteLater();
@@ -167,39 +160,27 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     connect(pasteAction, &QAction::triggered, this, [this] {
 
-        if (clipboard.lista.empty()) {
-            return;  // Salir temprano si no hay elementos
-        }
+        if (clipboard.lista.empty()) return;  // Salir temprano si no hay elementos
 
-        bool isCutOperation = !clipboard.lista.isEmpty() &&
+         bool isCutOperation = !clipboard.lista.isEmpty() &&
                                clipboard.lista.constFirst() &&
                                clipboard.lista.constFirst()->property("iscut").toBool();
 
-        for (QWidget *widget : clipboard.lista) {
+        for (auto it = clipboard.lista.begin(); it != clipboard.lista.end();) {
+            if (auto *itembase = qobject_cast<AudioItem*>(*it)) {
+                layout->addWidget(itembase->copy());
 
-            if (auto *itembase = qobject_cast<AudioItem*>(widget)) {
-                   this->AddItem(itembase->copy());
-
-                // Eliminar widget si fue cortado
-                   if (isCutOperation && widget)
-                        widget->deleteLater();
-
+                if (isCutOperation && *it) {
+                    (*it)->deleteLater();
+                    it = clipboard.lista.erase(it);  // Eliminar de la lista y avanzar el iterador
+                } else {
+                    ++it;
+                }
+            } else {
+                ++it;
             }
         }
-
-        if (isCutOperation) {
-            clipboard.lista.clear();
-        }
     });
-
-
-
-
-
-
-
-
-
 
 
 
@@ -226,143 +207,43 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 ContentsPlayer::~ContentsPlayer(){}
 
 
-//***********************************
-
-
-//entra el evento decide si elevento es valido
-void ContentsPlayer::dragEnterEvent(QDragEnterEvent *event){
-    // Verificar si el arrastre contiene URIs de archivos
-
-        if (event->mimeData()->hasFormat("text/uri-list")) {
-        QList<QUrl> urls = event->mimeData()->urls();
-        if (!urls.isEmpty()) {
-            QUrl fileUrl = urls.first(); // Tomamos el primer archivo (podrías expandir para múltiples)
-            QString filePath = fileUrl.toLocalFile();
-
-                event->acceptProposedAction();
-            return;
-
-        }
-    }
-
-    // Si no es un archivo de audio válido, ignorar el evento
-   // event->ignore();
-    event->acceptProposedAction();
-}
-
-
-
-// miestras se arrastra
-void ContentsPlayer::dragMoveEvent(QDragMoveEvent *event){
-
-    // Aceptar el movimiento solo si es un archivo de audio válido
-    if (event->mimeData()->hasFormat("text/uri-list")) {
-        QList<QUrl> urls = event->mimeData()->urls();
-        if (!urls.isEmpty()) {
-            QUrl fileUrl = urls.first();
-            QString filePath = fileUrl.toLocalFile();
-
-               event->acceptProposedAction();
-            return;
-
-        }
-    }
-  //  event->ignore();
-    event->acceptProposedAction();
-
-}
-
-// suelta evento
-void ContentsPlayer::dropEvent(QDropEvent *event){
-
-    QWidget* source = qobject_cast< QWidget*>(event->source());
-
-    if(source) {
-
-       // if(source->parent()!=this){ // es distinto mismo contents
-
-            // Removemos el widget de su layout original esto puede ser inutil
-                if(source->parentWidget() && source->parentWidget()->layout()) {
-                    source->parentWidget()->layout()->removeWidget(source);
-            }
-
-
-                this->AddItem(source);  //añadimos el muevo elemento
-
-       // }
-
-        return;
-    }
-
-
-
-
-    if (event->mimeData()->hasFormat("text/uri-list")) {
-        QList<QUrl> urls = event->mimeData()->urls();
-
-             foreach(QUrl url, urls) {
-                   QString filePath = url.toLocalFile();
-                   AudioItemFile *audioItem = new AudioItemFile;
-                   audioItem->setfilePath(filePath);
-
-                   QFileInfo fileInfo(filePath);
-                   audioItem->nombre->setText(fileInfo.completeBaseName());
-                   audioItem->setToolTip(filePath);
-
-
-                   this->AddItem(audioItem);
-            }
-
-        event->acceptProposedAction();
-    } else {
-        event->ignore();
-    }
-
-}
-
-
-//************************************************
-void ContentsPlayer::AddItem(QWidget * item){
-    layout->addWidget(item);
-
-
-}
-
 
 
 void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
-
     mousePos = event->pos();
 
+       QWidget *widget = childAt(mousePos);
 
-    // Obtener el widget en las coordenadas del ratón para las opciones de copy y paste
-    QWidget *widget = childAt(event->pos());
+       // Si no hay widget, oculta todas las opciones y retorna
+       if (!widget) {
+           copyAction->setVisible(false);
+           cutAction->setVisible(false);
+           deleteAction->setVisible(false);
+           propertiesAction->setVisible(false);
+           pasteAction->setVisible(!this->clipboard.lista.isEmpty());
+           menu->exec(mapToGlobal(mousePos));
+           return;
+       }
 
+       // Mostrar acciones por defecto
+       copyAction->setVisible(true);
+       cutAction->setVisible(true);
+       deleteAction->setVisible(true);
+       propertiesAction->setVisible(true);
 
-    if (widget) {
+       // Verifica si el widget tiene padres válidos antes de acceder a ellos
+       QWidget *parent1 = widget->parentWidget();
+       QWidget *parent2 = parent1 ? parent1->parentWidget() : nullptr;
 
-        copyAction->setVisible(true);
-        cutAction->setVisible(true);
-        deleteAction->setVisible(true);
-        propertiesAction->setVisible(true);
-    }else{
-        copyAction->setVisible(false);
-        cutAction->setVisible(false);
-        deleteAction->setVisible(false);
-        propertiesAction->setVisible(false);
-    }
+       if (parent2 && parent2->objectName() == "grups") {
+             propertiesAction->setVisible(false);
+       }
 
+       // Determinar visibilidad de "Paste"
+       pasteAction->setVisible(!this->clipboard.lista.isEmpty());
 
-    if (this->clipboard.lista.isEmpty()) {
-        pasteAction->setVisible(false);
-    } else {
-        pasteAction->setVisible(true);
-    }
-
-
-    menu->popup(mapToGlobal(event->pos()));
-    menu->exec(mapToGlobal(event->pos()));
-
+       // Mostrar menú contextual
+       menu->exec(mapToGlobal(mousePos));
 
 }
 

@@ -67,9 +67,6 @@ AudioItemFile::AudioItemFile(QWidget *parent):AudioItem(parent){
     btnproperties->adjustSize();
 
 
-
-
-
     layout->addWidget(hora);
     layout->addWidget(nombre);
     layout->addWidget(duracion);
@@ -83,6 +80,10 @@ AudioItemFile::AudioItemFile(QWidget *parent):AudioItem(parent){
 AudioItemFile::~AudioItemFile(){}
 
 
+
+
+
+//*****************
 AudioItem* AudioItemFile::copy() const  {
 
     AudioItemFile* audioitemfile = new AudioItemFile();

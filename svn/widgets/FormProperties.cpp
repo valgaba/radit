@@ -24,6 +24,7 @@
 
 #include "widgets/FormProperties.h"
 #include "widgets/frame.h"
+#include "widgets/ContentsPlayer.h"
 
 
 
@@ -112,7 +113,10 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
     btnfile->setText("File");
 
 
-    grupcontainer =new Container;
+    grupcontainer =new Container; // para los grupos
+
+    ContentsPlayer *contentsplayer = dynamic_cast<ContentsPlayer*>(grupcontainer->widget());
+    contentsplayer->setObjectName("grups"); //para qss
 
 
     gridlayout->addWidget(namefile,1,0 );

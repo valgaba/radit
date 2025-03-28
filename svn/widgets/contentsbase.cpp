@@ -32,13 +32,13 @@
 
 
 #include "widgets/contentsbase.h"
-
+#include "widgets/AudioItemFile.h"
 
 ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
   // setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
 
     this->setObjectName("Contents"); // para el archivo qss
-   // this->setAcceptDrops(true);
+    this->setAcceptDrops(true);
 
 
 
@@ -54,6 +54,110 @@ ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
 
 
 ContentsBase::~ContentsBase(){}
+
+//***********************************
+
+
+//entra el evento decide si elevento es valido
+void ContentsBase::dragEnterEvent(QDragEnterEvent *event){
+    // Verificar si el arrastre contiene URIs de archivos
+
+        if (event->mimeData()->hasFormat("text/uri-list")) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (!urls.isEmpty()) {
+            QUrl fileUrl = urls.first(); // Tomamos el primer archivo (podrías expandir para múltiples)
+            QString filePath = fileUrl.toLocalFile();
+
+                event->acceptProposedAction();
+            return;
+
+        }
+    }
+
+    // Si no es un archivo de audio válido, ignorar el evento
+   // event->ignore();
+    event->acceptProposedAction();
+}
+
+
+
+// miestras se arrastra
+void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
+
+    // Aceptar el movimiento solo si es un archivo de audio válido
+    if (event->mimeData()->hasFormat("text/uri-list")) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (!urls.isEmpty()) {
+            QUrl fileUrl = urls.first();
+            QString filePath = fileUrl.toLocalFile();
+
+               event->acceptProposedAction();
+            return;
+
+        }
+    }
+  //  event->ignore();
+    event->acceptProposedAction();
+
+}
+
+// suelta evento
+void ContentsBase::dropEvent(QDropEvent *event){
+
+    QWidget* source = qobject_cast< QWidget*>(event->source());
+
+    if(source) {
+
+       // if(source->parent()!=this){ // es distinto mismo contents
+
+            // Removemos el widget de su layout original esto puede ser inutil
+                if(source->parentWidget() && source->parentWidget()->layout()) {
+                    source->parentWidget()->layout()->removeWidget(source);
+            }
+
+
+                //this->AddItem(source);  //añadimos el muevo elemento
+                 layout->addWidget(source);
+
+       // }
+
+        return;
+    }
+
+
+
+
+    if (event->mimeData()->hasFormat("text/uri-list")) {
+        QList<QUrl> urls = event->mimeData()->urls();
+
+             foreach(QUrl url, urls) {
+                   QString filePath = url.toLocalFile();
+                   AudioItemFile *audioItem = new AudioItemFile;
+                   audioItem->setfilePath(filePath);
+
+                   QFileInfo fileInfo(filePath);
+                   audioItem->nombre->setText(fileInfo.completeBaseName());
+                   audioItem->setToolTip(filePath);
+
+
+                 //  this->AddItem(audioItem);
+                   layout->addWidget(audioItem);
+            }
+
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+
+}
+
+
+
+
+
+
+
+
 
 
 ////////////////esto es para el qss **********+

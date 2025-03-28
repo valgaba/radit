@@ -17,11 +17,8 @@ SOURCES += \
     widgets/AudioItem.cpp \
     widgets/AudioItemFile.cpp \
     widgets/ContentsPlayer.cpp \
-    widgets/ExternalWindow.cpp \
     widgets/FormProperties.cpp \
-    widgets/FrameView.cpp \
     widgets/ItemBase.cpp \
-    widgets/Scene.cpp \
     widgets/TabAuto.cpp \
     widgets/TabPlayer.cpp \
     widgets/View.cpp \
@@ -30,7 +27,6 @@ SOURCES += \
     widgets/contents.cpp \
     widgets/contentsbase.cpp \
     widgets/frame.cpp \
-    widgets/graphicstextitem.cpp \
     widgets/menu.cpp \
     widgets/scrollbar.cpp \
     widgets/tab.cpp \
@@ -43,11 +39,8 @@ HEADERS += \
     widgets/AudioItemFile.h \
     widgets/ContentsPlayer.h \
     widgets/DraggableWidget.h \
-    widgets/ExternalWindow.h \
     widgets/FormProperties.h \
-    widgets/FrameView.h \
     widgets/ItemBase.h \
-    widgets/Scene.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \
     widgets/View.h \
@@ -56,7 +49,6 @@ HEADERS += \
     widgets/contents.h \
     widgets/contentsbase.h \
     widgets/frame.h \
-    widgets/graphicstextitem.h \
     widgets/menu.h \
     widgets/scrollbar.h \
     widgets/tab.h \
@@ -78,11 +70,7 @@ win32 {
 
 /*
 LIBS += ..\lib\bass\bass.lib\
-        ..\lib\bassenc\bassenc.lib\
-        ..\lib\ffmpeg\lib\libavdevice.dll.a\
-        ..\lib\ffmpeg\lib\libavcodec.dll.a\
-        ..\lib\ffmpeg\lib\libavformat.dll.a\
-        ..\lib\ffmpeg\lib\libavutil.dll.a
+        ..\lib\bassenc\bassenc.lib
 
 
 
@@ -94,22 +82,22 @@ LIBS += ..\lib\bass\bass.lib\
 
 
 LIBS += -L$$PWD/../lib/bass \
-        -L$$PWD/../lib/bassenc \
-        -L$$PWD/../lib/ffmpeg/lib
+        -L$$PWD/../lib/bassenc
+
 
 
 
 
 /*
 INCLUDEPATH = ..\lib\bass\
-              ..\lib\bassenc\
-              ..\lib\ffmpeg\include
+              ..\lib\bassenc
+
 
 */
 
 INCLUDEPATH += $$PWD/../lib/bass \
-               $$PWD/../lib/bassenc \
-               $$PWD/../lib/ffmpeg/include
+               $$PWD/../lib/bassenc
+
 
 
 }
