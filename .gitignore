@@ -7,6 +7,10 @@
 *.dll
 *.pdb
 
+# Archivos excluidos
+!bass.dll
+!libbass.so
+
 # Archivos generados por moc (Qt Meta-Object Compiler)
 moc_*
 
