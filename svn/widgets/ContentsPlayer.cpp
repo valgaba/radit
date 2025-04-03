@@ -73,17 +73,21 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     // Crear el submenú
     Menu *submenu = new Menu(this);
-    QAction *addAudiofile = new QAction("Add file", this);
-    QAction *subAction2 = new QAction("Elemento 2", this);
-    QAction *subAction3 = new QAction("Elemento 3", this);
+    QAction *addAudiofile = new QAction("Audio File", this);
+    QAction *addAudioFolder = new QAction("Audio Folder", this);
+    QAction *addNeturl = new QAction("Net Url", this);
+    QAction *addGroup = new QAction("Group", this);
 
     // iconos del submenu
-    addAudiofile ->setIcon(QIcon(":/icons/net.svg"));
+    addAudiofile ->setIcon(QIcon(":/icons/audiofile.svg"));
+    addAudioFolder ->setIcon(QIcon(":/icons/folder.svg"));
+    addNeturl ->setIcon(QIcon(":/icons/net.svg"));
 
 
     submenu->addAction(addAudiofile);
-    submenu->addAction(subAction2);
-    submenu->addAction(subAction3);
+    submenu->addAction(addAudioFolder);
+    submenu->addAction(addNeturl);
+    submenu->addAction(addGroup);
 
     // Agregar el submenú a la opcion añadir
     addAction->setMenu(submenu);
@@ -96,7 +100,6 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     // aciones **************************************
     connect(addAudiofile, &QAction::triggered,this, [this]{
-
 
         layout->addWidget(new AudioItemFile);
     });

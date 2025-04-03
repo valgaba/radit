@@ -45,7 +45,7 @@ ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
     layout = new QVBoxLayout;
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setAlignment(Qt::AlignTop); // pone los item en la parte alta
-    layout->setSpacing(5); // espacios entre  item dentro del contenedor
+    layout->setSpacing(3); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
 

@@ -21,7 +21,6 @@ SOURCES += \
     widgets/ItemBase.cpp \
     widgets/TabAuto.cpp \
     widgets/TabPlayer.cpp \
-    widgets/View.cpp \
     widgets/button.cpp \
     widgets/container.cpp \
     widgets/contents.cpp \
@@ -43,7 +42,6 @@ HEADERS += \
     widgets/ItemBase.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \
-    widgets/View.h \
     widgets/button.h \
     widgets/container.h \
     widgets/contents.h \
@@ -69,12 +67,20 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 win32 {
 
 
+
+
 LIBS += -L$$PWD/../lib/bass \
-        -L$$PWD/../lib/bassenc
+        -L$$PWD/../lib/bassenc \
+       # -L$$PWD/../lib/ffmpeg/lib
+
+
+
+
 
 
 INCLUDEPATH += $$PWD/../lib/bass \
-               $$PWD/../lib/bassenc
+               $$PWD/../lib/bassenc \
+             #  $$PWD/../lib/ffmpeg/include
 
 
 }
@@ -91,10 +97,10 @@ DESTDIR =     $$PWD/../out/bin
 
 unix {
 
-   # LIBS += /usr/lib/libbass.so
+    LIBS += /usr/lib/libbass.so
            # /usr/lib/libbassenc.so
 
-   # INCLUDEPATH = ../lib/bass
+    INCLUDEPATH = ../lib/bass
                 #  ../lib/bassenc
 
 }

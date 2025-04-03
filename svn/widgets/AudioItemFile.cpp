@@ -1,4 +1,4 @@
-/* This file is part of Radit.
+ /* This file is part of Radit.
    Copyright 2022, Victor Algaba <victorengine@gmail.com> www.radit.org
 
    Radit is free software: you can redistribute it and/or modify

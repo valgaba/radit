@@ -45,5 +45,7 @@
         <file>icons/audio.svg</file>
         <file>icons/GuiTabMenu.svg</file>
         <file>icons/properties.svg</file>
+        <file>icons/audiofile.svg</file>
+        <file>icons/folder.svg</file>
     </qresource>
 </RCC>
