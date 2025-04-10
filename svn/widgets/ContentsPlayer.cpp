@@ -34,6 +34,7 @@
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItemFile.h"
 #include "widgets/FormProperties.h"
+#include "core/io.h"
 
 
 ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
@@ -103,6 +104,26 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
         layout->addWidget(new AudioItemFile);
     });
+
+
+
+    connect(addGroup, &QAction::triggered,this, [this]{
+
+        Io *io = new Io;
+
+        io->saveWidgetsToJson(this->layout,"salidajson.txt");
+
+    });
+
+    connect(addNeturl, &QAction::triggered,this, [this]{
+
+        Io *io = new Io;
+
+        io->loadWidgetsFromJson(this->layout,"salidajson.txt");
+
+    });
+
+
 
 
 

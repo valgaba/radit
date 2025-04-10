@@ -576,7 +576,7 @@ TabBar QToolButton::right-arrow {
 		
 		background-repeat: no-repeat;
 		background-position: center center;
-		background-size: 50px 50px;  /* Ajusta el tamaño del icono */
+		/*background-size: 50px 50px;  /* Ajusta el tamaño del icono */
 
 		
    		/*margin-top: 5px;
@@ -604,7 +604,7 @@ TabBar QToolButton::left-arrow {
 		
 	background-repeat: no-repeat;
 	background-position: center center;
-    background-size: 50px 50px;  /* Ajusta el tamaño del icono */
+   /* background-size: 50px 50px;  /* Ajusta el tamaño del icono */
 
 
 	    
@@ -707,9 +707,18 @@ AudioItemFile{
 
 
 
-FormProperties{
+#FormProperties{
+
+	 background-color: #262c3b;
 
 }
+
+#FormProperties Contents.Contentspropertie{               
+     
+	   background-color:rgb(59, 38, 41);
+	  
+}
+
 
 
 #FormProperties Button.Buttonpropertie{
@@ -786,6 +795,8 @@ FormProperties{
     padding: 2px;
 
 }
+
+
 
 
 

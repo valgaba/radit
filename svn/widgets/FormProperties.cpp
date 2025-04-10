@@ -46,19 +46,22 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
 
  this->setMinimumSize(300,300); // alto del item
- this->resize(600, 400);         // Tamaño inicial
+ this->resize(600, 600);         // Tamaño inicial
 
     layout = new QVBoxLayout;
-    layout->setContentsMargins(10, 20, 10, 20);
+    layout->setContentsMargins(5, 5, 5, 5);
     layout->setAlignment(Qt::AlignTop); // pone los item en la parte alta
-    layout->setSpacing(10); // espacios entre  item dentro del contenedor
+    layout->setSpacing(5); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
     container = new Container;
 
     contents = new QWidget;  // el contenido por defecto del container no nos sirve
 
-    contents->setObjectName("Contents"); // para el archivo qss
+   // contents->setObjectName("Contents"); // para el archivo qss
+    contents->setProperty("class", "Contentspropertie");
+
+
     gridlayout = new QGridLayout;
     gridlayout->setAlignment(Qt::AlignTop);
     contents->setLayout(gridlayout);
@@ -134,7 +137,7 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
      Frame *frame = new Frame;
      QHBoxLayout *downlayout = new QHBoxLayout;
-     downlayout->setContentsMargins(10, 0, 10, 0);
+     downlayout->setContentsMargins(10, 5, 10, 5);
 
 
      btncancel = new Button;

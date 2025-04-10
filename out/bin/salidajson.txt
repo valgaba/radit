@@ -1,0 +1,110 @@
+{
+    "audioitems": [
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/MYKE TOWERS - LA LA.mp3",
+            "name": "AudioItemFile",
+            "nombre": "MYKE TOWERS - LA LA",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Purple Disco Machine, Benjamin Ingrosso ft. Nile Rodgers, Shenseea - Honey Boy (Extende... - pdmVEVO.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Purple Disco Machine, Benjamin Ingrosso ft. Nile Rodgers, Shenseea - Honey Boy (Extende... - pdmVEVO",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/RAUW_ALEJANDRO____BZRP_Music_Sessions_56.mp3",
+            "name": "AudioItemFile",
+            "nombre": "RAUW_ALEJANDRO____BZRP_Music_Sessions_56",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Rauw_Alejandro_Bizarrap_BABY_HELLO.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Rauw_Alejandro_Bizarrap_BABY_HELLO",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Sabrina Carpenter - Espresso (Official Audio).mp3",
+            "name": "AudioItemFile",
+            "nombre": "Sabrina Carpenter - Espresso (Official Audio)",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Sebastián Yatra, Manuel Turizo, Beéle - VAGABUNDO.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Sebastián Yatra, Manuel Turizo, Beéle - VAGABUNDO",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/SHAKIRA - Soltera.mp3",
+            "name": "AudioItemFile",
+            "nombre": "SHAKIRA - Soltera",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Shakira_Manuel_Turizo_Copa_Vacía.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Shakira_Manuel_Turizo_Copa_Vacía",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Tate McRae - greedy (Official Audio).mp3",
+            "name": "AudioItemFile",
+            "nombre": "Tate McRae - greedy (Official Audio)",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/CHIMBALA - Rueda.mp3",
+            "name": "AudioItemFile",
+            "nombre": "CHIMBALA - Rueda",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Classy_101_Remix_.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Classy_101_Remix_",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/David_Guetta_Anne_Marie_Coi_Leray_Baby_Don’t_H.mp3",
+            "name": "AudioItemFile",
+            "nombre": "David_Guetta_Anne_Marie_Coi_Leray_Baby_Don’t_H",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/DePol_Ibiza.mp3",
+            "name": "AudioItemFile",
+            "nombre": "DePol_Ibiza",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/DUA LIPA - DANCE THE NIGHT.mp3",
+            "name": "AudioItemFile",
+            "nombre": "DUA LIPA - DANCE THE NIGHT",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Emilia_Ludmilla_Zecca - No Se Ve.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Emilia_Ludmilla_Zecca - No Se Ve",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Fred_De_Palma_Ana_Mena_Melodia_Criminal.mp3",
+            "name": "AudioItemFile",
+            "nombre": "Fred_De_Palma_Ana_Mena_Melodia_Criminal",
+            "type": "AudioItemFile"
+        },
+        {
+            "filepath": "C:/Users/victo/Desktop/musica/FIESTA 80/LISTA DEL 40 AL 01/Kapo - UWAIE (Dj Nev Afro House Version).mp3",
+            "name": "AudioItemFile",
+            "nombre": "Kapo - UWAIE (Dj Nev Afro House Version)",
+            "type": "AudioItemFile"
+        }
+    ],
+    "metadata": {
+        "description": "Rdit list",
+        "totalitem": 17
+    }
+}

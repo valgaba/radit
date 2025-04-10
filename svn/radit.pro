@@ -12,6 +12,7 @@ TARGET = radit
 
 SOURCES += \
     core/Clipboard.cpp \
+    core/io.cpp \
     main.cpp \
     mainwindow.cpp \
     widgets/AudioItem.cpp \
@@ -33,6 +34,7 @@ SOURCES += \
 
 HEADERS += \
     core/Clipboard.h \
+    core/io.h \
     mainwindow.h \
     widgets/AudioItem.h \
     widgets/AudioItemFile.h \
@@ -69,9 +71,10 @@ win32 {
 
 
 
+
+
 LIBS += -L$$PWD/../lib/bass \
-        -L$$PWD/../lib/bassenc \
-       # -L$$PWD/../lib/ffmpeg/lib
+        -L$$PWD/../lib/bassenc
 
 
 
@@ -79,8 +82,8 @@ LIBS += -L$$PWD/../lib/bass \
 
 
 INCLUDEPATH += $$PWD/../lib/bass \
-               $$PWD/../lib/bassenc \
-             #  $$PWD/../lib/ffmpeg/include
+               $$PWD/../lib/bassenc
+
 
 
 }
