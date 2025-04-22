@@ -68,23 +68,12 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 win32 {
 
-
-
-
-
-
 LIBS += -L$$PWD/../lib/bass \
         -L$$PWD/../lib/bassenc
 
 
-
-
-
-
 INCLUDEPATH += $$PWD/../lib/bass \
                $$PWD/../lib/bassenc
-
-
 
 }
 
@@ -100,10 +89,10 @@ DESTDIR =     $$PWD/../out/bin
 
 unix {
 
-    LIBS += /usr/lib/libbass.so
+   # LIBS += /usr/lib/libbass.so
            # /usr/lib/libbassenc.so
 
-    INCLUDEPATH = ../lib/bass
+   # INCLUDEPATH = ../lib/bass
                 #  ../lib/bassenc
 
 }

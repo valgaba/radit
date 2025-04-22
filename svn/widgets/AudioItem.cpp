@@ -21,7 +21,7 @@
 
 AudioItem::AudioItem(QWidget *parent): QWidget(parent){
 
-    setMinimumSize(100, 50); // Tamaño mínimo para evitar problemas visuales
+   // setMinimumSize(100, 50); // Tamaño mínimo para evitar problemas visuales
 
 
     // Aceptar operaciones de drag and drop

@@ -49,17 +49,20 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
  this->resize(600, 600);         // Tamaño inicial
 
     layout = new QVBoxLayout;
-    layout->setContentsMargins(5, 5, 5, 5);
+    layout->setContentsMargins(3, 3, 3, 3);
     layout->setAlignment(Qt::AlignTop); // pone los item en la parte alta
-    layout->setSpacing(5); // espacios entre  item dentro del contenedor
+    layout->setSpacing(3); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
     container = new Container;
 
     contents = new QWidget;  // el contenido por defecto del container no nos sirve
+    contents->setProperty("class", "Contentspropertie");
+
+
 
    // contents->setObjectName("Contents"); // para el archivo qss
-    contents->setProperty("class", "Contentspropertie");
+  //  contents->setProperty("class", "Contentspropertie");
 
 
     gridlayout = new QGridLayout;
@@ -117,6 +120,10 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
 
     grupcontainer =new Container; // para los grupos
+  // grupcontainer->setProperty("class", "Contentspropertie");
+   grupcontainer->widget()->setProperty("class", "Contentspropertie");
+
+
 
     ContentsPlayer *contentsplayer = dynamic_cast<ContentsPlayer*>(grupcontainer->widget());
     contentsplayer->setObjectName("grups"); //para qss
@@ -137,7 +144,7 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
      Frame *frame = new Frame;
      QHBoxLayout *downlayout = new QHBoxLayout;
-     downlayout->setContentsMargins(10, 5, 10, 5);
+     downlayout->setContentsMargins(3, 3, 3, 3);
 
 
      btncancel = new Button;

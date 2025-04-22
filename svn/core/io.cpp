@@ -82,7 +82,7 @@ void Io::saveWidgetsToJson(QLayout* layout, const QString& filename){
 void Io::loadWidgetsFromJson(QLayout* layout, const QString& filename) {
     // Limpiar el layout actual (opcional, depende de tu caso de uso)
     QLayoutItem* item;
-    while ((item = layout->takeAt(0)) != nullptr) {  // <<< Corrección aquí
+    while ((item = layout->takeAt(0)) != nullptr) {
         if (item->widget()) {
             delete item->widget();
         }

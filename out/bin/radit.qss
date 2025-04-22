@@ -368,7 +368,6 @@ QScrollBar::sub-page {
 #Contents {                   /* va bien asi */
      
 	  background-color: rgb(40, 32, 32);
-	
 	  
 }
 
@@ -379,7 +378,8 @@ QScrollBar::sub-page {
      
 	background-color: rgb(40, 32, 32);
 	border: 1px solid #333b4f;
-   
+    
+	   
 	
 }
 
@@ -710,15 +710,15 @@ AudioItemFile{
 #FormProperties{
 
 	 background-color: #262c3b;
+	 
+} 
 
+
+
+#FormProperties QWidget.Contentspropertie {
+      background-color: #1e1e1e;
+	
 }
-
-#FormProperties Contents.Contentspropertie{               
-     
-	   background-color:rgb(59, 38, 41);
-	  
-}
-
 
 
 #FormProperties Button.Buttonpropertie{

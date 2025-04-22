@@ -30,13 +30,7 @@
 
 #include "widgets/TabPlayer.h"
 #include "widgets/container.h"
-//#include "widgets/frame.h"
-//#include "widgets/FrameView.h"
-//#include "widgets/Scene.h"
-//#include "widgets/View.h"
-
 #include "widgets/TabAuto.h"
-#include "core/Clipboard.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -60,7 +54,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
 
-     Clipboard &clipboard = Clipboard::instance();
+     //Clipboard &clipboard = Clipboard::instance();
 
 
     this->setWindowTitle("Radit[]");
