@@ -33,7 +33,7 @@
 
 #include "widgets/contents.h"
 #include "widgets/AudioItemFile.h"
-#include "widgets/FormProperties.h"
+#include "widgets/FormPropertiesAudioItem.h".h"
 
 
 Contents::Contents(QWidget *parent):QWidget(parent){
@@ -130,9 +130,9 @@ Contents::Contents(QWidget *parent):QWidget(parent){
 
         if(item){
 
-            FormProperties *formproperties= new FormProperties(this);
-            formproperties->setItembase(item);
-            formproperties->show();
+            FormPropertiesAudioItem *formpropertiesaudioitem= new FormPropertiesAudioItem(this);
+            formpropertiesaudioitem->setItembase(item);
+            formpropertiesaudioitem->show();
         }
 
     });
@@ -223,7 +223,7 @@ Contents::Contents(QWidget *parent):QWidget(parent){
                               clipboard.lista.constFirst()->property("iscut").toBool();
 
         for (QWidget *widget : clipboard.lista) {
-            if (auto *itembase = qobject_cast<AudioItem*>(widget)) {
+            if (auto *itembase = qobject_cast<AudioItemMini*>(widget)) {
                 this->AddItem(itembase->copy());
 
                 // Eliminar widget si fue cortado

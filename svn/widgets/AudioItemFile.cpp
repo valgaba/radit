@@ -15,11 +15,6 @@
    along with radit.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-
-#include <QMouseEvent>
-#include <QDrag>
-#include <QMimeData>
 #include <QDebug>
 #include <QDateTime>
 
@@ -27,50 +22,12 @@
 
 #include "widgets/AudioItemFile.h"
 
-AudioItemFile::AudioItemFile(QWidget *parent):AudioItem(parent){
+AudioItemFile::AudioItemFile(QWidget *parent):AudioItemMini(parent){
 
 
     this->setObjectName("AudioItemFile"); //para qss
     this->setMinimumSize(100,30); // alto del item
 
-
-    layout = new QHBoxLayout;
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0); // espacios entre  item dentro del contenedor
-    this->setLayout(layout);
-
-
-    QString horaActual = QDateTime::currentDateTime().toString("HH:mm:ss");
-
-    hora =     new QLabel(horaActual);
-    nombre =   new QLabel;
-    duracion = new QLabel("00:03:15");
-
-    this->sethour(QDateTime::currentDateTime().time().hour());
-    this->setminute(QDateTime::currentDateTime().time().minute());
-    this->setsecond(QDateTime::currentDateTime().time().second());
-
-
-
-    btnproperties = new Button;
-    btnproperties->SetIcon("GuiTabMenu.svg");
-    btnproperties->setFixedSize(30, 29);  //Tamaño fijo
-
-    btnproperties->setToolTip("Properties");
-
-    // Ajustar el QLabel al tamaño de su texto
-    hora->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    hora->adjustSize();
-    duracion->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    duracion->adjustSize();
-    btnproperties->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    btnproperties->adjustSize();
-
-
-    layout->addWidget(hora);
-    layout->addWidget(nombre);
-    layout->addWidget(duracion);
-    layout->addWidget(btnproperties);
 
 
 }
@@ -87,13 +44,11 @@ AudioItemFile::~AudioItemFile(){}
 AudioItem* AudioItemFile::copy() const  {
 
     AudioItemFile* audioitemfile = new AudioItemFile();
-    audioitemfile->sethour(this->gethour());
-    audioitemfile->setminute(this->getminute());
-    audioitemfile->setsecond(this->getsecond());
 
-    audioitemfile->hora->setText(this->hora->text());
+   /* audioitemfile->hora->setText(this->hora->text());
     audioitemfile->duracion->setText(this->duracion->text());
-    audioitemfile->nombre->setText(this->nombre->text());
+    audioitemfile->nombre->setText(this->nombre->text());*/
+
     audioitemfile->setToolTip(this->toolTip());
 
     return audioitemfile;

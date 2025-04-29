@@ -10,10 +10,10 @@
 #include <QLabel>
 #include <QLineEdit>
 
-#include "widgets/button.h"
+
 #include "widgets/AudioItem.h"
 #include "widgets/container.h"
-
+#include "widgets/frame.h"
 
 class FormProperties : public QDialog {
 
@@ -21,37 +21,25 @@ class FormProperties : public QDialog {
     private:
 
         QVBoxLayout *layout;
-        Button *btncancel;
-        Button *btnaccept;
         AudioItem *itembase;
 
         Container *container;
         QWidget * contents;
-        QGridLayout * gridlayout;
-
-
-        QLabel *namehour;
-        QLineEdit *texthour;
-        QLabel *namefile;
-        QLineEdit *textfile;
-
-        Button *btnfile;
-
-        Container *grupcontainer;
-
-
-
-
+       // QGridLayout * gridlayout;
 
 
 
     public:
+
+        Frame *frame;
+        QHBoxLayout *downlayout;
+        QGridLayout * gridlayout;
+
+
        explicit FormProperties(QWidget *parent = nullptr);
 
       ~ FormProperties();
 
-       void setItembase(AudioItem *itembase);
-       AudioItem* getItembase();
 
 
   protected:

@@ -17,8 +17,12 @@ SOURCES += \
     mainwindow.cpp \
     widgets/AudioItem.cpp \
     widgets/AudioItemFile.cpp \
+    widgets/AudioItemFolder.cpp \
+    widgets/AudioItemMini.cpp \
+    widgets/AudioItemNet.cpp \
     widgets/ContentsPlayer.cpp \
     widgets/FormProperties.cpp \
+    widgets/FormPropertiesAudioItem.cpp \
     widgets/ItemBase.cpp \
     widgets/TabAuto.cpp \
     widgets/TabPlayer.cpp \
@@ -38,9 +42,13 @@ HEADERS += \
     mainwindow.h \
     widgets/AudioItem.h \
     widgets/AudioItemFile.h \
+    widgets/AudioItemFolder.h \
+    widgets/AudioItemMini.h \
+    widgets/AudioItemNet.h \
     widgets/ContentsPlayer.h \
     widgets/DraggableWidget.h \
     widgets/FormProperties.h \
+    widgets/FormPropertiesAudioItem.h \
     widgets/ItemBase.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \

@@ -1,26 +1,15 @@
 #ifndef AUDIOITEMFILE_H
 #define AUDIOITEMFILE_H
 
-
-
-
-
 #include <QHBoxLayout>
 #include <QLabel>
 
-#include "widgets/AudioItem.h"
-#include "widgets/ItemBase.h"
+#include "widgets/AudioItemMini.h"
 #include "widgets/button.h"
 
 
 
-
-
-
-
-
-
-class AudioItemFile: public AudioItem{
+class AudioItemFile: public AudioItemMini{
 
 
     Q_OBJECT
@@ -29,18 +18,13 @@ class AudioItemFile: public AudioItem{
 private:
 
      QHBoxLayout *layout;
-
-
-
      QLabel * duracion;
-
      Button *btnproperties;
 
 public:
 
     QLabel * nombre;
-
-  QLabel * hora;
+    QLabel * hora;
     explicit AudioItemFile(QWidget *parent = 0);
     ~AudioItemFile();
 
@@ -53,7 +37,7 @@ public:
 
     private slots:
 
-   public slots:
+    public slots:
 
 
 

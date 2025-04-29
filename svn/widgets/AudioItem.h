@@ -14,8 +14,6 @@ class AudioItem : public QWidget {
 
 private:
     QPoint dragStartPosition; // Guarda la posición inicial para el arrastre
-    int dayweek;
-    int hour, minute, second;
 
     QString filePath;
     double filesecond;
@@ -26,25 +24,9 @@ public:
     // Constructor
     explicit AudioItem(QWidget *parent = nullptr);
 
-    void setdayweek(int dayweek);
-    void sethour(int hour);
-    void setminute(int minute);
-    void setsecond(int second);
-
-    void setfilePath(QString filePath);
-    void setfilesecond(double filesecond);
 
 
-
-    int getdayweek() const;
-    int gethour() const;
-    int getminute() const;
-    int getsecond() const;
-
-    QString getfilePath() const;
-    double getfilesecond()const ;
-
-    virtual AudioItem* copy() const = 0; // Método virtual puro
+   // virtual AudioItem* copy() const = 0; // Método virtual puro
 
 
 

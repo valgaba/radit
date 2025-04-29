@@ -57,7 +57,7 @@ void Io::saveWidgetsToJson(QLayout* layout, const QString& filename){
 
                   if (AudioItemFile* audioitemfile = qobject_cast<AudioItemFile*>(widget)){
                         widgetObj["nombre"] = audioitemfile->nombre->text();
-                        widgetObj["filepath"] = audioitemfile->getfilePath();
+
                   }
 
                widgetsArray.append(widgetObj);
@@ -130,10 +130,10 @@ void Io::loadWidgetsFromJson(QLayout* layout, const QString& filename) {
 
             // Establecer propiedades específicas
             if (widgetObj.contains("nombre")) {
-                audioItem->nombre->setText(widgetObj["nombre"].toString());
+                //audioItem->nombre->setText(widgetObj["nombre"].toString());
             }
             if (widgetObj.contains("filepath")) {
-                audioItem->setfilePath(widgetObj["filepath"].toString());
+               // audioItem->setfilePath(widgetObj["filepath"].toString());
             }
 
             // Añadir al layout

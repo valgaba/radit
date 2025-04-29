@@ -1,4 +1,4 @@
-/* This file is part of Radit.
+ /* This file is part of Radit.
    Copyright 2022, Victor Algaba <victorengine@gmail.com> www.radit.org
 
    Radit is free software: you can redistribute it and/or modify
@@ -23,35 +23,16 @@
 
 
 #include "widgets/FormProperties.h"
-#include "widgets/frame.h"
-#include "widgets/ContentsPlayer.h"
-
-
 
 
 
 FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
-    this->setObjectName("FormProperties"); //para qss
-
-
-    setWindowFlags(Qt::Window | Qt::WindowCloseButtonHint);
-    //this->setModal(true); // hacerlo modal
-
-    setWindowTitle("Properties");  // nombre ventana
-    // Set the window icon here
-    QIcon windowIcon(":/icons/properties.svg");
-    setWindowIcon(windowIcon);
-
-
-
- this->setMinimumSize(300,300); // alto del item
- this->resize(600, 600);         // Tamaño inicial
 
     layout = new QVBoxLayout;
-    layout->setContentsMargins(3, 3, 3, 3);
+    layout->setContentsMargins(1, 1, 1, 1);
     layout->setAlignment(Qt::AlignTop); // pone los item en la parte alta
-    layout->setSpacing(3); // espacios entre  item dentro del contenedor
+    layout->setSpacing(1); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
     container = new Container;
@@ -73,130 +54,18 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
 
 
-    //************************************************
-
-    namehour = new QLabel("Hora de entrada");
-    namehour->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    namehour->setProperty("class", "Labelpropertie");
-
-
-    texthour = new QLineEdit("13:00:00");
-    texthour->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    texthour->setProperty("class", "LineEditpropertie");
-
-
-    //Definir una expresión regular para el formato HH:MM:SS (24 horas)
-    QRegularExpression regex("^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$");
-    QRegularExpressionValidator *validator = new QRegularExpressionValidator(regex, texthour);
-
-    // Aplicar el validador al QLineEdit
-    texthour->setValidator(validator);
-
-
-
-    gridlayout->addWidget(namehour,0,0 );
-  //  gridlayout->addWidget(textfile,0,1 );
-    gridlayout->addWidget(texthour,0,1 );
-
-
-
-    // file ***********************************
-    namefile = new QLabel("Local file");
-    namefile->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    namefile->setProperty("class", "Labelpropertie");
-
-
-
-    textfile = new QLineEdit("C:/Users/victo/Desktop/musica/FIESTA 80/LISTA");
-    textfile->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    textfile->setProperty("class", "LineEditpropertie");
-
-
-
-    btnfile = new Button;
-    btnfile->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    btnfile->setProperty("class", "Buttonpropertie");
-    btnfile->setText("File");
-
-
-    grupcontainer =new Container; // para los grupos
-  // grupcontainer->setProperty("class", "Contentspropertie");
-   grupcontainer->widget()->setProperty("class", "Contentspropertie");
-
-
-
-    ContentsPlayer *contentsplayer = dynamic_cast<ContentsPlayer*>(grupcontainer->widget());
-    contentsplayer->setObjectName("grups"); //para qss
-
-
-    gridlayout->addWidget(namefile,1,0 );
-    gridlayout->addWidget(textfile,1,1 );
-    gridlayout->addWidget(btnfile,1,2 );
-
-    gridlayout->addWidget(grupcontainer,3,1 );
-
-    layout->addWidget(container);
-
-
-
 
     // =============== parte baja para la botonera
 
-     Frame *frame = new Frame;
-     QHBoxLayout *downlayout = new QHBoxLayout;
-     downlayout->setContentsMargins(3, 3, 3, 3);
+     frame = new Frame;
+     downlayout = new QHBoxLayout;
+     downlayout->setContentsMargins(1, 1, 1, 1);
 
-
-     btncancel = new Button;
-     btncancel->setProperty("class", "Buttonpropertie");
-     btncancel->setText("Cancel");
-
-     btnaccept = new Button;
-     btnaccept->setProperty("class", "Buttonpropertie");
-
-     btnaccept->setText("Accept");
-     QSpacerItem * spacer = new QSpacerItem(40, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum);
-
-     downlayout->addItem(spacer);
-     downlayout->addWidget(btncancel);
-     downlayout->addWidget(btnaccept);
-
-     frame->setLayout(downlayout);
-
-     layout->addWidget(frame);
-
+      frame->setLayout(downlayout);
 
 
 
 }
 
 FormProperties::~FormProperties(){}
-
-
-void FormProperties::setItembase(AudioItem *itembase){
-
-    this->itembase=itembase;
-
-    QString hora = QString("%1:%2:%3")
-                       .arg(itembase->gethour(), 2, 10, QChar('0'))
-                       .arg(itembase->getminute(), 2, 10, QChar('0'))
-                       .arg(itembase->getsecond(), 2, 10, QChar('0'));
-
-    this->texthour->setText(hora);
-
-}
-
-AudioItem* FormProperties::getItembase(){
-
-    return (this->itembase);
-
-}
-
-
-
-
-
-
-
-
 

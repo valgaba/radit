@@ -66,7 +66,7 @@ void ContentsBase::dragEnterEvent(QDragEnterEvent *event){
         QList<QUrl> urls = event->mimeData()->urls();
         if (!urls.isEmpty()) {
             QUrl fileUrl = urls.first(); // Tomamos el primer archivo (podrías expandir para múltiples)
-            QString filePath = fileUrl.toLocalFile();
+          //  QString filePath = fileUrl.toLocalFile();
 
                 event->acceptProposedAction();
             return;
@@ -130,15 +130,17 @@ void ContentsBase::dropEvent(QDropEvent *event){
     if (event->mimeData()->hasFormat("text/uri-list")) {
         QList<QUrl> urls = event->mimeData()->urls();
 
+
              foreach(QUrl url, urls) {
+
                    QString filePath = url.toLocalFile();
                    AudioItemFile *audioItem = new AudioItemFile;
-                   audioItem->setfilePath(filePath);
+
 
                    QFileInfo fileInfo(filePath);
-                   audioItem->nombre->setText(fileInfo.completeBaseName());
+                //  audioItem->nombre->setText(fileInfo.completeBaseName());
+                  audioItem->setNameFile(fileInfo.completeBaseName());
                    audioItem->setToolTip(filePath);
-
 
                  //  this->AddItem(audioItem);
                    layout->addWidget(audioItem);

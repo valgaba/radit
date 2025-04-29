@@ -33,7 +33,7 @@
 
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItemFile.h"
-#include "widgets/FormProperties.h"
+#include "widgets/FormPropertiesAudioItem.h".h"
 #include "core/io.h"
 
 
@@ -134,9 +134,9 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
         AudioItem *audioitem = qobject_cast<AudioItem*>(widget->parentWidget());
 
         if(audioitem){
-            FormProperties *formproperties= new FormProperties(this);
-            formproperties->setItembase(audioitem);
-            formproperties->show();
+            FormPropertiesAudioItem *formpropertiesaudioitem= new FormPropertiesAudioItem(this);
+            formpropertiesaudioitem->setItembase(audioitem);
+            formpropertiesaudioitem->show();
         }
 
     });
@@ -191,7 +191,7 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
                                clipboard.lista.constFirst()->property("iscut").toBool();
 
         for (auto it = clipboard.lista.begin(); it != clipboard.lista.end();) {
-            if (auto *itembase = qobject_cast<AudioItem*>(*it)) {
+            if (auto *itembase = qobject_cast<AudioItemMini*>(*it)) {
                 layout->addWidget(itembase->copy());
 
                 if (isCutOperation && *it) {
