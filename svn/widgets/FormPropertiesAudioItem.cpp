@@ -62,16 +62,7 @@ this->resize(600, 600);         // Tamaño inicial
    //Definir una expresión regular para el formato HH:MM:SS (24 horas)
    QRegularExpression regex("^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$");
    QRegularExpressionValidator *validator = new QRegularExpressionValidator(regex, texthour);
-
-   // Aplicar el validador al QLineEdit
    texthour->setValidator(validator);
-
-
-
-   gridlayout->addWidget(namehour,0,0 );
- //  gridlayout->addWidget(textfile,0,1 );
-   gridlayout->addWidget(texthour,0,1 );
-
 
 
    // file ***********************************
@@ -103,13 +94,15 @@ this->resize(600, 600);         // Tamaño inicial
    contentsplayer->setObjectName("grups"); //para qss
 
 
-   gridlayout->addWidget(namefile,1,0 );
-   gridlayout->addWidget(textfile,1,1 );
-   gridlayout->addWidget(btnfile,1,2 );
 
-   gridlayout->addWidget(grupcontainer,3,1 );
+   this->addTopWidget(namehour,0,0);
+   this->addTopWidget(texthour,0,1 );
+   this->addTopWidget(namefile,1,0);
+   this->addTopWidget(textfile,1,1 );
+   this->addTopWidget(btnfile,1,2 );
+   this->addTopWidget(grupcontainer,3,1 );
 
-   layout->addWidget(container);
+  // layout->addWidget(container);
 
 
 
@@ -121,20 +114,19 @@ this->resize(600, 600);         // Tamaño inicial
     btncancel = new Button;
     btncancel->setProperty("class", "Buttonpropertie");
     btncancel->setText("Cancel");
+    connect(btncancel, &QPushButton::clicked, this, &QDialog::reject); //salir
+
 
     btnaccept = new Button;
     btnaccept->setProperty("class", "Buttonpropertie");
-
     btnaccept->setText("Accept");
-    QSpacerItem * spacer = new QSpacerItem(40, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum);
 
-    downlayout->addItem(spacer);
-    downlayout->addWidget(btncancel);
-    downlayout->addWidget(btnaccept);
+    this->addDownWidget(btncancel);
+    this->addDownWidget(btnaccept);
 
    // frame->setLayout(downlayout);
 
-    layout->addWidget(frame);
+   // layout->addWidget(frame);
 
 
 

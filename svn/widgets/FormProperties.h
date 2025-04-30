@@ -25,16 +25,15 @@ class FormProperties : public QDialog {
 
         Container *container;
         QWidget * contents;
-       // QGridLayout * gridlayout;
+        Frame *frame;
 
-
+        QHBoxLayout *downlayout;
+        QGridLayout * toplayout;
 
     public:
 
-        Frame *frame;
-        QHBoxLayout *downlayout;
-        QGridLayout * gridlayout;
-
+       void addTopWidget(QWidget *widget, int row, int column);
+       void addDownWidget(QWidget *widget);
 
        explicit FormProperties(QWidget *parent = nullptr);
 

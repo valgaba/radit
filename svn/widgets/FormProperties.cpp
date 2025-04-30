@@ -30,27 +30,21 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
 
 
     layout = new QVBoxLayout;
-    layout->setContentsMargins(1, 1, 1, 1);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setAlignment(Qt::AlignTop); // pone los item en la parte alta
-    layout->setSpacing(1); // espacios entre  item dentro del contenedor
+    layout->setSpacing(0); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
     container = new Container;
-
     contents = new QWidget;  // el contenido por defecto del container no nos sirve
     contents->setProperty("class", "Contentspropertie");
 
 
+     toplayout = new QGridLayout; //layout para en contenido
+     toplayout->setAlignment(Qt::AlignTop);
+     contents->setLayout(toplayout);
 
-   // contents->setObjectName("Contents"); // para el archivo qss
-  //  contents->setProperty("class", "Contentspropertie");
-
-
-    gridlayout = new QGridLayout;
-    gridlayout->setAlignment(Qt::AlignTop);
-    contents->setLayout(gridlayout);
-
-    container->setWidget(contents); // añadimos en contenido al container
+     container->setWidget(contents); // añadimos en contenido al container
 
 
 
@@ -58,14 +52,41 @@ FormProperties::FormProperties(QWidget *parent):QDialog(parent){
     // =============== parte baja para la botonera
 
      frame = new Frame;
+     QSpacerItem * spacer = new QSpacerItem(40, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum);
+
      downlayout = new QHBoxLayout;
      downlayout->setContentsMargins(1, 1, 1, 1);
+     downlayout->addItem(spacer);
+     frame->setLayout(downlayout);
 
-      frame->setLayout(downlayout);
 
+
+
+      //añadimos el principal
+      layout->addWidget(container); //parte alta
+      layout->addWidget(frame);     //parte baja
 
 
 }
 
 FormProperties::~FormProperties(){}
+
+
+
+//añadimos widget a las zonas****************************
+void FormProperties::addTopWidget(QWidget *widget, int row, int column){
+     toplayout->addWidget(widget,row,column);
+}
+
+
+void FormProperties::addDownWidget(QWidget *widget){
+    downlayout->addWidget(widget);
+}
+
+
+
+
+
+
+
 
