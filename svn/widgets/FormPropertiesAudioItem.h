@@ -2,10 +2,6 @@
 #define FORMPROPERTIESAUDIOITEM_H
 
 
-
-
-
-
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QGridLayout>

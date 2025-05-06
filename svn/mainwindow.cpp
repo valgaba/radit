@@ -26,11 +26,14 @@
 #include <QDebug>
 #include <QLabel>
 #include <QMenuBar>
+#include <QDesktopServices>
+#include <QUrl>
 
 
 #include "widgets/TabPlayer.h"
 #include "widgets/container.h"
 #include "widgets/TabAuto.h"
+#include "widgets/FormAbout.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -46,7 +49,37 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
        menubar->addMenu("&Archivo");
        menubar->addMenu("&Editar");
        menubar->addMenu("&Herramientas");
-       menubar->addMenu("A&yuda");
+      // menubar->addMenu("A&yuda");
+
+
+       // Crear submenús
+       QMenu *ayudaMenu = menubar->addMenu("A&yuda");
+
+       // Añadir acciones al submenú de ayuda
+       QAction *accionAyuda = new QAction("Ayuda", this);
+       QAction *accionWeb = new QAction("Visita el sitio web", this);
+
+       QAction *accionAcercaDe = new QAction("Acerca de", this);
+
+       ayudaMenu->addAction(accionAyuda);
+       ayudaMenu->addAction(accionWeb);
+       ayudaMenu->addSeparator();
+
+       ayudaMenu->addAction(accionAcercaDe);
+
+
+
+       connect(accionWeb, &QAction::triggered, this, []() {
+           QDesktopServices::openUrl(QUrl("http://www.radit.org"));
+       });
+
+       connect(accionAcercaDe, &QAction::triggered, this, []() {
+           FormAbout *frmabout = new FormAbout;
+           frmabout->show();
+       });
+
+
+
 
         this->setMenuBar(menubar);
 
