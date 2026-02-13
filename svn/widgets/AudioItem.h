@@ -24,11 +24,7 @@ public:
     // Constructor
     explicit AudioItem(QWidget *parent = nullptr);
 
-
-
-   // virtual AudioItem* copy() const = 0; // Método virtual puro
-
-
+     virtual AudioItem* copy() const = 0; // Método virtual puro
 
 
 

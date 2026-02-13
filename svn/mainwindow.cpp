@@ -181,8 +181,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
     splittertop->addWidget(tab);
-
-
     splittertop->addWidget(new TabAuto);
 
 
@@ -191,10 +189,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     QList<int> sizesTop;
     sizesTop << 1 << 1;  // Asigna el mismo peso a ambos widgets
     splittertop->setSizes(sizesTop);
-
-
-
-
 
 
 

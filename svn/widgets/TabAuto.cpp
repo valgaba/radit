@@ -34,8 +34,6 @@ TabAuto::TabAuto(QWidget *parent):Tab(parent){
     setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
 
 
-
-
     TabBar *tabbar=new TabBar(this);
     tabbar->setTabsClosable(false); //evita que se cierre las pestañas
 

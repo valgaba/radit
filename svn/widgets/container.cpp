@@ -28,11 +28,9 @@
 Container::Container(QWidget *parent):QScrollArea(parent){
 
      this->setObjectName("Container"); // para el archivo qss
-
-    this->setWidgetResizable(true); //hace que ocupe todo el dia
-
-    this->setVerticalScrollBar(new ScrollBar); // esta formula de añadir es nueva
-    this->setHorizontalScrollBar(new ScrollBar);
+     this->setWidgetResizable(true); //hace que ocupe todo el dia
+     this->setVerticalScrollBar(new ScrollBar); // esta formula de añadir es nueva
+     this->setHorizontalScrollBar(new ScrollBar);
 
 
     this->setContextMenuPolicy(Qt::NoContextMenu);

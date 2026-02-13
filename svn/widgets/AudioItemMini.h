@@ -27,6 +27,8 @@ public:
      QLabel * duracion;
      Button *btnproperties;
 
+
+
      QLabel * hora;
     explicit AudioItemMini(QWidget *parent = 0);
     ~AudioItemMini();

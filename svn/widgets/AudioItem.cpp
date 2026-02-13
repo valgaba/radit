@@ -62,7 +62,8 @@ void AudioItem::mouseMoveEvent(QMouseEvent *event)
     }
 
     // Ejecutar la operación de arrastre
-    Qt::DropAction dropAction = drag->exec(Qt::MoveAction);
+   // Qt::DropAction dropAction = drag->exec(Qt::MoveAction);
+     drag->exec(Qt::MoveAction);
 }
 
 void AudioItem::dragEnterEvent(QDragEnterEvent *event)

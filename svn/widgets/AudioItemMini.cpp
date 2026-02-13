@@ -26,9 +26,8 @@ AudioItemMini::AudioItemMini(QWidget *parent):AudioItem(parent){
 
 
    this->setObjectName("AudioItemMini"); //para qss
-   //this->setMinimumSize(100,30); // alto del item
-
-
+  // this->setMinimumSize(100,30); // alto del item
+     this->setFixedHeight(30);
    layout = new QHBoxLayout;
    layout->setContentsMargins(0, 0, 0, 0);
    layout->setSpacing(0); // espacios entre  item dentro del contenedor
@@ -46,6 +45,7 @@ AudioItemMini::AudioItemMini(QWidget *parent):AudioItem(parent){
    btnproperties = new Button;
    btnproperties->SetIcon("GuiTabMenu.svg");
    btnproperties->setFixedSize(30, 29);  //Tamaño fijo
+
 
    btnproperties->setToolTip("Properties");
 

@@ -1,15 +1,15 @@
-#ifndef AUDIOITEMFILE_H
-#define AUDIOITEMFILE_H
+#ifndef AUDIOITEMFILEMAXI_H
+#define AUDIOITEMFILEMAXI_H
 
 #include <QHBoxLayout>
 #include <QLabel>
 
-#include "widgets/AudioItemMini.h"
+#include "widgets/AudioItemMaxi.h"
 #include "widgets/button.h"
 
 
 
-class AudioItemFile: public AudioItemMini{
+class AudioItemFileMaxi: public AudioItemMaxi{
 
 
     Q_OBJECT
@@ -25,10 +25,10 @@ public:
 
     QLabel * nombre;
     QLabel * hora;
-    explicit AudioItemFile(QWidget *parent = 0);
-    ~AudioItemFile();
+    explicit AudioItemFileMaxi(QWidget *parent = 0);
+    ~AudioItemFileMaxi();
 
-     AudioItem* copy() const override;  // la virtual
+     AudioItem* copy() const override;  //  virtual
 
 
     protected:
@@ -46,4 +46,6 @@ public:
 
 
 
-#endif // AUDIOITEMFILE_H
+
+
+#endif // AUDIOITEMFILEMAXI_H

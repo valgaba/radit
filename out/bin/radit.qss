@@ -376,7 +376,7 @@ QScrollBar::sub-page {
 
 #Container {                   /* va bien asi */
      
-	background-color: rgb(40, 32, 32);
+	background-color: #282020;
 	border: 1px solid #333b4f;
     
 	   
@@ -707,6 +707,36 @@ AudioItemFile{
 
 
 
+AudioItemFileMini{
+
+
+
+
+}
+
+AudioItemFileMaxi{
+
+
+
+
+}
+
+
+
+
+
+#AudioItemFileMini QLabel {
+    
+    font-size: 20px; 
+   	color: #8a8d96;
+	border: 1px solid #686b74;
+    background-color: #262c3b
+   
+}
+
+
+
+
 #FormProperties{
 
 	 background-color: #262c3b;
@@ -796,6 +826,11 @@ AudioItemFile{
 
 }
 
+#TextEditAbout {
+    background-color: #1e1e1e;
+}
+
+
 
 
 
@@ -814,7 +849,7 @@ QMenu::item:selected {
 	
 }
 QMenu::item {
-	color:rgb(223,219,210);
+	color: #dfdbd2;
 	background-color: transparent;
 	padding-left:20px;
 	padding-top:4px;

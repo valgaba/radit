@@ -32,8 +32,10 @@
 
 
 #include "widgets/ContentsPlayer.h"
-#include "widgets/AudioItemFile.h"
-#include "widgets/FormPropertiesAudioItem.h".h"
+#include "widgets/AudioItem.h"
+#include "widgets/AudioItemFileMini.h"
+#include "widgets/AudioItemFileMaxi.h"
+#include "widgets/FormPropertiesAudioItem.h"
 #include "core/io.h"
 
 
@@ -102,7 +104,10 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     // aciones **************************************
     connect(addAudiofile, &QAction::triggered,this, [this]{
 
-        layout->addWidget(new AudioItemFile);
+       // layout->addWidget(new AudioItemFileMini);
+        layout->addWidget(new AudioItemFileMaxi);
+        layout->addWidget(new AudioItemFileMini);
+
     });
 
 
@@ -143,12 +148,15 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
 
     connect(deleteAction, &QAction::triggered,this, [this]{
-        if (QWidget *widget = childAt(mousePos)) {
-            if (QWidget *parent = widget->parentWidget()) {
-                parent->deleteLater();
-            }
-        }
+        QWidget *widget = childAt(mousePos);
 
+          while (widget && !qobject_cast<AudioItem*>(widget)) {
+              widget = widget->parentWidget();
+          }
+
+          if (widget) {
+              widget->deleteLater();
+          }
     });
 
 
@@ -158,9 +166,16 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
         this->clipboard.lista.clear(); // borramos todo el clipboard
         QWidget *widget = childAt(mousePos);
 
+        while (widget && !qobject_cast<AudioItem*>(widget)) {
+               widget = widget->parentWidget();
+
+           }
+
+
+
         if(widget){
-            widget->parentWidget()->setProperty("iscut", false); // saber si corta o pega
-            this->clipboard.lista.append(widget->parentWidget());
+            widget->setProperty("iscut", false); // saber si corta o pega
+            this->clipboard.lista.append(widget);
         }
 
     });
@@ -171,9 +186,18 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
         this->clipboard.lista.clear(); // borramos todo el clipboard
         QWidget *widget = childAt(mousePos);
 
+        while (widget && !qobject_cast<AudioItem*>(widget)) {
+               widget = widget->parentWidget();
+
+           }
+
+
+
+
+
         if(widget){
-            widget->parentWidget()->setProperty("iscut", true); // para la accion de corte del qwidget
-            this->clipboard.lista.append(widget->parentWidget());
+            widget->setProperty("iscut", true); // para la accion de corte del qwidget
+            this->clipboard.lista.append(widget);
         }
 
     });
@@ -191,8 +215,8 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
                                clipboard.lista.constFirst()->property("iscut").toBool();
 
         for (auto it = clipboard.lista.begin(); it != clipboard.lista.end();) {
-            if (auto *itembase = qobject_cast<AudioItemMini*>(*it)) {
-                layout->addWidget(itembase->copy());
+            if (auto *itembase = qobject_cast<AudioItem*>(*it)) { //polimorfica pega todos los hijos de audioitem
+                layout->addWidget(itembase->copy()); //Copia la copia del objeto
 
                 if (isCutOperation && *it) {
                     (*it)->deleteLater();

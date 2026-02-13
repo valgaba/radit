@@ -24,7 +24,7 @@
 
 
 #include "core/io.h"
-#include "widgets/AudioItemFile.h"
+#include "widgets/AudioItemFileMini.h"
 
 Io::Io(QObject *parent): QObject(parent){
 
@@ -40,9 +40,10 @@ void Io::saveWidgetsToJson(QLayout* layout, const QString& filename){
 
        //  Metadatos
        QJsonObject metadataObj;
-       metadataObj["description"] = "Rdit list";
+       metadataObj["description"] = "Radit list";
        metadataObj["totalitem"] = layout->count();
        rootObj["metadata"] = metadataObj;  // Se guarda en un campo "metadata"
+
 
        //  Lista de widgets
        QJsonArray widgetsArray;
@@ -55,13 +56,20 @@ void Io::saveWidgetsToJson(QLayout* layout, const QString& filename){
                widgetObj["type"] = widget->metaObject()->className();
                widgetObj["name"] = widget->objectName();
 
-                  if (AudioItemFile* audioitemfile = qobject_cast<AudioItemFile*>(widget)){
-                        widgetObj["nombre"] = audioitemfile->nombre->text();
+
+
+                  if (AudioItemFileMini* audioitem = qobject_cast<AudioItemFileMini*>(widget)){
+
+                       // widgetObj["nombre"] = audioitem->nombre->text();
+                          widgetObj["nombre"] = "sasasasasa";
+
 
                   }
 
                widgetsArray.append(widgetObj);
            }
+
+
        }
        rootObj["audioitems"] = widgetsArray;  // Se guarda en un campo "audioitem"
 
@@ -123,9 +131,9 @@ void Io::loadWidgetsFromJson(QLayout* layout, const QString& filename) {
             QString type = widgetObj["type"].toString();
             QString name = widgetObj["name"].toString();
 
-        if (type == "AudioItemFile") {
+        if (type == "AudioItemFileMini") {
             // Crear el widget personalizado AudioItemFile
-            AudioItemFile* audioItem = new AudioItemFile();
+            AudioItemFileMini* audioItem = new AudioItemFileMini;
             audioItem->setObjectName(name);
 
             // Establecer propiedades específicas

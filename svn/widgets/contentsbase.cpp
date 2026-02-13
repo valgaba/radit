@@ -32,7 +32,7 @@
 
 
 #include "widgets/contentsbase.h"
-#include "widgets/AudioItemFile.h"
+#include "widgets/AudioItemFileMini.h"
 
 ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
   // setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
@@ -134,7 +134,7 @@ void ContentsBase::dropEvent(QDropEvent *event){
              foreach(QUrl url, urls) {
 
                    QString filePath = url.toLocalFile();
-                   AudioItemFile *audioItem = new AudioItemFile;
+                   AudioItemFileMini *audioItem = new AudioItemFileMini;
 
 
                    QFileInfo fileInfo(filePath);
@@ -152,12 +152,6 @@ void ContentsBase::dropEvent(QDropEvent *event){
     }
 
 }
-
-
-
-
-
-
 
 
 

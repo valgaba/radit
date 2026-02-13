@@ -13,8 +13,8 @@
 #include "core/Clipboard.h"
 
 
-class ContentsBase: public QWidget
-{
+class ContentsBase: public QWidget{
+
 
     Q_OBJECT
 

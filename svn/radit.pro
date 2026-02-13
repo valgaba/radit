@@ -16,20 +16,19 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     widgets/AudioItem.cpp \
-    widgets/AudioItemFile.cpp \
-    widgets/AudioItemFolder.cpp \
+    widgets/AudioItemFileMaxi.cpp \
+    widgets/AudioItemFileMini.cpp \
+    widgets/AudioItemMaxi.cpp \
     widgets/AudioItemMini.cpp \
     widgets/AudioItemNet.cpp \
     widgets/ContentsPlayer.cpp \
     widgets/FormAbout.cpp \
     widgets/FormProperties.cpp \
     widgets/FormPropertiesAudioItem.cpp \
-    widgets/ItemBase.cpp \
     widgets/TabAuto.cpp \
     widgets/TabPlayer.cpp \
     widgets/button.cpp \
     widgets/container.cpp \
-    widgets/contents.cpp \
     widgets/contentsbase.cpp \
     widgets/frame.cpp \
     widgets/menu.cpp \
@@ -42,8 +41,9 @@ HEADERS += \
     core/io.h \
     mainwindow.h \
     widgets/AudioItem.h \
-    widgets/AudioItemFile.h \
-    widgets/AudioItemFolder.h \
+    widgets/AudioItemFileMaxi.h \
+    widgets/AudioItemFileMini.h \
+    widgets/AudioItemMaxi.h \
     widgets/AudioItemMini.h \
     widgets/AudioItemNet.h \
     widgets/ContentsPlayer.h \
@@ -51,12 +51,10 @@ HEADERS += \
     widgets/FormAbout.h \
     widgets/FormProperties.h \
     widgets/FormPropertiesAudioItem.h \
-    widgets/ItemBase.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \
     widgets/button.h \
     widgets/container.h \
-    widgets/contents.h \
     widgets/contentsbase.h \
     widgets/frame.h \
     widgets/menu.h \
