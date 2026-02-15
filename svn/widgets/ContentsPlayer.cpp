@@ -71,7 +71,7 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     cutAction->setIcon(QIcon(":/icons/ActionCut.svg"));
     copyAction->setIcon(QIcon(":/icons/ActionCopy.svg"));
     pasteAction->setIcon(QIcon(":/icons/ActionPaste.svg"));
-    deleteAction->setIcon(QIcon(":/icons/Remove.svg"));
+    deleteAction->setIcon(QIcon(":/icons/Deletemenu.svg"));
     propertiesAction->setIcon(QIcon(":/icons/properties.svg"));
 
     // Crear el submenú
@@ -104,9 +104,9 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     // aciones **************************************
     connect(addAudiofile, &QAction::triggered,this, [this]{
 
-       // layout->addWidget(new AudioItemFileMini);
+
         layout->addWidget(new AudioItemFileMaxi);
-        layout->addWidget(new AudioItemFileMini);
+
 
     });
 

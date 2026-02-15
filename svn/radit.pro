@@ -31,6 +31,7 @@ SOURCES += \
     widgets/container.cpp \
     widgets/contentsbase.cpp \
     widgets/frame.cpp \
+    widgets/label.cpp \
     widgets/menu.cpp \
     widgets/scrollbar.cpp \
     widgets/tab.cpp \
@@ -51,12 +52,14 @@ HEADERS += \
     widgets/FormAbout.h \
     widgets/FormProperties.h \
     widgets/FormPropertiesAudioItem.h \
+    widgets/FrameColorItemMax.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \
     widgets/button.h \
     widgets/container.h \
     widgets/contentsbase.h \
     widgets/frame.h \
+    widgets/label.h \
     widgets/menu.h \
     widgets/scrollbar.h \
     widgets/tab.h \

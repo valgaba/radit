@@ -398,14 +398,13 @@ AudioItem
 Frame {
 	border: 1px solid #333b4f;
     background-color: #262c3b;
+	
+	
 }
 
 
 
-Button{
-
-/*width: 30px;
-height: 27px;*/
+Button {
 
 border: 1px solid #686b74;
 background-color: #262c3b;
@@ -461,6 +460,8 @@ border-radius: 0px;
 border: 1px solid #686b74;
 color: #8a8d96;
 background: none;
+border: none;
+
 }
 
 Label#labelinfo{

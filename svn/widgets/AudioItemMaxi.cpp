@@ -23,6 +23,7 @@
 
 #include "widgets/AudioItemMaxi.h"
 
+
 AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
@@ -36,19 +37,12 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
    this->setLayout(layout);
 
    // diviedimos en tres partes
-       framecolor = new Frame;
-       framecolor->setFixedHeight(10);
-       framecolor->setFixedWidth(50);
-       framecolor->setFrameShape(QFrame::NoFrame);
-       framecolor->setFrameShadow(QFrame::Plain);
-       framecolor->setStyleSheet("background-color: red;");
-       //framecolor->setVisible(false);
-
-
 
        frametop = new Frame;
        framecenter = new Frame;
        framedown = new Frame;
+
+
 
        //layou de las zonas
        layouttop = new QHBoxLayout;
@@ -56,8 +50,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
        layoutcenter = new QHBoxLayout;
 
 
-      layoutcenterleft = new QHBoxLayout;
-      layoutcenterright = new QHBoxLayout ;
+       layoutcenterleft = new QHBoxLayout;
+       layoutcenterright = new QHBoxLayout ;
 
 
 
@@ -69,6 +63,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
        layoutcenterleft->setContentsMargins(0, 0, 0, 0);
        layoutcenterright->setContentsMargins(0, 0, 0, 0);
        layoutcenterleft->setSpacing(0); // espacios entre  item dentro del contenedor
+       layoutcenterright->setSpacing(0); // espacios entre  item dentro del contenedor
+
 
 
        frametop->setLayout(layouttop);
@@ -84,28 +80,125 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
        framecenterleft->setLayout(layoutcenterleft);
        framecenterright->setLayout(layoutcenterright);
 
+       framecenterleft->setStyleSheet("Frame { border: none;}"); //quitamos bordes de los layou
+       framecenterright->setStyleSheet("Frame { border: none;}");
+
+
        layoutcenter->addWidget(framecenterleft);
        layoutcenter->addWidget(framecenterright,1); // solo se redimensiona este
 
 
-//*****************************
+//****************Botonera parte alta*************
+
+       framecolor = new FrameColorItemMax;
+
+       btnselect = new Button;
+      // btnproperties->SetIcon("GuiTabMenu.svg");
+       btnselect->setFixedSize(30, 29);  //Tamaño fijo
+       btnselect->setToolTip("Select item");
+
 
         btnproperties = new Button;
-        btnproperties->SetIcon("GuiTabMenu.svg");
+        btnproperties->SetIcon("more.svg");
         btnproperties->setFixedSize(30, 29);  //Tamaño fijo
         btnproperties->setToolTip("Properties");
 
+        btndelete = new Button;
+        btndelete->SetIcon("Remove.svg");
+        btndelete->setFixedSize(30, 29);  //Tamaño fijo
+        btndelete->setToolTip("Delete item");
 
-        layouttop->addWidget(framecolor, 0, Qt::AlignTop);
-        layouttop->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum));
+
+        btnloop = new Button;
+        btnloop->SetIcon("Loop.svg");
+        btnloop->setIconSize(QSize(20, 20));   // no termina de gustarme el tamaño del icono por defecto
+        btnloop->setFixedSize(30, 29);  //Tamaño fijo
+        btnloop->setToolTip("Repeat the item indefinitely.");
+
+        btnpurge = new Button;
+        btnpurge->SetIcon("Purge.svg");
+        btnpurge->setIconSize(QSize(20, 20));   // no termina de gustarme el tamaño del icono por defecto
+        btnpurge->setFixedSize(30, 29);  //Tamaño fijo
+        btnpurge->setToolTip("Delete the item once it has been played.");
+
+        btnnext = new Button;
+        btnnext->SetIcon("Next.svg");
+        btnnext->setIconSize(QSize(20, 20));   // no termina de gustarme el tamaño del icono por defecto
+        btnnext->setFixedSize(30, 29);  //Tamaño fijo
+        btnnext->setToolTip("Play the item once the previous one has finished");
+
+
+
+        layouttop->addWidget(framecolor, 0, Qt::AlignTop); //añadimos un color al item
+        layouttop->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum)); //espaciador
+
+        // añadimos botones a la parte alta
+        layouttop->addWidget(btnnext);
+        layouttop->addWidget(btnpurge);
+        layouttop->addWidget(btnloop);
+        layouttop->addWidget(btndelete);
         layouttop->addWidget(btnproperties);
+        layouttop->addWidget(btnselect);
 
 
+
+        // botonera parte centro**********************************
+
+        btnplay = new Button;
+        btnplay->SetIcon("playpause2.svg");
+        btnplay->setIconSize(QSize(50, 60));  // ajusta al tamaño que quieras
+        btnplay->setFixedSize(60, 35);  //Tamaño fijo
+        btnplay->setToolTip("Properties");
+
+
+
+        labelnombre = new Label;
+        labelnombre->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        labelnombre->setText("fichero.....dfdfdfdfdfdfdfdfdfdfdf.....");
+
+        labeltiempo = new Label;
+        labeltiempo->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        labeltiempo->setFixedWidth(100);   // Fija solo el ancho
+        labeltiempo->setText("00:03:12.00");
+
+        labeltiempo->setFixedHeight(35);
+        labelnombre->setFixedHeight(35);
+
+        layoutcenterleft->addWidget(btnplay);
+        layoutcenterright->addWidget(labelnombre);
+        layoutcenterright->addWidget(labeltiempo);
+
+
+
+
+
+
+
+///***************** botonera parte baja ****************
         btnplaycue = new Button;
-        btnplaycue->SetIcon("PlayCue.svg");
+        btnplaycue->SetIcon("playpause.svg");
+        btnplaycue->setIconSize(QSize(35, 35));   // no termina de gustarme el tamaño del icono por defecto
         btnplaycue->setFixedSize(30, 29);  //Tamaño fijo
         btnplaycue->setToolTip("Properties");
+
+
+        btnrewind = new Button;
+        btnrewind->SetIcon("rewind.svg");
+        btnrewind->setFixedSize(30, 29);  //Tamaño fijo
+        btnrewind->setToolTip("Properties");
+
+        btnforward = new Button;
+        btnforward->SetIcon("forward.svg");
+        btnforward->setFixedSize(30, 29);  //Tamaño fijo
+        btnforward->setToolTip("Properties");
+
+
+
         layoutdown->addWidget(btnplaycue);
+        layoutdown->addWidget(btnrewind);
+        layoutdown->addWidget(btnforward);
+
+
         layoutdown->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum));
 
 
@@ -114,14 +207,6 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         });
 
 
-
-
-        btnplay = new Button;
-        btnplay->SetIcon("Play.svg");
-        btnplay->setIconSize(QSize(30, 50));  // ajusta al tamaño que quieras
-        btnplay->setFixedSize(60, 35);  //Tamaño fijo
-        btnplay->setToolTip("Properties");
-        layoutcenterleft->addWidget(btnplay);
 
 
 

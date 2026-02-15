@@ -31,7 +31,7 @@ Label::Label(QWidget *parent):QLabel(parent){
 
     this->setObjectName("Label"); //para qss
     this->setWordWrap(true); //hace el labal miltilinea
-    this->setAlignment(Qt::AlignCenter);
+    //this->setAlignment(Qt::AlignCenter);
     QFont font;
          font.setPointSize(12);
          font.setBold(true);

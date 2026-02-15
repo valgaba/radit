@@ -4,11 +4,13 @@
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QLabel>
+
 
 #include "widgets/frame.h"
 #include "widgets/AudioItem.h"
 #include "widgets/button.h"
+#include "widgets/label.h"
+#include "widgets/FrameColorItemMax.h"
 
 
 
@@ -23,7 +25,7 @@ private:
 
     QVBoxLayout *layout; //general
 
-    Frame *framecolor;
+    FrameColorItemMax *framecolor;
     Frame *frametop;
     Frame *framecenter;
     Frame *framedown;
@@ -42,8 +44,23 @@ private:
 
 
     Button * btnproperties;
-    Button * btnplaycue;
+    Button * btndelete;
+    Button * btnselect;
+    Button * btnloop;
+    Button * btnpurge;
+    Button * btnnext;
+
+
+
     Button * btnplay;
+    Label *labelnombre;
+    Label *labeltiempo;
+
+
+
+    Button * btnplaycue;
+    Button * btnrewind;
+    Button * btnforward;
 
 
 public:

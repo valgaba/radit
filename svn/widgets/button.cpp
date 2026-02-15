@@ -36,7 +36,7 @@ Button::Button(QWidget *parent):QPushButton(parent){
 
 
     this->setCheckable(false);
-    this->setFlat(true);
+   // this->setFlat(true);
     this->setCursor(QCursor(Qt::PointingHandCursor));  //cambiamos el cursor
 
  }
@@ -48,9 +48,10 @@ Button::~Button(){}
 
 void Button::SetIcon(QString file){
     QIcon icon;
-    icon.addFile(":/icons/"+file, QSize(), QIcon::Normal, QIcon::Off);
-    this->setIcon(icon);
 
+   icon.addFile(":/icons/"+file, QSize(), QIcon::Normal, QIcon::Off);
+    this->setIcon(icon);
+    this->setIconSize(QSize(25, 25));   // tamaño del icono
 
 }
 
