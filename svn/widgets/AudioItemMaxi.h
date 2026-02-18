@@ -11,6 +11,7 @@
 #include "widgets/button.h"
 #include "widgets/label.h"
 #include "widgets/FrameColorItemMax.h"
+#include "widgets/slider.h"
 
 
 
@@ -62,6 +63,14 @@ private:
     Button * btnrewind;
     Button * btnforward;
 
+    Slider * slider;
+
+
+     bool m_isPlayNext=false;
+     bool m_isPurge=false;
+     bool m_isLoop=false;
+     bool m_isSelect=false;
+
 
 public:
 
@@ -71,14 +80,89 @@ public:
     explicit AudioItemMaxi(QWidget *parent = 0);
     ~AudioItemMaxi();
 
-   virtual AudioItem* copy() const = 0; // Método virtual puro
+
+     virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
+
+    void setIsPlayNext(bool isPlayNext) {
+           m_isPlayNext = isPlayNext;
+
+           if (btnnext) {
+                   if (m_isPlayNext) {
+                       btnnext->setStyleSheet("background-color: #39385b;");
+                   } else {
+                       btnnext->setStyleSheet("background-color: none; color: black;");
+                   }
+               }
+       }
+
+    bool isPlayNext() const {
+          return m_isPlayNext;
+       }
+
+
+    void setIsPurge(bool isPurge) {
+           m_isPurge = isPurge;
+
+           if (btnpurge) {
+                   if (m_isPurge) {
+                       btnpurge->setStyleSheet("background-color: #39385b;");
+                   } else {
+                       btnpurge->setStyleSheet("background-color: none; color: black;");
+                   }
+               }
+       }
+
+    bool isPurge() const {
+          return m_isPurge;
+       }
+
+
+
+    void setIsLoop(bool isLoop) {
+           m_isLoop = isLoop;
+
+           if (btnloop) {
+                   if (m_isLoop) {
+                       btnloop->setStyleSheet("background-color: #39385b;");
+                   } else {
+                       btnloop->setStyleSheet("background-color: none; color: black;");
+                   }
+               }
+
+
+           // Control de visibilidad
+              if (btnpurge) {
+                  btnpurge->setVisible(!m_isLoop);
+              }
+
+              if (btnnext) {
+                  btnnext->setVisible(!m_isLoop);
+              }
+
+
+
+
+       }
+
+    bool isLoop() const {
+          return m_isLoop;
+       }
+
+
 
     protected:
 
 
     private slots:
+      void onDeleteClicked();   // ← SLOT aquí
+
 
     public slots:
+
+
+    signals:
+      void requestDelete(AudioItemMaxi* item);
+
 
 
 

@@ -28,7 +28,7 @@ public:
     explicit AudioItemFileMaxi(QWidget *parent = 0);
     ~AudioItemFileMaxi();
 
-     AudioItem* copy() const override;  //  virtual
+     AudioItemMaxi* copy(QWidget* newParent) const override;  //  virtual
 
 
     protected:

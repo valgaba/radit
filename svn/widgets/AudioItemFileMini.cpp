@@ -39,9 +39,9 @@ AudioItemFileMini::~AudioItemFileMini(){}
 
 
 //***************** cuando hacemos paste hacemos una copia del objeto
-AudioItem* AudioItemFileMini::copy() const  {
+AudioItemMini* AudioItemFileMini::copy(QWidget* newParent) const  {
 
-   AudioItemFileMini* audioitem = new AudioItemFileMini;
+   AudioItemFileMini* audioitem = new AudioItemFileMini(newParent);
 
   /* audioitem->hora->setText(this->hora->text());
    audioitem->duracion->setText(this->duracion->text());

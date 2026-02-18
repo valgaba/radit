@@ -14,6 +14,7 @@
 #include "widgets/contentsbase.h"
 #include "widgets/menu.h"
 #include "core/Clipboard.h"
+#include "widgets/AudioItemMaxi.h"
 
 
 class ContentsPlayer: public ContentsBase
@@ -36,7 +37,7 @@ private:
 
     bool isCut;  //para las operaciones de cortar pegar
 
-
+    AudioItemMaxi* createItem(AudioItemMaxi* item);
 
 public:
 

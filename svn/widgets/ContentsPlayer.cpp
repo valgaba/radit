@@ -104,8 +104,20 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     // aciones **************************************
     connect(addAudiofile, &QAction::triggered,this, [this]{
 
+        createItem(new AudioItemFileMaxi(this));
 
-        layout->addWidget(new AudioItemFileMaxi);
+      //  layout->addWidget(new AudioItemFileMaxi);
+      /*  AudioItemFileMaxi *item = new AudioItemFileMaxi;
+
+        layout->addWidget(item);
+
+        connect(item, &AudioItemMaxi::requestDelete,  //señal de borrado
+                this, [this](AudioItemMaxi* item)
+        {
+            layout->removeWidget(item);  // quitar del layout
+            item->deleteLater();         // borrar seguro
+        });*/
+
 
 
     });
@@ -172,7 +184,6 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
            }
 
 
-
         if(widget){
             widget->setProperty("iscut", false); // saber si corta o pega
             this->clipboard.lista.append(widget);
@@ -190,9 +201,6 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
                widget = widget->parentWidget();
 
            }
-
-
-
 
 
         if(widget){
@@ -215,8 +223,23 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
                                clipboard.lista.constFirst()->property("iscut").toBool();
 
         for (auto it = clipboard.lista.begin(); it != clipboard.lista.end();) {
-            if (auto *itembase = qobject_cast<AudioItem*>(*it)) { //polimorfica pega todos los hijos de audioitem
-                layout->addWidget(itembase->copy()); //Copia la copia del objeto
+            if (auto *itembase = qobject_cast<AudioItemMaxi*>(*it)) { //polimorfica pega todos los hijos de audioitem
+                AudioItemMaxi* newItem = itembase->copy(this);
+                 createItem(newItem);
+
+               /* AudioItem* newItem = itembase->copy(this);  // crear copia
+                layout->addWidget(newItem);
+
+
+                if (auto maxiItem = qobject_cast<AudioItemMaxi*>(newItem)) {
+
+                    connect(maxiItem, &AudioItemMaxi::requestDelete,
+                            this, [this](AudioItemMaxi* item)
+                    {
+                        layout->removeWidget(item);
+                        item->deleteLater();
+                    });
+                }*/
 
                 if (isCutOperation && *it) {
                     (*it)->deleteLater();
@@ -296,7 +319,22 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 }
 
 
+AudioItemMaxi* ContentsPlayer::createItem(AudioItemMaxi* item){
 
+    layout->addWidget(item);
+
+    connect(item, &AudioItemMaxi::requestDelete,  //señal de borrado
+            this, [this](AudioItemMaxi* item)
+    {
+        layout->removeWidget(item);  // quitar del layout
+        item->deleteLater();         // borrar seguro
+    });
+
+      return item;
+
+
+
+}
 
 ////////////////esto es para el qss **********+
 

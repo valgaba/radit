@@ -32,7 +32,7 @@ public:
     explicit AudioItemNet(QWidget *parent = 0);
     ~AudioItemNet();
 
-     AudioItem* copy() const override;  // la virtual
+    // AudioItem* copy(QWidget* newParent) const override;  // la virtual
 
 
     protected:

@@ -39,15 +39,15 @@ AudioItemFileMaxi::~AudioItemFileMaxi(){}
 
 
 //***************** cuando hacemos paste hacemos una copia del objeto
-AudioItem* AudioItemFileMaxi::copy() const  {
+AudioItemMaxi* AudioItemFileMaxi::copy(QWidget* newParent) const  {
 
-   AudioItemFileMaxi* audioitem = new AudioItemFileMaxi;
+   AudioItemFileMaxi* audioitem = new AudioItemFileMaxi(newParent);
 
-  /* audioitem->hora->setText(this->hora->text());
-   audioitem->duracion->setText(this->duracion->text());
-   audioitem->nombre->setText(this->nombre->text());*/
+      audioitem->setIsLoop(this->isLoop());
+      audioitem->setIsPurge(this->isPurge());
+      audioitem->setIsPlayNext(this->isPlayNext());
 
-   audioitem->setToolTip(this->toolTip());
+      audioitem->setToolTip(this->toolTip());
 
 
    return audioitem;

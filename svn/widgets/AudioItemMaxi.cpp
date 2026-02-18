@@ -128,6 +128,25 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnnext->setToolTip("Play the item once the previous one has finished");
 
 
+        connect(btnnext, &QPushButton::clicked, this, [=](){
+             this->setIsPlayNext(!this->isPlayNext());
+        });
+
+        connect(btnpurge, &QPushButton::clicked, this, [=](){
+             this->setIsPurge(!this->isPurge());
+        });
+
+        connect(btnloop, &QPushButton::clicked, this, [=](){
+             this->setIsLoop(!this->isLoop());
+        });
+
+
+        connect(btndelete, &QPushButton::clicked,
+                this, &AudioItemMaxi::onDeleteClicked);
+
+
+
+
 
         layouttop->addWidget(framecolor, 0, Qt::AlignTop); //añadimos un color al item
         layouttop->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum)); //espaciador
@@ -158,11 +177,18 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         labeltiempo = new Label;
         labeltiempo->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        labeltiempo->setFixedWidth(100);   // Fija solo el ancho
+        labeltiempo->setFixedWidth(125);   // Fija solo el ancho
+        // Cambiar tamaño de fuente
+        QFont font = labeltiempo->font();
+        font.setPointSize(16);
+        font.setBold(true);
+        labeltiempo->setFont(font);
+
+
         labeltiempo->setText("00:03:12.00");
 
-        labeltiempo->setFixedHeight(35);
-        labelnombre->setFixedHeight(35);
+        labeltiempo->setFixedHeight(45);
+        labelnombre->setFixedHeight(45);
 
         layoutcenterleft->addWidget(btnplay);
         layoutcenterright->addWidget(labelnombre);
@@ -193,13 +219,16 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnforward->setToolTip("Properties");
 
 
+         slider = new Slider;
+        // slider->setFixedHeight(29);
+
 
         layoutdown->addWidget(btnplaycue);
         layoutdown->addWidget(btnrewind);
         layoutdown->addWidget(btnforward);
+        layoutdown->addWidget(slider,1);
 
-
-        layoutdown->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum));
+       // layoutdown->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum));
 
 
         connect(btnplaycue, &QPushButton::clicked, this, [=](){
@@ -234,8 +263,11 @@ void AudioItemMaxi::setNameFile(const QString &NameFile) const{
 
 }
 
+//***************************************
+void AudioItemMaxi::onDeleteClicked(){  // pulsamos boton borrar
 
-
+    emit requestDelete(this);  //mandamos señal borrar
+}
 
 
 

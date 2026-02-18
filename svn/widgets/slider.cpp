@@ -33,14 +33,15 @@ Slider::Slider(QWidget *parent):QSlider(parent){
     this->setOrientation(Qt::Horizontal);
     this->setCursor(QCursor(Qt::PointingHandCursor));  //cambiamos el cursor
 
-    this->setMinimumSize(QSize(10, 5));      //minimo que ocupa el itemaudio
-    this->setMaximumSize(QSize(10000, 20)); //maxima que ocupa el itenaudio
+   // this->setMinimumSize(QSize(10, 5));      //minimo que ocupa el itemaudio
+   // this->setMaximumSize(QSize(10000, 20)); //maxima que ocupa el itenaudio
 
 
     QSizePolicy sizePolicy; //para ocupar todo el espacio
-    sizePolicy.setHorizontalStretch(1);
-    this->setSizePolicy(sizePolicy);
+  //  sizePolicy.setHorizontalStretch(1);
+   // this->setSizePolicy(sizePolicy);
 
+    this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     this->setSingleStep(0);  // Desactiva el movimiento con la rueda del ratón
 
 

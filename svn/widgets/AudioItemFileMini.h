@@ -28,7 +28,7 @@ public:
     explicit AudioItemFileMini(QWidget *parent = 0);
     ~AudioItemFileMini();
 
-     AudioItem* copy() const override;  //  virtual opcional viene del padre
+     AudioItemMini* copy(QWidget* newParent) const override;  //  virtual opcional viene del padre
 
 
     protected:

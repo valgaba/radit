@@ -34,6 +34,7 @@ SOURCES += \
     widgets/label.cpp \
     widgets/menu.cpp \
     widgets/scrollbar.cpp \
+    widgets/slider.cpp \
     widgets/tab.cpp \
     widgets/tabbar.cpp
 
@@ -62,6 +63,7 @@ HEADERS += \
     widgets/label.h \
     widgets/menu.h \
     widgets/scrollbar.h \
+    widgets/slider.h \
     widgets/tab.h \
     widgets/tabbar.h
 

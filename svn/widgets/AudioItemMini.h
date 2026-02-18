@@ -33,7 +33,7 @@ public:
     explicit AudioItemMini(QWidget *parent = 0);
     ~AudioItemMini();
 
-    virtual AudioItem* copy() const = 0; // Método virtual puro
+    virtual AudioItemMini* copy(QWidget* newParent) const = 0; // Método virtual puro
 
     protected:
 

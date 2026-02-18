@@ -35,14 +35,14 @@ AudioItemNet::~AudioItemNet(){}
 
 
 //*****************
-AudioItem* AudioItemNet::copy() const  {
+/*AudioItem* AudioItemNet::copy(QWidget* newParent) const  {
 
-   AudioItemNet* audioitemnet = new AudioItemNet();
+   AudioItemNet* audioitemnet = new AudioItemNet(newParent);
 
    audioitemnet->setToolTip(this->toolTip());
 
    return audioitemnet;
-}
+}*/
 
 
 
