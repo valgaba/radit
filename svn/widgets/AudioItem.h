@@ -15,8 +15,8 @@ class AudioItem : public QWidget {
 private:
     QPoint dragStartPosition; // Guarda la posición inicial para el arrastre
 
-    QString filePath;
-    double filesecond;
+    QString m_filePath;
+    double  m_second;
 
 
 
@@ -27,6 +27,14 @@ public:
     // virtual AudioItem* copy(QWidget* newParent) const = 0; // Método virtual puro
 
 
+
+    // --- SETTERS ---
+      void setFilePath(const QString &filePath);
+      void setSecond(double second);
+
+      // --- GETTERS ---
+      QString filePath() const;
+      double second() const;
 
 
 

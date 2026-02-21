@@ -33,7 +33,7 @@
 
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItem.h"
-#include "widgets/AudioItemFileMini.h"
+//#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFileMaxi.h"
 #include "widgets/FormPropertiesAudioItem.h"
 #include "core/io.h"
@@ -105,20 +105,6 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     connect(addAudiofile, &QAction::triggered,this, [this]{
 
         createItem(new AudioItemFileMaxi(this));
-
-      //  layout->addWidget(new AudioItemFileMaxi);
-      /*  AudioItemFileMaxi *item = new AudioItemFileMaxi;
-
-        layout->addWidget(item);
-
-        connect(item, &AudioItemMaxi::requestDelete,  //señal de borrado
-                this, [this](AudioItemMaxi* item)
-        {
-            layout->removeWidget(item);  // quitar del layout
-            item->deleteLater();         // borrar seguro
-        });*/
-
-
 
     });
 
@@ -317,43 +303,4 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
        menu->exec(mapToGlobal(mousePos));
 
 }
-
-
-AudioItemMaxi* ContentsPlayer::createItem(AudioItemMaxi* item){
-
-    layout->addWidget(item);
-
-    connect(item, &AudioItemMaxi::requestDelete,  //señal de borrado
-            this, [this](AudioItemMaxi* item)
-    {
-        layout->removeWidget(item);  // quitar del layout
-        item->deleteLater();         // borrar seguro
-    });
-
-      return item;
-
-
-
-}
-
-////////////////esto es para el qss **********+
-
-/*Como se dice en la referencia de hojas de estilo de Qt,
-aplicar estilos CSS a widgets personalizados heredados de QWidget
-requiere volver a implementar paintEvent() de esa manera:
-En un Qframe no haria falta
-*/
-
-void ContentsPlayer::paintEvent(QPaintEvent *){
-
-    /* QStyleOption opt;
-    opt.initFrom(this);
-    QPainter p(this);
-    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);*/
-
-}
-
-
-
-
 

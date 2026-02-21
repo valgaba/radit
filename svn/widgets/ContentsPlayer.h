@@ -37,7 +37,7 @@ private:
 
     bool isCut;  //para las operaciones de cortar pegar
 
-    AudioItemMaxi* createItem(AudioItemMaxi* item);
+   // AudioItemMaxi* createItem(AudioItemMaxi* item);
 
 public:
 
@@ -49,7 +49,7 @@ public:
 
 
 protected:
-    void paintEvent(QPaintEvent *event) override;
+
     void contextMenuEvent(QContextMenuEvent *event) override;
 
 

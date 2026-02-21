@@ -11,6 +11,7 @@
 
 
 #include "core/Clipboard.h"
+#include "widgets/AudioItemMaxi.h"
 
 
 class ContentsBase: public QWidget{
@@ -36,7 +37,7 @@ public:
     explicit ContentsBase(QWidget *parent = 0);
     ~ContentsBase();
 
-
+    virtual AudioItemMaxi* createItem(AudioItemMaxi* item);
 
 
 protected:
@@ -45,7 +46,7 @@ protected:
     void dropEvent(QDropEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
 
-    void paintEvent(QPaintEvent *event) override;
+
 
 private slots:
 

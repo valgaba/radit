@@ -34,6 +34,7 @@
 #include "widgets/container.h"
 #include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
+#include "bass.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -91,6 +92,8 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
     this->setWindowTitle("Radit[]");
+
+    this->IniAudio();
 
     this->setMinimumSize(200, 200); // si no pongo esto  no se maximiza al pincipio, una puta mierda
    // clipboardlist = new QList<QWidget*>; // crea un objeto grobal para la gestion de un porta papeles
@@ -199,4 +202,74 @@ MainWindow::~MainWindow(){
 
 
 }
+
+//------------------------------------------
+void MainWindow::IniAudio(){
+
+    BASS_DEVICEINFO i;
+    int device = -1;  // default en windows
+
+    //bass configuration
+    BASS_SetConfig(BASS_CONFIG_BUFFER, 5000 );
+    // BASS_SetConfig(BASS_CONFIG_UPDATEPERIOD, 10);
+    BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST,1); // enable playlist processing
+    //BASS_SetConfig(BASS_CONFIG_DEV_DEFAULT,false);
+
+    BASS_Init(device, 44100,0, 0, NULL); // abrimos dispositivo por defecto
+
+
+    // plugin
+
+    //BASS_PluginFree(0);
+    QString basePath = QCoreApplication::applicationDirPath() + "/bassplugin";
+
+    #ifdef _WIN32
+
+
+    QStringList plugins = {
+        "bass_aac.dll",
+        "bassflac.dll",
+        "basswma.dll"
+    };
+
+    for (const QString &plugin : plugins)
+    {
+        QString fullPath = basePath + "/" + plugin;
+        HPLUGIN handle = BASS_PluginLoad(fullPath.toUtf8().constData(), 0);
+
+        if (!handle)
+        {
+            qDebug() << "Error cargando plugin:" << fullPath
+                     << "Error code:" << BASS_ErrorGetCode();
+        }
+        else
+        {
+            qDebug() << "Plugin cargado:" << fullPath;
+        }
+    }
+
+    #endif
+
+
+    #ifdef Q_OS_UNIX
+        BASS_PluginLoad(Path.toLatin1() + "/Plugin/libbass_aac.so",0);
+        BASS_PluginLoad(Path.toLatin1() + "/Plugin/libbassflac.so",0);
+         device=1; // el defaul en linux
+    #endif
+
+
+
+     //****************** Abrimmos dispositivos de audio *****************************
+        for (int c=0;BASS_GetDeviceInfo(c,&i);c++)// device 1 = el primer dispositivo
+        {
+           if (i.flags&BASS_DEVICE_ENABLED){
+
+                // BASS_Init(c, 44100,0, 0, NULL);
+
+              }
+        }
+
+
+}
+
 

@@ -28,7 +28,7 @@ private:
     QSplitter *splittertop;
     QSplitter *splitterdown;
 
-
+    void IniAudio();
 
 
 };

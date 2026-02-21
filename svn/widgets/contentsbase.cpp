@@ -32,7 +32,8 @@
 
 
 #include "widgets/contentsbase.h"
-#include "widgets/AudioItemFileMini.h"
+//#include "widgets/AudioItemFileMini.h"
+#include "widgets/AudioItemFilemaxi.h"
 
 ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
   // setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
@@ -45,7 +46,7 @@ ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
     layout = new QVBoxLayout;
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setAlignment(Qt::AlignTop); // pone los item en la parte alta
-    layout->setSpacing(3); // espacios entre  item dentro del contenedor
+    layout->setSpacing(10); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
 
@@ -108,23 +109,13 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
     if(source) {
 
-       // if(source->parent()!=this){ // es distinto mismo contents
+            if(source->parentWidget() && source->parentWidget()->layout()) {
+                 source->parentWidget()->layout()->removeWidget(source);
+              }
 
-            // Removemos el widget de su layout original esto puede ser inutil
-                if(source->parentWidget() && source->parentWidget()->layout()) {
-                    source->parentWidget()->layout()->removeWidget(source);
-            }
-
-
-                //this->AddItem(source);  //añadimos el muevo elemento
-                 layout->addWidget(source);
-
-       // }
-
-        return;
+            layout->addWidget(source);
+            return;
     }
-
-
 
 
     if (event->mimeData()->hasFormat("text/uri-list")) {
@@ -134,16 +125,14 @@ void ContentsBase::dropEvent(QDropEvent *event){
              foreach(QUrl url, urls) {
 
                    QString filePath = url.toLocalFile();
-                   AudioItemFileMini *audioItem = new AudioItemFileMini;
-
-
+                   AudioItemFileMaxi *audioItem = new AudioItemFileMaxi(this);
                    QFileInfo fileInfo(filePath);
-                //  audioItem->nombre->setText(fileInfo.completeBaseName());
-                  audioItem->setNameFile(fileInfo.completeBaseName());
-                   audioItem->setToolTip(filePath);
 
-                 //  this->AddItem(audioItem);
-                   layout->addWidget(audioItem);
+                   audioItem->setFilePath(filePath);
+                   audioItem->setToolTip(filePath);
+                   audioItem->setNameFile(fileInfo.baseName());
+
+                   createItem(audioItem );
             }
 
         event->acceptProposedAction();
@@ -155,20 +144,16 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
 
 
+AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
+{
+    layout->addWidget(item);
 
-////////////////esto es para el qss **********+
+    connect(item, &AudioItemMaxi::requestDelete,
+            this, [this](AudioItemMaxi* item)
+    {
+        layout->removeWidget(item);
+        item->deleteLater();
+    });
 
-/*Como se dice en la referencia de hojas de estilo de Qt,
-aplicar estilos CSS a widgets personalizados heredados de QWidget
-requiere volver a implementar paintEvent() de esa manera:
-En un Qframe no haria falta
-*/
-
-void ContentsBase::paintEvent(QPaintEvent *){
-
-   /* QStyleOption opt;
-    opt.initFrom(this);
-    QPainter p(this);
-    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);*/
-
+    return item;
 }

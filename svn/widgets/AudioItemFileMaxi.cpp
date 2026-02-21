@@ -27,7 +27,7 @@ AudioItemFileMaxi::AudioItemFileMaxi(QWidget *parent):AudioItemMaxi(parent){
 
    this->setObjectName("AudioItemFileMaxi"); //para qss
   // this->setMinimumSize(100,30); // alto del item
-   this->setNameFile(this->metaObject()->className());
+   //this->setNameFile(this->metaObject()->className());
 }
 
 
@@ -46,8 +46,15 @@ AudioItemMaxi* AudioItemFileMaxi::copy(QWidget* newParent) const  {
       audioitem->setIsLoop(this->isLoop());
       audioitem->setIsPurge(this->isPurge());
       audioitem->setIsPlayNext(this->isPlayNext());
+      audioitem->setIsSelect(this->isSelect());
 
-      audioitem->setToolTip(this->toolTip());
+      audioitem->setNameFile(this->nameFile());
+
+      audioitem->setFilePath(this->filePath());
+      audioitem->setSecond(this->second());
+
+      audioitem->setToolTip(this->filePath());
+
 
 
    return audioitem;

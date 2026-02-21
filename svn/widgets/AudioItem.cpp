@@ -21,9 +21,6 @@
 
 AudioItem::AudioItem(QWidget *parent): QWidget(parent){
 
-   // setMinimumSize(100, 50); // Tamaño mínimo para evitar problemas visuales
-
-
     // Aceptar operaciones de drag and drop
     setAcceptDrops(true);
 }
@@ -108,3 +105,22 @@ void AudioItem::dropEvent(QDropEvent *event)
 
 //***********************************************
 
+void AudioItem::setFilePath(const QString &filePath)
+{
+    m_filePath = filePath;
+}
+
+void AudioItem::setSecond(double second)
+{
+    m_second = second;
+}
+
+QString AudioItem::filePath() const
+{
+    return m_filePath;
+}
+
+double AudioItem::second() const
+{
+    return m_second;
+}

@@ -435,6 +435,12 @@ Button:hover{
 }
 
 
+Button[active="true"] {
+    background-color: #39385b;
+}
+
+
+
 VuMeter{
 border: 1px solid #686b74;
 

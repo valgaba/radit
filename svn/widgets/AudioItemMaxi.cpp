@@ -140,6 +140,12 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
              this->setIsLoop(!this->isLoop());
         });
 
+        connect(btnselect, &QPushButton::clicked, this, [=](){
+             this->setIsSelect(!this->isSelect());
+        });
+
+
+
 
         connect(btndelete, &QPushButton::clicked,
                 this, &AudioItemMaxi::onDeleteClicked);
@@ -258,10 +264,38 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 AudioItemMaxi::~AudioItemMaxi(){}
 
-void AudioItemMaxi::setNameFile(const QString &NameFile) const{
 
 
+
+
+
+//****************************************************
+void AudioItemMaxi::setNameFile(const QString &nombre)
+{
+    m_NameFile=nombre;
+
+    this->labelnombre->setText(nombre);
 }
+
+
+void AudioItemMaxi::setTiempoFile(double segundos)
+{
+    int minutos = static_cast<int>(segundos) / 60;
+    int seg = static_cast<int>(segundos) % 60;
+
+    QString tiempo = QString("%1:%2")
+            .arg(minutos)
+            .arg(seg, 2, 10, QChar('0'));
+
+   this->labeltiempo->setText(tiempo);
+}
+
+
+const QString& AudioItemMaxi::nameFile() const
+{
+    return m_NameFile;
+}
+
 
 //***************************************
 void AudioItemMaxi::onDeleteClicked(){  // pulsamos boton borrar

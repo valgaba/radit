@@ -7,6 +7,12 @@
 *.dll
 *.pdb
 
+
+# Exceptuar carpetas completas específicas
+!bassplugin/
+
+
+
 # Archivos excluidos
 !bass.dll
 !libbass.so

@@ -4,7 +4,7 @@
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-
+#include <QStyle>
 
 #include "widgets/frame.h"
 #include "widgets/AudioItem.h"
@@ -70,11 +70,15 @@ private:
      bool m_isPurge=false;
      bool m_isLoop=false;
      bool m_isSelect=false;
+     QString m_NameFile;
 
 
 public:
 
-    void setNameFile(const QString &NameFile) const;
+    void setNameFile(const QString &NameFile);
+    void setTiempoFile(double segundos);
+
+    const QString& nameFile() const;
 
 
     explicit AudioItemMaxi(QWidget *parent = 0);
@@ -84,15 +88,11 @@ public:
      virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
 
     void setIsPlayNext(bool isPlayNext) {
-           m_isPlayNext = isPlayNext;
+        m_isPlayNext = isPlayNext;
 
-           if (btnnext) {
-                   if (m_isPlayNext) {
-                       btnnext->setStyleSheet("background-color: #39385b;");
-                   } else {
-                       btnnext->setStyleSheet("background-color: none; color: black;");
-                   }
-               }
+            btnnext->setProperty("active", m_isPlayNext);
+            btnnext->style()->polish(btnnext);
+            btnnext->update();
        }
 
     bool isPlayNext() const {
@@ -102,14 +102,9 @@ public:
 
     void setIsPurge(bool isPurge) {
            m_isPurge = isPurge;
-
-           if (btnpurge) {
-                   if (m_isPurge) {
-                       btnpurge->setStyleSheet("background-color: #39385b;");
-                   } else {
-                       btnpurge->setStyleSheet("background-color: none; color: black;");
-                   }
-               }
+           btnpurge->setProperty("active", m_isPurge); //active viene del css
+           btnpurge->style()->polish(btnpurge);
+           btnpurge->update();
        }
 
     bool isPurge() const {
@@ -121,14 +116,9 @@ public:
     void setIsLoop(bool isLoop) {
            m_isLoop = isLoop;
 
-           if (btnloop) {
-                   if (m_isLoop) {
-                       btnloop->setStyleSheet("background-color: #39385b;");
-                   } else {
-                       btnloop->setStyleSheet("background-color: none; color: black;");
-                   }
-               }
-
+           btnloop->setProperty("active", m_isLoop); //active viene del css
+           btnloop->style()->polish(btnloop);
+           btnloop->update();
 
            // Control de visibilidad
               if (btnpurge) {
@@ -147,6 +137,24 @@ public:
     bool isLoop() const {
           return m_isLoop;
        }
+
+
+
+
+    void setIsSelect(bool isSelect) {
+           m_isSelect = isSelect;
+           btnselect->setProperty("active", m_isSelect); //active viene del css
+           btnselect->style()->polish(btnselect);
+           btnselect->update();
+
+       }
+
+    bool isSelect() const {
+          return m_isSelect;
+       }
+
+
+
 
 
 
