@@ -25,6 +25,9 @@ private:
 
     QList<QWidget*>  list;
 
+    double getAudioDurationSecond(const QString &filePath);
+    QString formatTimeHhMmSsDd(double duration);
+
 
 
 

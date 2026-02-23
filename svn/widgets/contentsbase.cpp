@@ -30,10 +30,14 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 
+//#include <QtConcurrent/QtConcurrentMap>
+//#include <QFuture>
+//#include <QFutureWatcher>
 
 #include "widgets/contentsbase.h"
 //#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFilemaxi.h"
+#include "bass.h"
 
 ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
   // setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
@@ -117,20 +121,32 @@ void ContentsBase::dropEvent(QDropEvent *event){
             return;
     }
 
-
-    if (event->mimeData()->hasFormat("text/uri-list")) {
+  //////////// viene del sistema de archivos
+   if (event->mimeData()->hasFormat("text/uri-list")) {
         QList<QUrl> urls = event->mimeData()->urls();
 
 
              foreach(QUrl url, urls) {
 
                    QString filePath = url.toLocalFile();
+
+                   double duration = getAudioDurationSecond(filePath);
+
+                   if (duration <= 0.0) {
+                       qDebug() << "Archivo inválido:" << filePath;
+                       continue; // saltar este archivo
+                   }
+
                    AudioItemFileMaxi *audioItem = new AudioItemFileMaxi(this);
                    QFileInfo fileInfo(filePath);
 
                    audioItem->setFilePath(filePath);
                    audioItem->setToolTip(filePath);
-                   audioItem->setNameFile(fileInfo.baseName());
+                   audioItem->setNameFile(fileInfo.completeBaseName());
+                   audioItem->setSecond(duration);
+                   audioItem->setTiempoFile(duration);
+
+
 
                    createItem(audioItem );
             }
@@ -139,6 +155,9 @@ void ContentsBase::dropEvent(QDropEvent *event){
     } else {
         event->ignore();
     }
+
+
+
 
 }
 
@@ -157,3 +176,62 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
 
     return item;
 }
+
+
+
+double ContentsBase::getAudioDurationSecond(const QString &filePath){
+
+#ifdef Q_OS_WIN
+    HSTREAM stream = BASS_StreamCreateFile(
+        FALSE,
+        filePath.utf16(),
+        0,
+        0,
+        BASS_STREAM_DECODE | BASS_UNICODE
+    );
+#else
+    QByteArray path = filePath.toUtf8();
+
+    HSTREAM stream = BASS_StreamCreateFile(
+        FALSE,
+        path.constData(),
+        0,
+        0,
+        BASS_STREAM_DECODE
+    );
+#endif
+
+    if (!stream) {
+        qDebug() << "BASS error:" << BASS_ErrorGetCode()
+                 << "File:" << filePath;
+        return -1.0;
+    }
+
+    QWORD length = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
+    double seconds = BASS_ChannelBytes2Seconds(stream, length);
+
+    BASS_StreamFree(stream);
+    return seconds;
+}
+
+
+QString ContentsBase::formatTimeHhMmSsDd(double duration){
+
+    if (duration < 0)
+        return "00:00:00.00";
+
+    int hours = static_cast<int>(duration) / 3600;
+    int minutes = (static_cast<int>(duration) % 3600) / 60;
+    int seconds = static_cast<int>(duration) % 60;
+
+    // Centésimas (2 decimales)
+    int centiseconds = static_cast<int>((duration - static_cast<int>(duration)) * 100);
+
+    return QString("%1:%2:%3.%4")
+            .arg(hours, 2, 10, QChar('0'))
+            .arg(minutes, 2, 10, QChar('0'))
+            .arg(seconds, 2, 10, QChar('0'))
+            .arg(centiseconds, 2, 10, QChar('0'));
+}
+
+

@@ -47,12 +47,10 @@ AudioItemMaxi* AudioItemFileMaxi::copy(QWidget* newParent) const  {
       audioitem->setIsPurge(this->isPurge());
       audioitem->setIsPlayNext(this->isPlayNext());
       audioitem->setIsSelect(this->isSelect());
-
       audioitem->setNameFile(this->nameFile());
-
+      audioitem->setTiempoFile(this->second());
       audioitem->setFilePath(this->filePath());
       audioitem->setSecond(this->second());
-
       audioitem->setToolTip(this->filePath());
 
 

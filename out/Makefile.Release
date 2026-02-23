@@ -13,13 +13,13 @@ EQ            = =
 
 CC            = gcc
 CXX           = g++
-DEFINES       = -DUNICODE -D_UNICODE -DWIN32 -DMINGW_HAS_SECURE_API=1 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -DQT_NEEDS_QMAIN
+DEFINES       = -DUNICODE -D_UNICODE -DWIN32 -DMINGW_HAS_SECURE_API=1 -DQT_NO_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_NEEDS_QMAIN
 CFLAGS        = -fno-keep-inline-dllexport -march=nocona -msahf -mtune=generic -Wa,-mbig-obj -O2 -Wall -Wextra -Wextra $(DEFINES)
 CXXFLAGS      = -fno-keep-inline-dllexport -march=nocona -msahf -mtune=generic -Wa,-mbig-obj -O2 -std=gnu++1z -Wall -Wextra -Wextra -fexceptions -mthreads $(DEFINES)
-INCPATH       = -I../svn -I. -I../lib/bass -I../lib/bassenc -I../../../../mingw64/include/qt6 -I../../../../mingw64/include/qt6/QtWidgets -I../../../../mingw64/include/qt6/QtGui -I../../../../mingw64/include/qt6/QtCore -Irelease -I/include -I../../../../mingw64/share/qt6/mkspecs/win32-g++ 
+INCPATH       = -I../svn -I. -I../lib/bass -I../../../../mingw64/include/qt6 -I../../../../mingw64/include/qt6/QtWidgets -I../../../../mingw64/include/qt6/QtGui -I../../../../mingw64/include/qt6/QtConcurrent -I../../../../mingw64/include/qt6/QtCore -Irelease -I/include -I../../../../mingw64/share/qt6/mkspecs/win32-g++ 
 LINKER      =        g++
 LFLAGS        =        -Wl,-s -Wl,-subsystem,windows -mthreads
-LIBS        =        -LC:/msys64/home/victo/radit/lib/bass -LC:/msys64/home/victo/radit/lib/bassenc C:/msys64/mingw64/lib/libQt6Widgets.dll.a C:/msys64/mingw64/lib/libQt6Gui.dll.a C:/msys64/mingw64/lib/libQt6Core.dll.a -lmingw32 C:/msys64/mingw64/lib/libQt6EntryPoint.a -lshell32  
+LIBS        =        ../lib/bass/bass.lib C:/msys64/mingw64/lib/libQt6Widgets.dll.a C:/msys64/mingw64/lib/libQt6Gui.dll.a C:/msys64/mingw64/lib/libQt6Concurrent.dll.a C:/msys64/mingw64/lib/libQt6Core.dll.a -lmingw32 C:/msys64/mingw64/lib/libQt6EntryPoint.a -lshell32  
 QMAKE         = C:/msys64/mingw64/bin/qmake6.exe
 DEL_FILE      = rm -f
 CHK_DIR_EXISTS= test -d
@@ -211,7 +211,7 @@ DESTDIR_TARGET = bin/radit.exe
 first: all
 all: Makefile.Release  bin/radit.exe
 
-bin/radit.exe: C:/msys64/mingw64/lib/libQt6Widgets.dll.a C:/msys64/mingw64/lib/libQt6Gui.dll.a C:/msys64/mingw64/lib/libQt6Core.dll.a C:/msys64/mingw64/lib/libQt6EntryPoint.a $(OBJECTS) release/radit_res.o
+bin/radit.exe: C:/msys64/mingw64/lib/libQt6Widgets.dll.a C:/msys64/mingw64/lib/libQt6Gui.dll.a C:/msys64/mingw64/lib/libQt6Concurrent.dll.a C:/msys64/mingw64/lib/libQt6Core.dll.a C:/msys64/mingw64/lib/libQt6EntryPoint.a $(OBJECTS) release/radit_res.o
 	$(LINKER) $(LFLAGS) -o $(DESTDIR_TARGET) @release/object_script.radit.Release $(LIBS)
 
 release/radit_res.o: ../svn/radit.rc
@@ -514,7 +514,7 @@ release/moc_Clipboard.cpp: ../svn/core/Clipboard.h \
 		../../../../mingw64/include/qt6/QtCore/QDebug \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/core/Clipboard.h -o release/moc_Clipboard.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/core/Clipboard.h -o release/moc_Clipboard.cpp
 
 release/moc_io.cpp: ../svn/core/io.h \
 		../../../../mingw64/include/qt6/QtCore/QObject \
@@ -722,7 +722,7 @@ release/moc_io.cpp: ../svn/core/io.h \
 		../../../../mingw64/include/qt6/QtWidgets/qgridlayout.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/core/io.h -o release/moc_io.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/core/io.h -o release/moc_io.cpp
 
 release/moc_mainwindow.cpp: ../svn/mainwindow.h \
 		../../../../mingw64/include/qt6/QtWidgets/QMainWindow \
@@ -930,7 +930,7 @@ release/moc_mainwindow.cpp: ../svn/mainwindow.h \
 		../../../../mingw64/include/qt6/QtWidgets/qframe.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/mainwindow.h -o release/moc_mainwindow.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/mainwindow.h -o release/moc_mainwindow.cpp
 
 release/moc_AudioItem.cpp: ../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QWidget \
@@ -1148,7 +1148,7 @@ release/moc_AudioItem.cpp: ../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtCore/qmimedata.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItem.h -o release/moc_AudioItem.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItem.h -o release/moc_AudioItem.cpp
 
 release/moc_AudioItemFileMaxi.cpp: ../svn/widgets/AudioItemFileMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
@@ -1360,6 +1360,8 @@ release/moc_AudioItemFileMaxi.cpp: ../svn/widgets/AudioItemFileMaxi.h \
 		../../../../mingw64/include/qt6/QtGui/qtextdocument.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QVBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
 		../svn/widgets/AudioItem.h \
@@ -1385,7 +1387,7 @@ release/moc_AudioItemFileMaxi.cpp: ../svn/widgets/AudioItemFileMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemFileMaxi.h -o release/moc_AudioItemFileMaxi.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemFileMaxi.h -o release/moc_AudioItemFileMaxi.cpp
 
 release/moc_AudioItemFileMini.cpp: ../svn/widgets/AudioItemFileMini.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
@@ -1610,7 +1612,7 @@ release/moc_AudioItemFileMini.cpp: ../svn/widgets/AudioItemFileMini.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemFileMini.h -o release/moc_AudioItemFileMini.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemFileMini.h -o release/moc_AudioItemFileMini.cpp
 
 release/moc_AudioItemMaxi.cpp: ../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QVBoxLayout \
@@ -1816,6 +1818,8 @@ release/moc_AudioItemMaxi.cpp: ../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtCore/qlocale.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
 		../../../../mingw64/include/qt6/QtWidgets/qframe.h \
@@ -1846,7 +1850,7 @@ release/moc_AudioItemMaxi.cpp: ../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemMaxi.h -o release/moc_AudioItemMaxi.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemMaxi.h -o release/moc_AudioItemMaxi.cpp
 
 release/moc_AudioItemMini.cpp: ../svn/widgets/AudioItemMini.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
@@ -2070,7 +2074,7 @@ release/moc_AudioItemMini.cpp: ../svn/widgets/AudioItemMini.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemMini.h -o release/moc_AudioItemMini.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemMini.h -o release/moc_AudioItemMini.cpp
 
 release/moc_AudioItemNet.cpp: ../svn/widgets/AudioItemNet.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
@@ -2295,7 +2299,7 @@ release/moc_AudioItemNet.cpp: ../svn/widgets/AudioItemNet.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemNet.h -o release/moc_AudioItemNet.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/AudioItemNet.h -o release/moc_AudioItemNet.cpp
 
 release/moc_ContentsPlayer.cpp: ../svn/widgets/ContentsPlayer.h \
 		../../../../mingw64/include/qt6/QtWidgets/QWidget \
@@ -2506,11 +2510,10 @@ release/moc_ContentsPlayer.cpp: ../svn/widgets/ContentsPlayer.h \
 		../../../../mingw64/include/qt6/QtCore/QDebug \
 		../svn/widgets/contentsbase.h \
 		../svn/core/Clipboard.h \
-		../svn/widgets/menu.h \
-		../../../../mingw64/include/qt6/QtWidgets/QMenu \
-		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QLabel \
@@ -2536,9 +2539,12 @@ release/moc_ContentsPlayer.cpp: ../svn/widgets/ContentsPlayer.h \
 		../../../../mingw64/include/qt6/QtWidgets/QSlider \
 		../../../../mingw64/include/qt6/QtWidgets/qslider.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
+		../svn/widgets/menu.h \
+		../../../../mingw64/include/qt6/QtWidgets/QMenu \
+		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/ContentsPlayer.h -o release/moc_ContentsPlayer.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/ContentsPlayer.h -o release/moc_ContentsPlayer.cpp
 
 release/moc_TabAuto.cpp: ../svn/widgets/TabAuto.h \
 		../svn/widgets/tab.h \
@@ -2743,7 +2749,7 @@ release/moc_TabAuto.cpp: ../svn/widgets/TabAuto.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/TabAuto.h -o release/moc_TabAuto.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/TabAuto.h -o release/moc_TabAuto.cpp
 
 release/moc_TabPlayer.cpp: ../svn/widgets/TabPlayer.h \
 		../svn/widgets/tab.h \
@@ -2951,7 +2957,7 @@ release/moc_TabPlayer.cpp: ../svn/widgets/TabPlayer.h \
 		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/TabPlayer.h -o release/moc_TabPlayer.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/TabPlayer.h -o release/moc_TabPlayer.cpp
 
 release/moc_button.cpp: ../svn/widgets/button.h \
 		../../../../mingw64/include/qt6/QtWidgets/QPushButton \
@@ -3156,7 +3162,7 @@ release/moc_button.cpp: ../svn/widgets/button.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/button.h -o release/moc_button.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/button.h -o release/moc_button.cpp
 
 release/moc_container.cpp: ../svn/widgets/container.h \
 		../../../../mingw64/include/qt6/QtWidgets/QScrollArea \
@@ -3368,7 +3374,7 @@ release/moc_container.cpp: ../svn/widgets/container.h \
 		../../../../mingw64/include/qt6/QtWidgets/qgridlayout.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/container.h -o release/moc_container.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/container.h -o release/moc_container.cpp
 
 release/moc_contentsbase.cpp: ../svn/widgets/contentsbase.h \
 		../../../../mingw64/include/qt6/QtWidgets/QWidget \
@@ -3576,9 +3582,40 @@ release/moc_contentsbase.cpp: ../svn/widgets/contentsbase.h \
 		../../../../mingw64/include/qt6/QtWidgets/qgridlayout.h \
 		../../../../mingw64/include/qt6/QtCore/QDebug \
 		../svn/core/Clipboard.h \
+		../svn/widgets/AudioItemMaxi.h \
+		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
+		../svn/widgets/frame.h \
+		../../../../mingw64/include/qt6/QtWidgets/QFrame \
+		../../../../mingw64/include/qt6/QtWidgets/qframe.h \
+		../svn/widgets/AudioItem.h \
+		../../../../mingw64/include/qt6/QtWidgets/QLabel \
+		../../../../mingw64/include/qt6/QtWidgets/qlabel.h \
+		../../../../mingw64/include/qt6/QtGui/qpicture.h \
+		../../../../mingw64/include/qt6/QtGui/qtextdocument.h \
+		../../../../mingw64/include/qt6/QtGui/QMouseEvent \
+		../../../../mingw64/include/qt6/QtGui/QDrag \
+		../../../../mingw64/include/qt6/QtGui/qdrag.h \
+		../../../../mingw64/include/qt6/QtCore/QMimeData \
+		../../../../mingw64/include/qt6/QtCore/qmimedata.h \
+		../svn/widgets/button.h \
+		../../../../mingw64/include/qt6/QtWidgets/QPushButton \
+		../../../../mingw64/include/qt6/QtWidgets/qpushbutton.h \
+		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h \
+		../svn/widgets/label.h \
+		../svn/widgets/FrameColorItemMax.h \
+		../../../../mingw64/include/qt6/QtGui/QPainter \
+		../../../../mingw64/include/qt6/QtGui/qpainter.h \
+		../../../../mingw64/include/qt6/QtGui/qtextoption.h \
+		../../../../mingw64/include/qt6/QtGui/qpen.h \
+		../svn/widgets/slider.h \
+		../../../../mingw64/include/qt6/QtWidgets/QSlider \
+		../../../../mingw64/include/qt6/QtWidgets/qslider.h \
+		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/contentsbase.h -o release/moc_contentsbase.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/contentsbase.h -o release/moc_contentsbase.cpp
 
 release/moc_frame.cpp: ../svn/widgets/frame.h \
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
@@ -3782,7 +3819,7 @@ release/moc_frame.cpp: ../svn/widgets/frame.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/frame.h -o release/moc_frame.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/frame.h -o release/moc_frame.cpp
 
 release/moc_label.cpp: ../svn/widgets/label.h \
 		../../../../mingw64/include/qt6/QtWidgets/QLabel \
@@ -3989,7 +4026,7 @@ release/moc_label.cpp: ../svn/widgets/label.h \
 		../../../../mingw64/include/qt6/QtGui/qtextdocument.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/label.h -o release/moc_label.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/label.h -o release/moc_label.cpp
 
 release/moc_menu.cpp: ../svn/widgets/menu.h \
 		../../../../mingw64/include/qt6/QtWidgets/QMenu \
@@ -4193,7 +4230,7 @@ release/moc_menu.cpp: ../svn/widgets/menu.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/menu.h -o release/moc_menu.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/menu.h -o release/moc_menu.cpp
 
 release/moc_scrollbar.cpp: ../svn/widgets/scrollbar.h \
 		../../../../mingw64/include/qt6/QtWidgets/QScrollBar \
@@ -4398,7 +4435,7 @@ release/moc_scrollbar.cpp: ../svn/widgets/scrollbar.h \
 		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/scrollbar.h -o release/moc_scrollbar.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/scrollbar.h -o release/moc_scrollbar.cpp
 
 release/moc_slider.cpp: ../svn/widgets/slider.h \
 		../../../../mingw64/include/qt6/QtWidgets/QSlider \
@@ -4603,7 +4640,7 @@ release/moc_slider.cpp: ../svn/widgets/slider.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/slider.h -o release/moc_slider.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/slider.h -o release/moc_slider.cpp
 
 release/moc_tab.cpp: ../svn/widgets/tab.h \
 		../../../../mingw64/include/qt6/QtWidgets/QTabWidget \
@@ -4807,7 +4844,7 @@ release/moc_tab.cpp: ../svn/widgets/tab.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/tab.h -o release/moc_tab.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/tab.h -o release/moc_tab.cpp
 
 release/moc_tabbar.cpp: ../svn/widgets/tabbar.h \
 		../../../../mingw64/include/qt6/QtWidgets/QTabBar \
@@ -5011,7 +5048,7 @@ release/moc_tabbar.cpp: ../svn/widgets/tabbar.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		release/moc_predefs.h \
 		../../../../mingw64/share/qt6/bin/moc.exe
-	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/home/victo/radit/lib/bassenc -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/tabbar.h -o release/moc_tabbar.cpp
+	'C:\msys64\mingw64\share\qt6\bin\moc.exe' $(DEFINES) --include C:/msys64/home/victo/radit/out/release/moc_predefs.h -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -IC:/msys64/home/victo/radit/svn -IC:/msys64/home/victo/radit/lib/bass -IC:/msys64/mingw64/include/qt6 -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6/QtGui -IC:/msys64/mingw64/include/qt6/QtConcurrent -IC:/msys64/mingw64/include/qt6/QtCore -I. -IC:/msys64/mingw64/include/c++/14.2.0 -IC:/msys64/mingw64/include/c++/14.2.0/x86_64-w64-mingw32 -IC:/msys64/mingw64/include/c++/14.2.0/backward -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include -IC:/msys64/mingw64/include -IC:/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0/include-fixed ../svn/widgets/tabbar.h -o release/moc_tabbar.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -5947,7 +5984,8 @@ release/mainwindow.o: ../svn/mainwindow.cpp ../svn/mainwindow.h \
 		../svn/widgets/button.h \
 		../../../../mingw64/include/qt6/QtWidgets/QPushButton \
 		../../../../mingw64/include/qt6/QtWidgets/qpushbutton.h \
-		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h
+		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h \
+		../lib/bass/bass.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release/mainwindow.o ../svn/mainwindow.cpp
 
 release/AudioItem.o: ../svn/widgets/AudioItem.cpp ../../../../mingw64/include/qt6/QtWidgets/QApplication \
@@ -6382,6 +6420,8 @@ release/AudioItemFileMaxi.o: ../svn/widgets/AudioItemFileMaxi.cpp ../../../../mi
 		../../../../mingw64/include/qt6/QtGui/qtextdocument.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QVBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
 		../svn/widgets/AudioItem.h \
@@ -6843,6 +6883,8 @@ release/AudioItemMaxi.o: ../svn/widgets/AudioItemMaxi.cpp ../../../../mingw64/in
 		../../../../mingw64/include/qt6/QtGui/qinputmethod.h \
 		../../../../mingw64/include/qt6/QtGui/qguiapplication_platform.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
 		../../../../mingw64/include/qt6/QtWidgets/qframe.h \
@@ -7571,11 +7613,9 @@ release/ContentsPlayer.o: ../svn/widgets/ContentsPlayer.cpp ../../../../mingw64/
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
 		../svn/widgets/contentsbase.h \
 		../svn/core/Clipboard.h \
-		../svn/widgets/menu.h \
-		../../../../mingw64/include/qt6/QtWidgets/QMenu \
-		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
 		../svn/widgets/frame.h \
 		../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QLabel \
@@ -7591,8 +7631,9 @@ release/ContentsPlayer.o: ../svn/widgets/ContentsPlayer.cpp ../../../../mingw64/
 		../svn/widgets/FrameColorItemMax.h \
 		../svn/widgets/slider.h \
 		../../../../mingw64/include/qt6/QtWidgets/QSlider \
-		../svn/widgets/AudioItemFileMini.h \
-		../svn/widgets/AudioItemMini.h \
+		../svn/widgets/menu.h \
+		../../../../mingw64/include/qt6/QtWidgets/QMenu \
+		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		../svn/widgets/AudioItemFileMaxi.h \
 		../svn/widgets/FormPropertiesAudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QGridLayout \
@@ -8344,11 +8385,10 @@ release/FormPropertiesAudioItem.o: ../svn/widgets/FormPropertiesAudioItem.cpp ..
 		../svn/widgets/ContentsPlayer.h \
 		../svn/widgets/contentsbase.h \
 		../svn/core/Clipboard.h \
-		../svn/widgets/menu.h \
-		../../../../mingw64/include/qt6/QtWidgets/QMenu \
-		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/label.h \
 		../svn/widgets/FrameColorItemMax.h \
 		../../../../mingw64/include/qt6/QtGui/QPainter \
@@ -8356,7 +8396,10 @@ release/FormPropertiesAudioItem.o: ../svn/widgets/FormPropertiesAudioItem.cpp ..
 		../svn/widgets/slider.h \
 		../../../../mingw64/include/qt6/QtWidgets/QSlider \
 		../../../../mingw64/include/qt6/QtWidgets/qslider.h \
-		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h
+		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
+		../svn/widgets/menu.h \
+		../../../../mingw64/include/qt6/QtWidgets/QMenu \
+		../../../../mingw64/include/qt6/QtWidgets/qmenu.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release/FormPropertiesAudioItem.o ../svn/widgets/FormPropertiesAudioItem.cpp
 
 release/TabAuto.o: ../svn/widgets/TabAuto.cpp ../../../../mingw64/include/qt6/QtCore/QDebug \
@@ -8579,11 +8622,10 @@ release/TabAuto.o: ../svn/widgets/TabAuto.cpp ../../../../mingw64/include/qt6/Qt
 		../../../../mingw64/include/qt6/QtWidgets/QFrame \
 		../svn/widgets/contentsbase.h \
 		../svn/core/Clipboard.h \
-		../svn/widgets/menu.h \
-		../../../../mingw64/include/qt6/QtWidgets/QMenu \
-		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QLabel \
@@ -8608,7 +8650,10 @@ release/TabAuto.o: ../svn/widgets/TabAuto.cpp ../../../../mingw64/include/qt6/Qt
 		../svn/widgets/slider.h \
 		../../../../mingw64/include/qt6/QtWidgets/QSlider \
 		../../../../mingw64/include/qt6/QtWidgets/qslider.h \
-		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h
+		../../../../mingw64/include/qt6/QtWidgets/qabstractslider.h \
+		../svn/widgets/menu.h \
+		../../../../mingw64/include/qt6/QtWidgets/QMenu \
+		../../../../mingw64/include/qt6/QtWidgets/qmenu.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release/TabAuto.o ../svn/widgets/TabAuto.cpp
 
 release/TabPlayer.o: ../svn/widgets/TabPlayer.cpp ../../../../mingw64/include/qt6/QtCore/QDebug \
@@ -9247,11 +9292,10 @@ release/container.o: ../svn/widgets/container.cpp ../../../../mingw64/include/qt
 		../../../../mingw64/include/qt6/QtCore/QDebug \
 		../svn/widgets/contentsbase.h \
 		../svn/core/Clipboard.h \
-		../svn/widgets/menu.h \
-		../../../../mingw64/include/qt6/QtWidgets/QMenu \
-		../../../../mingw64/include/qt6/QtWidgets/qmenu.h \
 		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../../../../mingw64/include/qt6/QtWidgets/qstyle.h \
 		../svn/widgets/frame.h \
 		../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QLabel \
@@ -9272,7 +9316,10 @@ release/container.o: ../svn/widgets/container.cpp ../../../../mingw64/include/qt
 		../../../../mingw64/include/qt6/QtGui/qpen.h \
 		../svn/widgets/slider.h \
 		../../../../mingw64/include/qt6/QtWidgets/QSlider \
-		../../../../mingw64/include/qt6/QtWidgets/qslider.h
+		../../../../mingw64/include/qt6/QtWidgets/qslider.h \
+		../svn/widgets/menu.h \
+		../../../../mingw64/include/qt6/QtWidgets/QMenu \
+		../../../../mingw64/include/qt6/QtWidgets/qmenu.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release/container.o ../svn/widgets/container.cpp
 
 release/contentsbase.o: ../svn/widgets/contentsbase.cpp ../../../../mingw64/include/qt6/QtGui/QDrag \
@@ -9518,19 +9565,27 @@ release/contentsbase.o: ../svn/widgets/contentsbase.cpp ../../../../mingw64/incl
 		../../../../mingw64/include/qt6/QtWidgets/qlayout.h \
 		../../../../mingw64/include/qt6/QtWidgets/qgridlayout.h \
 		../svn/core/Clipboard.h \
-		../svn/widgets/AudioItemFileMini.h \
+		../svn/widgets/AudioItemMaxi.h \
 		../../../../mingw64/include/qt6/QtWidgets/QHBoxLayout \
+		../../../../mingw64/include/qt6/QtWidgets/QStyle \
+		../svn/widgets/frame.h \
+		../../../../mingw64/include/qt6/QtWidgets/QFrame \
+		../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtWidgets/QLabel \
 		../../../../mingw64/include/qt6/QtWidgets/qlabel.h \
 		../../../../mingw64/include/qt6/QtGui/qpicture.h \
 		../../../../mingw64/include/qt6/QtGui/qtextdocument.h \
-		../svn/widgets/AudioItemMini.h \
-		../svn/widgets/AudioItem.h \
 		../../../../mingw64/include/qt6/QtGui/QMouseEvent \
 		../svn/widgets/button.h \
 		../../../../mingw64/include/qt6/QtWidgets/QPushButton \
 		../../../../mingw64/include/qt6/QtWidgets/qpushbutton.h \
-		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h
+		../../../../mingw64/include/qt6/QtWidgets/qabstractbutton.h \
+		../svn/widgets/label.h \
+		../svn/widgets/FrameColorItemMax.h \
+		../svn/widgets/slider.h \
+		../../../../mingw64/include/qt6/QtWidgets/QSlider \
+		../svn/widgets/AudioItemFilemaxi.h \
+		../lib/bass/bass.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release/contentsbase.o ../svn/widgets/contentsbase.cpp
 
 release/frame.o: ../svn/widgets/frame.cpp ../../../../mingw64/include/qt6/QtCore/QDebug \

@@ -278,16 +278,28 @@ void AudioItemMaxi::setNameFile(const QString &nombre)
 }
 
 
-void AudioItemMaxi::setTiempoFile(double segundos)
-{
-    int minutos = static_cast<int>(segundos) / 60;
-    int seg = static_cast<int>(segundos) % 60;
+void AudioItemMaxi::setTiempoFile(double segundos){
 
-    QString tiempo = QString("%1:%2")
-            .arg(minutos)
-            .arg(seg, 2, 10, QChar('0'));
+    if (segundos < 0) {
+            this->labeltiempo->setText("00:00:00.00");
+            return;
+        }
 
-   this->labeltiempo->setText(tiempo);
+        // Convertimos a milisegundos para mayor precisión
+        qint64 totalMilliseconds = static_cast<qint64>(segundos * 1000.0);
+
+        int horas = totalMilliseconds / 3600000;
+        int minutos = (totalMilliseconds % 3600000) / 60000;
+        int seg = (totalMilliseconds % 60000) / 1000;
+        int centesimas = (totalMilliseconds % 1000) / 10;
+
+        QString tiempo = QString("%1:%2:%3.%4")
+                .arg(horas, 2, 10, QChar('0'))
+                .arg(minutos, 2, 10, QChar('0'))
+                .arg(seg, 2, 10, QChar('0'))
+                .arg(centesimas, 2, 10, QChar('0'));
+
+        this->labeltiempo->setText(tiempo);
 }
 
 
