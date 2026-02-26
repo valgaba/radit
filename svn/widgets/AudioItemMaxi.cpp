@@ -31,6 +31,27 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
    this->setFixedHeight(110); //alto del item fijo
 
 
+     mediamanager = new MediaManager;
+
+     connect(mediamanager, &MediaManager::audioFrameUpdated,
+             this, [this](const AudioFrame &frame) {
+
+         //qDebug()<<frame.position;
+
+         this->setTiempoFile(frame.position);
+
+         if (!m_userIsSeeking && m_duration > 0.0)
+         {
+             int value = static_cast<int>((frame.position / m_duration) * 1000.0);
+             slider->setValue(value);
+         }
+
+
+
+
+     });
+
+
    layout = new QVBoxLayout; //layout general
    layout->setContentsMargins(0, 0, 0, 0);
    layout->setSpacing(0); // espacios entre  item dentro del contenedor
@@ -238,13 +259,47 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
         connect(btnplaycue, &QPushButton::clicked, this, [=](){
-            framecolor->setVisible(!framecolor->isVisible()); // alterna visibilidad
+           // framecolor->setVisible(!framecolor->isVisible()); // alterna visibilidad
+            // Si no hay stream cargado, cargarlo
+               if (!mediamanager->isPlaying() && !mediamanager->isPaused())
+               {
+                   mediamanager->loadFile(this->filePath());
+                   m_duration = this->second();
+                   mediamanager->play();
+                   return;
+               }
+
+               // Si está reproduciendo → pausar
+               if (mediamanager->isPlaying()){
+                    mediamanager->pause();
+               }else{
+                   // Si está en pausa → reanudar
+                   mediamanager->play();
+               }
+
         });
 
 
 
+        connect(btnrewind, &QPushButton::clicked,
+                mediamanager, &MediaManager::rewind);
+
+        connect(btnforward, &QPushButton::clicked,
+                mediamanager, &MediaManager::forward);
 
 
+
+
+        connect(slider, &QSlider::sliderPressed, this, [this]() {
+            m_userIsSeeking = true;
+        });
+
+        connect(slider, &QSlider::sliderReleased, this, [this]() {
+            m_userIsSeeking = false;
+
+            double percent = slider->value() / 1000.0;
+            mediamanager->seek(percent * m_duration);
+        });
 
 
 

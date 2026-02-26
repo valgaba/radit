@@ -12,6 +12,7 @@
 
 #include "core/Clipboard.h"
 #include "widgets/AudioItemMaxi.h"
+#include "core/MediaManager.h"
 
 
 class ContentsBase: public QWidget{
@@ -24,10 +25,8 @@ private:
 
 
     QList<QWidget*>  list;
-
-    double getAudioDurationSecond(const QString &filePath);
     QString formatTimeHhMmSsDd(double duration);
-
+    MediaManager *mediamanager;
 
 
 

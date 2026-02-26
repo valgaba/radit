@@ -44,6 +44,8 @@ Slider::Slider(QWidget *parent):QSlider(parent){
     this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     this->setSingleStep(0);  // Desactiva el movimiento con la rueda del ratón
 
+    this->setRange(0, 1000);   // escala interna normalizada
+    this->setValue(0);
 
 
 }

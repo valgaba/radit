@@ -53,6 +53,8 @@ ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
     layout->setSpacing(10); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
+    mediamanager = new MediaManager;
+
 
 }
 
@@ -130,7 +132,9 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
                    QString filePath = url.toLocalFile();
 
-                   double duration = getAudioDurationSecond(filePath);
+
+                    double duration = mediamanager->getDurationSecond(filePath);
+
 
                    if (duration <= 0.0) {
                        qDebug() << "Archivo inválido:" << filePath;
@@ -177,42 +181,6 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
     return item;
 }
 
-
-
-double ContentsBase::getAudioDurationSecond(const QString &filePath){
-
-#ifdef Q_OS_WIN
-    HSTREAM stream = BASS_StreamCreateFile(
-        FALSE,
-        filePath.utf16(),
-        0,
-        0,
-        BASS_STREAM_DECODE | BASS_UNICODE
-    );
-#else
-    QByteArray path = filePath.toUtf8();
-
-    HSTREAM stream = BASS_StreamCreateFile(
-        FALSE,
-        path.constData(),
-        0,
-        0,
-        BASS_STREAM_DECODE
-    );
-#endif
-
-    if (!stream) {
-        qDebug() << "BASS error:" << BASS_ErrorGetCode()
-                 << "File:" << filePath;
-        return -1.0;
-    }
-
-    QWORD length = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
-    double seconds = BASS_ChannelBytes2Seconds(stream, length);
-
-    BASS_StreamFree(stream);
-    return seconds;
-}
 
 
 QString ContentsBase::formatTimeHhMmSsDd(double duration){

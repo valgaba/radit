@@ -12,6 +12,7 @@
 #include "widgets/label.h"
 #include "widgets/FrameColorItemMax.h"
 #include "widgets/slider.h"
+#include "core/MediaManager.h"
 
 
 
@@ -71,6 +72,11 @@ private:
      bool m_isLoop=false;
      bool m_isSelect=false;
      QString m_NameFile;
+
+     MediaManager * mediamanager;
+
+     bool m_userIsSeeking = false;
+     double m_duration = 0.0;
 
 
 public:
