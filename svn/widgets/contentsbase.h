@@ -25,7 +25,7 @@ private:
 
 
     QList<QWidget*>  list;
-    QString formatTimeHhMmSsDd(double duration);
+   // QString formatTimeHhMmSsDd(double duration);
     MediaManager *mediamanager;
 
 

@@ -61,8 +61,10 @@ private:
 
 
     Button * btnplaycue;
+    Button * btnstopcue;
     Button * btnrewind;
     Button * btnforward;
+    Label *labeltiempocue;
 
     Slider * slider;
 
@@ -77,6 +79,8 @@ private:
 
      bool m_userIsSeeking = false;
      double m_duration = 0.0;
+
+     QString SecondToTime(double segundos);
 
 
 public:

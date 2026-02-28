@@ -51,7 +51,7 @@ MediaManager::MediaManager(QObject *parent)
 
                emit audioFrameUpdated(frame);
            }
-           else if (state == BASS_ACTIVE_STOPPED)
+         /*  else if (state == BASS_ACTIVE_STOPPED)
            {
                m_timer->stop();
 
@@ -62,14 +62,21 @@ MediaManager::MediaManager(QObject *parent)
 
                emit audioFrameUpdated(frame);
                emit playbackFinished();
-           }
+           }*/
        });
 
        //m_timer->start(50); // 20 FPS
 }
 
 
-MediaManager::~MediaManager(){}
+MediaManager::~MediaManager(){
+
+    if (m_stream)
+    {
+        BASS_StreamFree(m_stream);
+        m_stream = 0;
+    }
+}
 
 
 
@@ -162,6 +169,7 @@ void MediaManager::play()
 {
     if (!m_stream) return;
 
+       // BASS_ChannelSetPosition(m_stream, 0, BASS_POS_BYTE);
         BASS_ChannelPlay(m_stream, FALSE);
         m_timer->start(50);
 }
@@ -199,44 +207,51 @@ bool MediaManager::isPaused() const
 
 void MediaManager::rewind()
 {
-    seekRelative(-5.0);
+    seekRelative(-1.0); // esta a 1 segundo
 }
 
 void MediaManager::forward()
 {
-    seekRelative(5.0);
+    seekRelative(1.0);
 }
 
 void MediaManager::seek(double seconds)
 {
     if (!m_stream) return;
 
-    // Duración total
-    double duration = BASS_ChannelBytes2Seconds(
-        m_stream,
-        BASS_ChannelGetLength(m_stream, BASS_POS_BYTE)
-    );
+       // Duración total
+       double duration = BASS_ChannelBytes2Seconds(
+           m_stream,
+           BASS_ChannelGetLength(m_stream, BASS_POS_BYTE)
+       );
 
+       if (seconds < 0.0)
+           seconds = 0.0;
 
-    if (seconds < 0.0)
-        seconds = 0.0;
+       if (seconds > duration)
+           seconds = duration;
 
-    if (seconds > duration)
-        seconds = duration;
+       // Convertir y aplicar
+       QWORD bytePos = BASS_ChannelSeconds2Bytes(m_stream, seconds);
+       BASS_ChannelSetPosition(m_stream, bytePos, BASS_POS_BYTE);
 
-    // Convertir y aplicar
-    QWORD bytePos = BASS_ChannelSeconds2Bytes(m_stream, seconds);
-    BASS_ChannelSetPosition(m_stream, bytePos, BASS_POS_BYTE);
+       // 🔥 Actualizar UI inmediatamente
+       DWORD level = BASS_ChannelGetLevel(m_stream);
 
-    // 🔥 Actualizar UI inmediatamente (sin esperar timer)
-    DWORD level = BASS_ChannelGetLevel(m_stream);
+       AudioFrame frame;
 
-    AudioFrame frame;
-    frame.position = seconds;
-    frame.left  = LOWORD(level) / 32768.0f;
-    frame.right = HIWORD(level) / 32768.0f;
+       frame.position = seconds;
 
-    emit audioFrameUpdated(frame);
+       float leftLinear  = LOWORD(level) / 32768.0f;
+       float rightLinear = HIWORD(level) / 32768.0f;
+
+       leftLinear  = std::max(leftLinear,  0.000001f);
+       rightLinear = std::max(rightLinear, 0.000001f);
+
+       frame.left  = 20.0f * log10f(leftLinear);
+       frame.right = 20.0f * log10f(rightLinear);
+
+       emit audioFrameUpdated(frame);
 }
 
 
@@ -253,6 +268,8 @@ void MediaManager::seekRelative(double deltaSeconds)
 
       seek(current + deltaSeconds);
 }
+
+
 
 
 

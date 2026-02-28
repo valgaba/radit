@@ -53,8 +53,11 @@ signals:
 
 private:
 
+
     QTimer* m_timer = nullptr;
     HSTREAM m_stream = 0;
+
+
 
     static void CALLBACK EndSyncCallback(
            HSYNC handle,

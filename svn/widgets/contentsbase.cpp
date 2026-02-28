@@ -37,7 +37,7 @@
 #include "widgets/contentsbase.h"
 //#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFilemaxi.h"
-#include "bass.h"
+//#include "bass.h"
 
 ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
   // setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
@@ -145,11 +145,12 @@ void ContentsBase::dropEvent(QDropEvent *event){
                    QFileInfo fileInfo(filePath);
 
                    audioItem->setFilePath(filePath);
-                   audioItem->setToolTip(filePath);
-                   audioItem->setNameFile(fileInfo.completeBaseName());
                    audioItem->setSecond(duration);
+
+                   audioItem->setNameFile(fileInfo.completeBaseName());
                    audioItem->setTiempoFile(duration);
 
+                   audioItem->setToolTip(filePath);
 
 
                    createItem(audioItem );
@@ -183,7 +184,7 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
 
 
 
-QString ContentsBase::formatTimeHhMmSsDd(double duration){
+/*QString ContentsBase::formatTimeHhMmSsDd(double duration){
 
     if (duration < 0)
         return "00:00:00.00";
@@ -200,6 +201,6 @@ QString ContentsBase::formatTimeHhMmSsDd(double duration){
             .arg(minutes, 2, 10, QChar('0'))
             .arg(seconds, 2, 10, QChar('0'))
             .arg(centiseconds, 2, 10, QChar('0'));
-}
+}*/
 
 

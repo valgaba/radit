@@ -31,14 +31,14 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
    this->setFixedHeight(110); //alto del item fijo
 
 
-     mediamanager = new MediaManager;
+     mediamanager = new MediaManager(this);
 
      connect(mediamanager, &MediaManager::audioFrameUpdated,
              this, [this](const AudioFrame &frame) {
 
-         //qDebug()<<frame.position;
 
-         this->setTiempoFile(frame.position);
+         this->labeltiempocue->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
+          qDebug() <<frame.left;
 
          if (!m_userIsSeeking && m_duration > 0.0)
          {
@@ -46,10 +46,22 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
              slider->setValue(value);
          }
 
+     });
 
 
+
+     connect(mediamanager, &MediaManager::playbackFinished,
+             this, [this]()
+     {
+         mediamanager->seek(0.0);   // volver al inicio
+         mediamanager->stop();
 
      });
+
+
+
+
+
 
 
    layout = new QVBoxLayout; //layout general
@@ -234,6 +246,15 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnplaycue->setFixedSize(30, 29);  //Tamaño fijo
         btnplaycue->setToolTip("Properties");
 
+        btnstopcue = new Button;
+        btnstopcue->SetIcon("Stop.svg");
+        btnstopcue->setIconSize(QSize(35, 35));   // no termina de gustarme el tamaño del icono por defecto
+        btnstopcue->setFixedSize(30, 29);  //Tamaño fijo
+        btnstopcue->setToolTip("Stop cue");
+
+
+
+
 
         btnrewind = new Button;
         btnrewind->SetIcon("rewind.svg");
@@ -247,13 +268,21 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
          slider = new Slider;
-        // slider->setFixedHeight(29);
 
+         labeltiempocue = new Label;
+         labeltiempocue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+         labeltiempocue->setFixedWidth(125);   // Fija solo el ancho
+         font.setPointSize(14);
+         labeltiempocue->setFont(font);
+         labeltiempocue->setText("00:04:23.30");
 
         layoutdown->addWidget(btnplaycue);
+        layoutdown->addWidget(btnstopcue);
+
         layoutdown->addWidget(btnrewind);
         layoutdown->addWidget(btnforward);
         layoutdown->addWidget(slider,1);
+        layoutdown->addWidget(labeltiempocue);
 
        // layoutdown->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum));
 
@@ -278,6 +307,13 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
                }
 
         });
+
+
+        connect(btnstopcue, &QPushButton::clicked,
+                this, [=]() {
+                    mediamanager->stop();
+                    mediamanager->seek(0.0);
+                });
 
 
 
@@ -334,14 +370,27 @@ void AudioItemMaxi::setNameFile(const QString &nombre)
 
 
 void AudioItemMaxi::setTiempoFile(double segundos){
+        this->labeltiempo->setText(SecondToTime(segundos));
+        this->labeltiempocue->setText(SecondToTime(segundos));
+}
+
+
+
+const QString& AudioItemMaxi::nameFile() const
+{
+    return m_NameFile;
+}
+
+
+QString AudioItemMaxi::SecondToTime(double segundos){
 
     if (segundos < 0) {
-            this->labeltiempo->setText("00:00:00.00");
-            return;
+          return "00:00:00.00";
         }
 
         // Convertimos a milisegundos para mayor precisión
-        qint64 totalMilliseconds = static_cast<qint64>(segundos * 1000.0);
+      //  qint64 totalMilliseconds = static_cast<qint64>(segundos * 1000.0);
+        qint64 totalMilliseconds = qRound64(segundos * 1000.0);
 
         int horas = totalMilliseconds / 3600000;
         int minutos = (totalMilliseconds % 3600000) / 60000;
@@ -354,14 +403,15 @@ void AudioItemMaxi::setTiempoFile(double segundos){
                 .arg(seg, 2, 10, QChar('0'))
                 .arg(centesimas, 2, 10, QChar('0'));
 
-        this->labeltiempo->setText(tiempo);
+        return tiempo;
+
+
+
 }
 
 
-const QString& AudioItemMaxi::nameFile() const
-{
-    return m_NameFile;
-}
+
+
 
 
 //***************************************
