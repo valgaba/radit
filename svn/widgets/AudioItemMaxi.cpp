@@ -38,7 +38,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
          this->labeltiempocue->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
-          qDebug() <<frame.left;
+
 
          if (!m_userIsSeeking && m_duration > 0.0)
          {
@@ -55,9 +55,24 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
      {
          mediamanager->seek(0.0);   // volver al inicio
          mediamanager->stop();
+         m_pauseBlinkTimer->stop();
+         labeltiempocue->setStyleSheet("color: #84868f;");
 
      });
 
+
+
+     m_pauseBlinkTimer = new QTimer(this);
+     m_pauseBlinkTimer->setInterval(500); // parpadeo cada 500ms
+
+     connect(m_pauseBlinkTimer, &QTimer::timeout, this, [this]() {
+         m_labelVisible = !m_labelVisible;
+            if (m_labelVisible) {
+                labeltiempocue->setStyleSheet("color: #84868f;");
+            } else {
+                labeltiempocue->setStyleSheet("color: transparent;"); // texto invisible pero el espacio se mantiene
+            }
+     });
 
 
 
@@ -284,26 +299,31 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         layoutdown->addWidget(slider,1);
         layoutdown->addWidget(labeltiempocue);
 
-       // layoutdown->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum));
-
-
         connect(btnplaycue, &QPushButton::clicked, this, [=](){
-           // framecolor->setVisible(!framecolor->isVisible()); // alterna visibilidad
-            // Si no hay stream cargado, cargarlo
-               if (!mediamanager->isPlaying() && !mediamanager->isPaused())
-               {
+
+            if (!mediamanager->isPlaying() && !mediamanager->isPaused()){
+
+                   mediamanager->setDevice(-1);
                    mediamanager->loadFile(this->filePath());
                    m_duration = this->second();
                    mediamanager->play();
+
+                   // Detener parpadeo por si estaba activo
+                   m_pauseBlinkTimer->stop();
+                   labeltiempocue->setStyleSheet("color: #84868f;");
                    return;
                }
 
-               // Si está reproduciendo → pausar
                if (mediamanager->isPlaying()){
-                    mediamanager->pause();
-               }else{
-                   // Si está en pausa → reanudar
+                   mediamanager->pause();
+                   // Iniciar parpadeo
+                   m_pauseBlinkTimer->start();
+               } else {
                    mediamanager->play();
+
+                   // Detener parpadeo
+                   m_pauseBlinkTimer->stop();
+                   labeltiempocue->setStyleSheet("color: #84868f;");
                }
 
         });
@@ -311,8 +331,11 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         connect(btnstopcue, &QPushButton::clicked,
                 this, [=]() {
-                    mediamanager->stop();
-                    mediamanager->seek(0.0);
+                mediamanager->stop();
+                mediamanager->seek(0.0);
+
+              m_pauseBlinkTimer->stop();
+              labeltiempocue->setStyleSheet("color: #84868f;");
                 });
 
 
@@ -339,11 +362,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
 
-
-
-
         //añadimos al principal
-       // layout->addWidget(framecolor);
+
         layout->addWidget(frametop,1);
         layout->addWidget(framecenter,3);
         layout->addWidget(framedown,1);
@@ -354,9 +374,6 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
 AudioItemMaxi::~AudioItemMaxi(){}
-
-
-
 
 
 

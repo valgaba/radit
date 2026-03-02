@@ -53,7 +53,7 @@ ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
     layout->setSpacing(10); // espacios entre  item dentro del contenedor
     this->setLayout(layout);
 
-    mediamanager = new MediaManager;
+    mediamanager = new MediaManager(this);
 
 
 }
@@ -69,21 +69,27 @@ ContentsBase::~ContentsBase(){}
 void ContentsBase::dragEnterEvent(QDragEnterEvent *event){
     // Verificar si el arrastre contiene URIs de archivos
 
-        if (event->mimeData()->hasFormat("text/uri-list")) {
-        QList<QUrl> urls = event->mimeData()->urls();
-        if (!urls.isEmpty()) {
-            QUrl fileUrl = urls.first(); // Tomamos el primer archivo (podrías expandir para múltiples)
-          //  QString filePath = fileUrl.toLocalFile();
+    //  Drag interno (widgets)
+       if (qobject_cast<QWidget*>(event->source())) {
+           event->acceptProposedAction();
+           return;
+       }
 
-                event->acceptProposedAction();
-            return;
+       //  Archivos externos
+       if (event->mimeData()->hasUrls()) {
 
-        }
-    }
+           const QList<QUrl> urls = event->mimeData()->urls();
 
-    // Si no es un archivo de audio válido, ignorar el evento
-   // event->ignore();
-    event->acceptProposedAction();
+           for (const QUrl &url : urls) {
+               if (url.isLocalFile()) {
+                   event->acceptProposedAction();
+                   return;
+               }
+           }
+       }
+
+       // Si no cumple ninguna condición
+       event->ignore();
 }
 
 
@@ -91,27 +97,16 @@ void ContentsBase::dragEnterEvent(QDragEnterEvent *event){
 // miestras se arrastra
 void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
 
-    // Aceptar el movimiento solo si es un archivo de audio válido
-    if (event->mimeData()->hasFormat("text/uri-list")) {
-        QList<QUrl> urls = event->mimeData()->urls();
-        if (!urls.isEmpty()) {
-            QUrl fileUrl = urls.first();
-            QString filePath = fileUrl.toLocalFile();
-
-               event->acceptProposedAction();
-            return;
-
-        }
-    }
-  //  event->ignore();
     event->acceptProposedAction();
 
 }
 
+
 // suelta evento
 void ContentsBase::dropEvent(QDropEvent *event){
 
-    QWidget* source = qobject_cast< QWidget*>(event->source());
+   // QWidget* source = qobject_cast< QWidget*>(event->source());
+    AudioItemMaxi* source = qobject_cast<AudioItemMaxi*>(event->source());
 
     if(source) {
 
@@ -124,16 +119,14 @@ void ContentsBase::dropEvent(QDropEvent *event){
     }
 
   //////////// viene del sistema de archivos
-   if (event->mimeData()->hasFormat("text/uri-list")) {
+   if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
 
 
              foreach(QUrl url, urls) {
 
-                   QString filePath = url.toLocalFile();
-
-
-                    double duration = mediamanager->getDurationSecond(filePath);
+               QString filePath = url.toLocalFile();
+               double duration = mediamanager->getDurationSecond(filePath);
 
 
                    if (duration <= 0.0) {
@@ -152,7 +145,6 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
                    audioItem->setToolTip(filePath);
 
-
                    createItem(audioItem );
             }
 
@@ -160,8 +152,6 @@ void ContentsBase::dropEvent(QDropEvent *event){
     } else {
         event->ignore();
     }
-
-
 
 
 }
@@ -184,23 +174,6 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
 
 
 
-/*QString ContentsBase::formatTimeHhMmSsDd(double duration){
 
-    if (duration < 0)
-        return "00:00:00.00";
-
-    int hours = static_cast<int>(duration) / 3600;
-    int minutes = (static_cast<int>(duration) % 3600) / 60;
-    int seconds = static_cast<int>(duration) % 60;
-
-    // Centésimas (2 decimales)
-    int centiseconds = static_cast<int>((duration - static_cast<int>(duration)) * 100);
-
-    return QString("%1:%2:%3.%4")
-            .arg(hours, 2, 10, QChar('0'))
-            .arg(minutes, 2, 10, QChar('0'))
-            .arg(seconds, 2, 10, QChar('0'))
-            .arg(centiseconds, 2, 10, QChar('0'));
-}*/
 
 

@@ -4,6 +4,8 @@
 #include <QMainWindow>
 #include <QSplitter>
 
+#include "core/MediaManager.h"
+
 
 class MainWindow : public QMainWindow
 {
@@ -27,8 +29,9 @@ private:
     QSplitter *splitterprincipal;
     QSplitter *splittertop;
     QSplitter *splitterdown;
+    MediaManager * mediamanager;
 
-    void IniAudio();
+
 
 
 };

@@ -18,6 +18,7 @@
 
 
 #include <QDebug>
+#include <QCoreApplication>
 #include "core/MediaManager.h"
 
 
@@ -46,23 +47,18 @@ MediaManager::MediaManager(QObject *parent)
 
                DWORD level = BASS_ChannelGetLevel(m_stream);
 
-               frame.left  = LOWORD(level) / 32768.0f;
-               frame.right = HIWORD(level) / 32768.0f;
+               float leftLinear  = LOWORD(level) / 32768.0f;
+               float rightLinear = HIWORD(level) / 32768.0f;
+
+               leftLinear  = std::max(leftLinear,  0.000001f);
+               rightLinear = std::max(rightLinear, 0.000001f);
+
+               frame.left  = 20.0f * log10f(leftLinear);
+               frame.right = 20.0f * log10f(rightLinear);
 
                emit audioFrameUpdated(frame);
            }
-         /*  else if (state == BASS_ACTIVE_STOPPED)
-           {
-               m_timer->stop();
 
-               AudioFrame frame;
-               frame.position = 0.0;
-               frame.left = 0.0f;
-               frame.right = 0.0f;
-
-               emit audioFrameUpdated(frame);
-               emit playbackFinished();
-           }*/
        });
 
        //m_timer->start(50); // 20 FPS
@@ -71,11 +67,79 @@ MediaManager::MediaManager(QObject *parent)
 
 MediaManager::~MediaManager(){
 
+    if (m_stream){
+        BASS_StreamFree(m_stream);
+        m_stream = 0;
+       }
+
+
+}
+
+
+//*****************************************
+
+bool MediaManager::initialize()
+{
+    int device = -1; // default Windows
+
+    BASS_SetConfig(BASS_CONFIG_BUFFER, 5000);
+    BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST, 1);
+
+    if (!BASS_Init(device, 44100, 0, nullptr, nullptr))
+    {
+        qDebug() << "BASS_Init error:" << BASS_ErrorGetCode();
+        return false;
+    }
+
+#ifdef Q_OS_WIN
+
+    QString basePath = QCoreApplication::applicationDirPath() + "/bassplugin";
+
+    QStringList plugins = {
+        "bass_aac.dll",
+        "bassflac.dll",
+        "basswma.dll"
+    };
+
+    for (const QString &plugin : plugins)
+    {
+        QString fullPath = basePath + "/" + plugin;
+
+        HPLUGIN handle = BASS_PluginLoad(
+            fullPath.toUtf8().constData(), 0
+        );
+
+        if (!handle){
+
+            qDebug() << "Error cargando plugin:"
+                     << fullPath
+                     << "Error code:"
+                     << BASS_ErrorGetCode();
+
+        }
+    }
+
+#endif
+
+#ifdef Q_OS_UNIX
+    QString basePath = QCoreApplication::applicationDirPath() + "/Plugin";
+    BASS_PluginLoad((basePath + "/libbass_aac.so").toUtf8(), 0);
+    BASS_PluginLoad((basePath + "/libbassflac.so").toUtf8(), 0);
+#endif
+
+    return true;
+}
+
+
+void MediaManager::shutdown(){
+
     if (m_stream)
     {
         BASS_StreamFree(m_stream);
         m_stream = 0;
     }
+
+    BASS_Free();
 }
 
 
@@ -235,7 +299,7 @@ void MediaManager::seek(double seconds)
        QWORD bytePos = BASS_ChannelSeconds2Bytes(m_stream, seconds);
        BASS_ChannelSetPosition(m_stream, bytePos, BASS_POS_BYTE);
 
-       // 🔥 Actualizar UI inmediatamente
+       //  Actualizar UI inmediatamente
        DWORD level = BASS_ChannelGetLevel(m_stream);
 
        AudioFrame frame;
@@ -268,6 +332,42 @@ void MediaManager::seekRelative(double deltaSeconds)
 
       seek(current + deltaSeconds);
 }
+
+
+//**************************
+bool MediaManager::setDevice(int deviceId){
+
+    if (deviceId == m_currentDevice)
+        return true;
+
+
+    // Verificar que el dispositivo existe
+    BASS_DEVICEINFO info;
+    if (!BASS_GetDeviceInfo(deviceId, &info))
+        return false;
+
+    // Si no está inicializado → inicializar
+    if (!(info.flags & BASS_DEVICE_INIT))
+    {
+        if (!BASS_Init(deviceId, 44100, 0, nullptr, nullptr))
+        {
+            qDebug() << "Error initializing device:" << BASS_ErrorGetCode();
+            return false;
+        }
+    }
+
+    // Cambiar dispositivo actual
+    if (!BASS_SetDevice(deviceId))
+    {
+        qDebug() << "Error setting device:" << BASS_ErrorGetCode();
+        return false;
+    }
+
+    m_currentDevice = deviceId;
+
+    return true;
+}
+
 
 
 

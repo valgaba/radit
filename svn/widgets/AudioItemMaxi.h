@@ -82,6 +82,9 @@ private:
 
      QString SecondToTime(double segundos);
 
+     QTimer* m_pauseBlinkTimer = nullptr;
+     bool m_labelVisible = true;
+
 
 public:
 

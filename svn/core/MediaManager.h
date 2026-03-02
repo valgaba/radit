@@ -45,6 +45,10 @@ public:
     void rewind();
     void forward();
 
+    bool setDevice(int deviceId);
+    int currentDevice() const;
+
+
 signals:
     void positionChanged(double seconds);
     void playbackFinished();
@@ -56,7 +60,7 @@ private:
 
     QTimer* m_timer = nullptr;
     HSTREAM m_stream = 0;
-
+    int m_currentDevice = -1;
 
 
     static void CALLBACK EndSyncCallback(
