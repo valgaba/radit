@@ -46,7 +46,9 @@ public:
     void forward();
 
     bool setDevice(int deviceId);
-    int currentDevice() const;
+    int  currentDevice() const;
+    void fadeOut(int durationMs);
+
 
 
 signals:
@@ -69,6 +71,17 @@ private:
            DWORD data,
            void *user
        );
+
+
+    static void CALLBACK FadeOutSyncCallback(
+        HSYNC handle,
+        DWORD channel,
+        DWORD data,
+        void *user
+    );
+
+
+
 
 };
 

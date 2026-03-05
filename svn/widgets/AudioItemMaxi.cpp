@@ -178,6 +178,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         connect(btnnext, &QPushButton::clicked, this, [=](){
              this->setIsPlayNext(!this->isPlayNext());
+             this->mediamanager->fadeOut(2000);
         });
 
         connect(btnpurge, &QPushButton::clicked, this, [=](){
@@ -197,9 +198,6 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         connect(btndelete, &QPushButton::clicked,
                 this, &AudioItemMaxi::onDeleteClicked);
-
-
-
 
 
         layouttop->addWidget(framecolor, 0, Qt::AlignTop); //añadimos un color al item

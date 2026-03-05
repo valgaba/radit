@@ -147,43 +147,43 @@ void MediaManager::shutdown(){
 bool MediaManager::loadFile(const QString &filePath){
 
     if (m_stream) {
-        BASS_StreamFree(m_stream);
-        m_stream = 0;
-    }
+          BASS_StreamFree(m_stream);
+          m_stream = 0;
+      }
 
-#ifdef Q_OS_WIN
-    m_stream = BASS_StreamCreateFile(
-        FALSE,
-        filePath.utf16(),
-        0,
-        0,
-        BASS_UNICODE
-    );
-#else
-    QByteArray path = filePath.toUtf8();
-    m_stream = BASS_StreamCreateFile(
-        FALSE,
-        path.constData(),
-        0,
-        0,
-        0
-    );
-#endif
+  #ifdef Q_OS_WIN
+      m_stream = BASS_StreamCreateFile(
+          FALSE,
+          filePath.utf16(),
+          0,
+          0,
+          BASS_UNICODE
+      );
+  #else
+      QByteArray path = filePath.toUtf8();
+      m_stream = BASS_StreamCreateFile(
+          FALSE,
+          path.constData(),
+          0,
+          0,
+          0
+      );
+  #endif
 
-    if (!m_stream) {
-         return false;
-       }
+      if (!m_stream) {
+           return false;
+         }
 
 
-       BASS_ChannelSetSync(
-           m_stream,
-           BASS_SYNC_END,
-           0,
-           &MediaManager::EndSyncCallback,
-           this
-       );
+         BASS_ChannelSetSync(
+             m_stream,
+             BASS_SYNC_END,
+             0,
+             &MediaManager::EndSyncCallback,
+             this
+         );
 
-       return true;
+         return true;
 }
 
 //******************************************************************
@@ -369,15 +369,40 @@ bool MediaManager::setDevice(int deviceId){
 }
 
 
+//******************************
+void MediaManager::fadeOut(int durationMs)
+{
+    if (!m_stream)
+        return;
+
+    // Deslizar volumen hasta 0
+    BASS_ChannelSlideAttribute(
+        m_stream,
+        BASS_ATTRIB_VOL,
+        0.0f,
+        durationMs
+    );
+
+    // Sync cuando termina el slide
+    BASS_ChannelSetSync(
+        m_stream,
+        BASS_SYNC_SLIDE,
+        0,
+        &MediaManager::FadeOutSyncCallback,
+        this
+    );
+}
 
 
 
 
 //****************************************************
 
-
-
-void CALLBACK MediaManager::EndSyncCallback(HSYNC, DWORD, DWORD, void *user)
+void CALLBACK MediaManager::EndSyncCallback(
+        HSYNC,
+        DWORD,
+        DWORD,
+        void *user)
 {
     MediaManager* self = static_cast<MediaManager*>(user);
 
@@ -394,5 +419,42 @@ void CALLBACK MediaManager::EndSyncCallback(HSYNC, DWORD, DWORD, void *user)
         },
         Qt::QueuedConnection
     );
+}
+
+
+//*****************************************
+void CALLBACK MediaManager::FadeOutSyncCallback(
+        HSYNC,
+        DWORD channel,
+        DWORD,
+        void *user)
+        {
+            MediaManager* self = static_cast<MediaManager*>(user);
+            if (!self) return;
+
+            QMetaObject::invokeMethod(
+                self,
+                [self, channel]()
+                {
+                    // Restaurar volumen
+                    BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, 1.0f);
+
+                    // Stop
+                    BASS_ChannelStop(channel);
+
+                    // Posición al inicio
+                    BASS_ChannelSetPosition(channel, 0, BASS_POS_BYTE);
+
+                    // Si es el canal actual, mantener coherencia
+                    if (channel == self->m_stream)
+                    {
+                        if (self->m_timer)
+                            self->m_timer->stop();
+
+                        emit self->playbackFinished();
+                    }
+                },
+                Qt::QueuedConnection
+            );
 }
 
