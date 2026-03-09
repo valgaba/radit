@@ -37,7 +37,7 @@ Slider::Slider(QWidget *parent):QSlider(parent){
    // this->setMaximumSize(QSize(10000, 20)); //maxima que ocupa el itenaudio
 
 
-    QSizePolicy sizePolicy; //para ocupar todo el espacio
+  //  QSizePolicy sizePolicy; //para ocupar todo el espacio
   //  sizePolicy.setHorizontalStretch(1);
    // this->setSizePolicy(sizePolicy);
 

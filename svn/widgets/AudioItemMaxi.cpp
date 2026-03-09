@@ -349,6 +349,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         connect(slider, &QSlider::sliderPressed, this, [this]() {
             m_userIsSeeking = true;
+
         });
 
         connect(slider, &QSlider::sliderReleased, this, [this]() {

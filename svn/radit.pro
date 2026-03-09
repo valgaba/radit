@@ -106,11 +106,11 @@ DESTDIR =     $$PWD/../out/bin
 
 unix {
 
-   # LIBS += /usr/lib/libbass.so
-           # /usr/lib/libbassenc.so
 
-   # INCLUDEPATH = ../lib/bass
-                #  ../lib/bassenc
+    INCLUDEPATH = ../lib/bass
+
+    LIBS += -L/usr/lib -lbass
+
 
 }
 

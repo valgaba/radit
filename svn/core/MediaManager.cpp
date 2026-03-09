@@ -233,7 +233,6 @@ void MediaManager::play()
 {
     if (!m_stream) return;
 
-       // BASS_ChannelSetPosition(m_stream, 0, BASS_POS_BYTE);
         BASS_ChannelPlay(m_stream, FALSE);
         m_timer->start(50);
 }
