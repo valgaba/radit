@@ -72,7 +72,7 @@ private:
      bool m_isPlayNext=false;
      bool m_isPurge=false;
      bool m_isLoop=false;
-     bool m_isSelect=false;
+    // bool m_isSelect=false;
      QString m_NameFile;
 
      MediaManager * mediamanager;
@@ -99,6 +99,8 @@ public:
 
 
      virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
+     void setIsSelect(bool value) override;
+
 
     void setIsPlayNext(bool isPlayNext) {
         m_isPlayNext = isPlayNext;
@@ -154,7 +156,7 @@ public:
 
 
 
-    void setIsSelect(bool isSelect) {
+  /*  void setIsSelect(bool isSelect) {
            m_isSelect = isSelect;
            btnselect->setProperty("active", m_isSelect); //active viene del css
            btnselect->style()->polish(btnselect);
@@ -164,7 +166,7 @@ public:
 
     bool isSelect() const {
           return m_isSelect;
-       }
+       }*/
 
 
 

@@ -146,54 +146,97 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
 
     connect(deleteAction, &QAction::triggered,this, [this]{
-        QWidget *widget = childAt(mousePos);
+        // Buscar todos los AudioItemMaxi seleccionados
+          QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
+          bool hasSelection = false;
 
-          while (widget && !qobject_cast<AudioItem*>(widget)) {
-              widget = widget->parentWidget();
+          for (AudioItemMaxi* item : std::as_const(items)) {
+              if (item->isSelect()) {
+                  item->deleteLater();
+                  hasSelection = true;
+              }
           }
 
-          if (widget) {
-              widget->deleteLater();
+          // Si no hay seleccionados, borrar el item bajo el cursor
+          if (!hasSelection) {
+              QWidget *widget = childAt(mousePos);
+
+              while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
+                  widget = widget->parentWidget();
+              }
+
+              if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+                  item->deleteLater();
+              }
           }
+
     });
 
 
 
     connect(copyAction, &QAction::triggered,this, [=]{
 
-        this->clipboard.lista.clear(); // borramos todo el clipboard
-        QWidget *widget = childAt(mousePos);
+        clipboard.lista.clear();
 
-        while (widget && !qobject_cast<AudioItem*>(widget)) {
-               widget = widget->parentWidget();
+            QList<AudioItemMaxi*> items = this->findChildren<AudioItemMaxi*>();
+            bool hasSelection = false;
 
-           }
+            for (AudioItemMaxi *item : std::as_const(items)) {
+                if (item->isSelect()) {
+                    item->setProperty("iscut", false);
+                    clipboard.lista.append(item);
+                    hasSelection = true;
+                }
 
 
-        if(widget){
-            widget->setProperty("iscut", false); // saber si corta o pega
-            this->clipboard.lista.append(widget);
-        }
+            }
+
+            // Si no hay selección usar el item bajo el cursor
+            if (!hasSelection) {
+
+                QWidget *widget = childAt(mousePos);
+
+                while (widget && !qobject_cast<AudioItemMaxi*>(widget))
+                    widget = widget->parentWidget();
+
+                if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+                    item->setProperty("iscut", false);
+                    clipboard.lista.append(item);
+                }
+            }
 
     });
 
 
     connect(cutAction, &QAction::triggered,this, [=]{
 
-        this->clipboard.lista.clear(); // borramos todo el clipboard
-        QWidget *widget = childAt(mousePos);
+        clipboard.lista.clear();
 
-        while (widget && !qobject_cast<AudioItem*>(widget)) {
-               widget = widget->parentWidget();
+            QList<AudioItemMaxi*> items = this->findChildren<AudioItemMaxi*>();
+            bool hasSelection = false;
 
-           }
+            for (AudioItemMaxi *item : std::as_const(items)) {
+                if (item->isSelect()) {
+                    item->setProperty("iscut", true);
+                    clipboard.lista.append(item);
+                    hasSelection = true;
+                }
 
 
-        if(widget){
-            widget->setProperty("iscut", true); // para la accion de corte del qwidget
-            this->clipboard.lista.append(widget);
-        }
+            }
 
+            if (!hasSelection) {
+
+                QWidget *widget = childAt(mousePos);
+
+                while (widget && !qobject_cast<AudioItemMaxi*>(widget))
+                    widget = widget->parentWidget();
+
+                if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+                    item->setProperty("iscut", true);
+                    clipboard.lista.append(item);
+                }
+            }
     });
 
 
@@ -202,49 +245,41 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     connect(pasteAction, &QAction::triggered, this, [this] {
 
-        if (clipboard.lista.empty()) return;  // Salir temprano si no hay elementos
+        if (clipboard.lista.empty())
+                return;
 
-         bool isCutOperation = !clipboard.lista.isEmpty() &&
-                               clipboard.lista.constFirst() &&
-                               clipboard.lista.constFirst()->property("iscut").toBool();
+            bool isCutOperation = clipboard.lista.constFirst()->property("iscut").toBool();
 
-        for (auto it = clipboard.lista.begin(); it != clipboard.lista.end();) {
-            if (auto *itembase = qobject_cast<AudioItemMaxi*>(*it)) { //polimorfica pega todos los hijos de audioitem
-                AudioItemMaxi* newItem = itembase->copy(this);
-                 createItem(newItem);
+            for (auto it = clipboard.lista.begin(); it != clipboard.lista.end(); ) {
 
-               /* AudioItem* newItem = itembase->copy(this);  // crear copia
-                layout->addWidget(newItem);
+                if (auto *itembase = qobject_cast<AudioItemMaxi*>(*it)) {
 
+                    AudioItemMaxi *newItem = itembase->copy(this);
+                    createItem(newItem);
 
-                if (auto maxiItem = qobject_cast<AudioItemMaxi*>(newItem)) {
+                    // 🔹 quitar selección del nuevo item pegado
+                    newItem->setIsSelect(false);
 
-                    connect(maxiItem, &AudioItemMaxi::requestDelete,
-                            this, [this](AudioItemMaxi* item)
-                    {
-                        layout->removeWidget(item);
-                        item->deleteLater();
-                    });
-                }*/
+                    if (isCutOperation) {
+                        itembase->deleteLater();
+                        it = clipboard.lista.erase(it);
+                    } else {
+                        ++it;
+                    }
 
-                if (isCutOperation && *it) {
-                    (*it)->deleteLater();
-                    it = clipboard.lista.erase(it);  // Eliminar de la lista y avanzar el iterador
                 } else {
                     ++it;
                 }
-            } else {
-                ++it;
             }
-        }
+
+            // limpiar selección de los originales
+            for (auto it = clipboard.lista.begin(); it != clipboard.lista.end(); ++it) {
+                if (auto *item = qobject_cast<AudioItemMaxi*>(*it)) {
+                    item->setIsSelect(false);
+                }
+            }
+
     });
-
-
-
-
-    // connect(copyAction, &QAction::triggered, this, &MyWidget::copyActionTriggered);
-    // connect(cutAction, &QAction::triggered, this, &MyWidget::cutActionTriggered);
-    //  connect(pasteAction, &QAction::triggered, this, &MyWidget::pasteActionTriggered);
 
 
     menu->addAction(addAction);
@@ -263,6 +298,48 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
 ContentsPlayer::~ContentsPlayer(){}
 
+
+
+
+void ContentsPlayer::dropEvent(QDropEvent *event)
+{
+    if (event->mimeData()->hasFormat("application/x-audioitems")) {
+
+            QByteArray data = event->mimeData()->data("application/x-audioitems");
+            QDataStream stream(&data, QIODevice::ReadOnly);
+
+            QList<AudioItem*> movedItems;
+
+            while (!stream.atEnd()) {
+
+                quintptr ptr;
+                stream >> ptr;
+
+                AudioItem *item = reinterpret_cast<AudioItem*>(ptr);
+                if (!item)
+                    continue;
+
+                if (item->parentWidget() && item->parentWidget()->layout())
+                    item->parentWidget()->layout()->removeWidget(item);
+
+                layout->addWidget(item);
+                item->setParent(this);
+
+                movedItems.append(item);
+            }
+
+            // Desmarcar los items seleccionados después del drag
+            for (AudioItem* item : movedItems) {
+                item->setIsSelect(false);
+            }
+
+            event->acceptProposedAction();
+            return;
+        }
+
+        // Si no es drag interno, usar el comportamiento del padre
+        ContentsBase::dropEvent(event);
+}
 
 
 

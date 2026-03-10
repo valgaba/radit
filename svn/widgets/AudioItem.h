@@ -17,6 +17,7 @@ private:
 
     QString m_filePath;
     double  m_second;
+    bool    m_isSelect=false;
 
 
 
@@ -36,6 +37,10 @@ public:
       QString filePath() const;
       double second() const;
 
+      virtual void setIsSelect(bool value);
+      bool isSelect() const;
+
+
 
 
 
@@ -47,6 +52,7 @@ protected:
     // Eventos de drag and drop
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+
 
 
 };

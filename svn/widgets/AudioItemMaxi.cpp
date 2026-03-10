@@ -425,7 +425,14 @@ QString AudioItemMaxi::SecondToTime(double segundos){
 
 }
 
+void AudioItemMaxi::setIsSelect(bool value)
+{
+    AudioItem::setIsSelect(value); // guardar estado en la base
 
+    btnselect->setProperty("active", isSelect());
+    btnselect->style()->polish(btnselect);
+    btnselect->update();
+}
 
 
 

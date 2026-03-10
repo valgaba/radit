@@ -35,40 +35,54 @@ void AudioItem::mousePressEvent(QMouseEvent *event)
 
 void AudioItem::mouseMoveEvent(QMouseEvent *event)
 {
-    // Solo procesar si es el botón izquierdo
-    if (!(event->buttons() & Qt::LeftButton)) return;
+    if (!(event->buttons() & Qt::LeftButton))
+            return;
 
-    // Comprobar si se ha movido lo suficiente para considerar arrastre
-    if ((event->pos() - dragStartPosition).manhattanLength() < QApplication::startDragDistance()) return;
+        if ((event->pos() - dragStartPosition).manhattanLength()
+            < QApplication::startDragDistance())
+            return;
 
-    // Crear la operación de arrastre
-    QDrag *drag = new QDrag(this);
-    QMimeData *mimeData = new QMimeData;
-    mimeData->setText("AudioItem");
-    drag->setMimeData(mimeData);
+        QDrag *drag = new QDrag(this);
+        QMimeData *mimeData = new QMimeData;
 
-    // Crear una imagen del widget para el efecto visual de arrastre
-    QPixmap pixmap(this->size());
-    if (!pixmap.isNull()) {
-        this->render(&pixmap);
+        QByteArray data;
+        QDataStream stream(&data, QIODevice::WriteOnly);
+
+        QWidget *container = parentWidget();
+
+        QList<AudioItem*> selected;
+        QList<AudioItem*> items = container->findChildren<AudioItem*>();
+
+        for (auto *item : std::as_const(items)) {
+            if (item->isSelect())
+                selected.append(item);
+        }
+
+        // si no hay seleccionados arrastramos solo este
+        if (selected.isEmpty()) {
+            stream << reinterpret_cast<quintptr>(this);
+        }
+        else {
+            for (auto *item : std::as_const(selected))
+                stream << reinterpret_cast<quintptr>(item);
+        }
+
+        mimeData->setData("application/x-audioitems", data);
+        drag->setMimeData(mimeData);
+
+        QPixmap pixmap(size());
+        render(&pixmap);
         drag->setPixmap(pixmap);
         drag->setHotSpot(event->pos());
-    } else {
-        // Alternativa si no se puede crear el pixmap
-        drag->setPixmap(QPixmap(1, 1));
-    }
 
-    // Ejecutar la operación de arrastre
-   // Qt::DropAction dropAction = drag->exec(Qt::MoveAction);
-     drag->exec(Qt::MoveAction);
+        drag->exec(Qt::MoveAction);
 }
 
 void AudioItem::dragEnterEvent(QDragEnterEvent *event)
 {
     // Aceptar solo si el formato es texto plano
-    if (event->mimeData()->hasFormat("text/plain")) {
-        event->acceptProposedAction();
-    }
+    if (event->mimeData()->hasFormat("application/x-audioitems"))
+            event->acceptProposedAction();
 }
 
 void AudioItem::dropEvent(QDropEvent *event)
@@ -124,3 +138,17 @@ double AudioItem::second() const
 {
     return m_second;
 }
+
+
+
+void AudioItem::setIsSelect(bool value)
+{
+    m_isSelect = value;
+}
+
+bool AudioItem::isSelect() const
+{
+    return m_isSelect;
+}
+
+

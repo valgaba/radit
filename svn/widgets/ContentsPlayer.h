@@ -51,7 +51,7 @@ public:
 protected:
 
     void contextMenuEvent(QContextMenuEvent *event) override;
-
+    void dropEvent(QDropEvent *event) override;
 
 private slots:
 
