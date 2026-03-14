@@ -26,8 +26,12 @@
 #include "widgets/tabbar.h"
 
 TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
-    this->setObjectName("TabPlayer"); //para qss
+   // this->setObjectName("TabPlayer"); //para qss
     //  this->setCursor(QCursor(Qt::PointingHandCursor));  //cambiamos el cursor
+
+
+
+
 
     setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
 

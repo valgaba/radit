@@ -34,6 +34,7 @@
 #include "widgets/container.h"
 #include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
+#include "widgets/Player.h";
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -180,10 +181,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     }
 
 
+    Player *player = new Player;
+
 
     splitterdown->addWidget(tab4);
     splitterdown->addWidget(tab2);
     splitterdown->addWidget(tab3);
+    splitterdown->addWidget(player);
 
 
 

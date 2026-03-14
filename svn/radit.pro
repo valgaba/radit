@@ -28,6 +28,7 @@ SOURCES += \
     widgets/FormAbout.cpp \
     widgets/FormProperties.cpp \
     widgets/FormPropertiesAudioItem.cpp \
+    widgets/Player.cpp \
     widgets/TabAuto.cpp \
     widgets/TabPlayer.cpp \
     widgets/button.cpp \
@@ -58,6 +59,7 @@ HEADERS += \
     widgets/FormProperties.h \
     widgets/FormPropertiesAudioItem.h \
     widgets/FrameColorItemMax.h \
+    widgets/Player.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \
     widgets/button.h \

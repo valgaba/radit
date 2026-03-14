@@ -28,7 +28,7 @@
 #include "widgets/ContentsPlayer.h"
 
 TabAuto::TabAuto(QWidget *parent):Tab(parent){
-    this->setObjectName("TabAuto"); //para qss
+    //this->setObjectName("TabAuto"); //para qss
     //  this->setCursor(QCursor(Qt::PointingHandCursor));  //cambiamos el cursor
 
     setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada

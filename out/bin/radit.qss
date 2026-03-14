@@ -392,12 +392,16 @@ AudioItem
 }
 
 
-
+AudioItemMaxi {
+	
+   background-color: #39385b;
+}
 
 
 Frame {
 	border: 1px solid #333b4f;
     background-color: #262c3b;
+   
 	
 	
 }
@@ -484,25 +488,30 @@ border: none;
 
 
 
-Tab {
-
-	
+#Tab {
+     background-color: #343434;
 }
+
 
 
 Tab::pane {
-	
-	
 
+	
+	
 
 }
 
-TabBar {
+#TabBar {
 	
-    background-color: none;
+   background-color: #343434;
+    
 	
  
 }
+
+
+
+
 
 TabBar::tab {
    

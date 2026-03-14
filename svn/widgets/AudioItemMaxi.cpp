@@ -29,8 +29,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
    this->setObjectName("AudioItemMaxi"); //para qss
    this->setFixedHeight(110); //alto del item fijo
-
-
+this->setStyleSheet("background-color: #262c3b;");
      mediamanager = new MediaManager(this);
 
      connect(mediamanager, &MediaManager::audioFrameUpdated,

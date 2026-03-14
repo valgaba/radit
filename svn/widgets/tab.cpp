@@ -26,6 +26,7 @@
 
 Tab::Tab(QWidget *parent):QTabWidget(parent){
     this->setObjectName("Tab"); //para qss
+setAttribute(Qt::WA_StyledBackground, true);
 
  }
 
