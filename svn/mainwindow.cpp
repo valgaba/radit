@@ -181,13 +181,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     }
 
 
-    Player *player = new Player;
+   // Player *player = new Player;
 
 
-    splitterdown->addWidget(tab4);
-    splitterdown->addWidget(tab2);
-    splitterdown->addWidget(tab3);
-    splitterdown->addWidget(player);
+    //splitterdown->addWidget(tab4);
+    splitterdown->addWidget(new Player);
+    splitterdown->addWidget(new Player);
+    splitterdown->addWidget(new Player);
 
 
 

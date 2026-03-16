@@ -16,8 +16,10 @@
 */
 
 #include <QDebug>
+#include <QMessageBox>
 
 #include "widgets/Player.h"
+#include "widgets/container.h"
 
 
 
@@ -65,7 +67,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       // partes fijas
       framebarra->setFixedHeight(25);
       frametop->setFixedHeight(30);
-      framecenter->setFixedHeight(60);
+      framecenter->setFixedHeight(50);
       framedown->setFixedHeight(30);
 
       // parte flexible
@@ -76,18 +78,47 @@ Player::Player(QWidget *parent) : Frame(parent) {
     // this->setStyleSheet("background-color: #343434;");
 
 
-      tabplayer = new TabPlayer;
+
+      labelplayernombre =new Label(this);
+      labelplayernombre->setText("Player [noname]");
+      labelplayernombre->setStyleSheet("font-size: 14px;");
+      btnclose = new Button(this);
+      btnclose->setStyleSheet(
+          "QPushButton {"
+          "   border: none;"
+          "   background: transparent;"
+          "   padding: 0px;"
+          "}"
+      );
+
+
+      btnclose->setFixedSize(15, 15);
+      btnclose->setCursor(Qt::PointingHandCursor);
+      btnclose->SetIcon("Close-hover.svg");
+      btnclose->setToolTip("Close player");
+
+      layoutbarra->addWidget(labelplayernombre);
+      layoutbarra->addStretch();
+      layoutbarra->addWidget(btnclose);
+
+      connect(btnclose, &QPushButton::clicked, this, [this]() {
+          QMessageBox::StandardButton reply;
+          reply = QMessageBox::question(
+              this,
+              "Cerrar Player",
+              "¿Seguro que quieres cerrar este player?",
+              QMessageBox::Yes | QMessageBox::No
+          );
+
+          if (reply == QMessageBox::Yes) {
+              this->deleteLater();
+          }
+      });
 
 
 
-      for (int i = 0; i < 4; ++i) {
-          Container *container = new Container;
-       //  container->setStyleSheet("background-color: #282020;");
-          tabplayer->addTab(container, "lista " + QString::number(i + 1));
-      }
 
-    // layouttab->addWidget(tabplayer);
-      layout->addWidget(tabplayer);
+      layout->addWidget(new TabPlayer);
 
 
 }

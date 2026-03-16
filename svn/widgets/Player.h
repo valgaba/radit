@@ -11,7 +11,6 @@
 #include "widgets/label.h"
 #include "widgets/frame.h"
 #include "widgets/TabPlayer.h"
-#include "widgets/container.h"
 
 
 
@@ -41,9 +40,9 @@ private:
 
 
 
-    Button * btnproperties;
+    Button * btnclose;
 
-    Label *labelnombre;
+    Label *labelplayernombre;
 
     TabPlayer *tabplayer;
 

@@ -27,7 +27,7 @@ public:
     explicit TabPlayer(QWidget *parent = 0);
     ~TabPlayer();
 
-
+ void closeTab(int index);
 
 
 protected:
