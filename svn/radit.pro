@@ -24,6 +24,7 @@ SOURCES += \
     widgets/AudioItemMaxi.cpp \
     widgets/AudioItemMini.cpp \
     widgets/AudioItemNet.cpp \
+    widgets/ContentsMenu.cpp \
     widgets/ContentsPlayer.cpp \
     widgets/FormAbout.cpp \
     widgets/FormProperties.cpp \
@@ -53,6 +54,7 @@ HEADERS += \
     widgets/AudioItemMaxi.h \
     widgets/AudioItemMini.h \
     widgets/AudioItemNet.h \
+    widgets/ContentsMenu.h \
     widgets/ContentsPlayer.h \
     widgets/DraggableWidget.h \
     widgets/FormAbout.h \

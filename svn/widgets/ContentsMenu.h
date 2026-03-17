@@ -1,0 +1,59 @@
+#ifndef CONTENTSMENU_H
+#define CONTENTSMENU_H
+
+// ContentsMenu.h
+//#pragma once
+#include <QMenu>
+#include <QAction>
+#include <QWidgetAction>
+#include <QColor>
+#include <QVector>
+
+
+class ContentsPlayer;
+struct ColorButton;
+
+class ContentsMenu : public QMenu
+{
+    Q_OBJECT
+public:
+    explicit ContentsMenu(ContentsPlayer *parent);
+
+    void showAt(const QPoint &pos);
+
+    void setColorVisible(bool visible);
+    void setSelectAllVisible(bool visible);
+    void setCopyVisible(bool visible);
+    void setCutVisible(bool visible);
+    void setDeleteVisible(bool visible);
+    void setPropertiesVisible(bool visible);
+    void setPasteVisible(bool visible);
+
+private:
+    ContentsPlayer *player;
+
+    // Acciones principales
+    QAction *addMenuAction;
+    QAction *colorAction;
+    QAction *selectallAction;
+    QAction *cutAction;
+    QAction *copyAction;
+    QAction *pasteAction;
+    QAction *deleteAction;
+    QAction *propertiesAction;
+
+    void setupAddMenu();
+    void setupColorMenu();
+    void setupActions();
+    void connectActions();
+
+    QAction* createAddAction();
+    QAction* createColorAction();
+    QIcon createColorIcon(const QColor &color);
+};
+
+
+
+
+
+#endif // CONTENTSMENU_H

@@ -12,9 +12,10 @@
 
 
 #include "widgets/contentsbase.h"
-#include "widgets/menu.h"
+//#include "widgets/menu.h"
 #include "core/Clipboard.h"
-#include "widgets/AudioItemMaxi.h"
+//#include "widgets/AudioItemMaxi.h"
+#include "widgets/ContentsMenu.h"
 
 
 class ContentsPlayer: public ContentsBase
@@ -25,25 +26,11 @@ class ContentsPlayer: public ContentsBase
 
 private:
 
-    Menu *menu;
     QPoint mousePos;
-
-    //opciones del menu contectual
-
-    QAction *selectallAction;
-    QAction *cutAction;
-    QAction *copyAction;
-    QAction *pasteAction;
-    QAction *deleteAction;
-    QAction *propertiesAction;
-    QAction *colorAction;
-
-
     bool isCut;  //para las operaciones de cortar pegar
+    ContentsMenu *contentsMenu = nullptr;
 
-   // AudioItemMaxi* createItem(AudioItemMaxi* item);
 
-    static QIcon createColorIcon(const QColor &color);
 
 public:
 
@@ -51,7 +38,12 @@ public:
     explicit ContentsPlayer(QWidget *parent = 0);
     ~ContentsPlayer();
 
-
+    void selectAllItems();
+    void deleteSelected();
+    void copySelected();
+    void cutSelected();
+    void pasteClipboard();
+    void applyColor(const QColor &color);
 
 
 protected:
