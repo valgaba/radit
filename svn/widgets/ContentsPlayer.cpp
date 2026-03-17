@@ -29,6 +29,8 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QMessageBox>
+#include <QWidgetAction>
 
 
 #include "widgets/ContentsPlayer.h"
@@ -59,11 +61,14 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
     menu->setFixedWidth(200); // Establecer anchura del menú en píxeles
 
     QAction *addAction = new QAction("Añadir  ", this);
-    cutAction = new QAction("Cortar", this);
-    copyAction = new QAction("Copiar", this);
-    pasteAction = new QAction("Pegar", this);
+
+    selectallAction = new QAction("SelectAll", this);
+    cutAction = new QAction("Cut", this);
+    copyAction = new QAction("Copy", this);
+    pasteAction = new QAction("Paste", this);
     deleteAction = new QAction("Delete", this);
     propertiesAction = new QAction("Properties", this);
+    colorAction = new QAction("Color Item", this);
 
 
     //iconos del menu
@@ -94,6 +99,83 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     // Agregar el submenú a la opcion añadir
     addAction->setMenu(submenu);
+
+
+
+    //sub menu para el color
+    Menu *colorSubmenu = new Menu(this);
+
+    // Crear un QWidgetAction para contener los botones horizontalmente
+    QWidgetAction *colorWidgetAction = new QWidgetAction(colorSubmenu);
+    QWidget *colorWidget = new QWidget(colorSubmenu);
+    QHBoxLayout *colorLayout = new QHBoxLayout(colorWidget);
+    colorLayout->setContentsMargins(0,0,0,0);
+    colorLayout->setSpacing(0);
+
+    // Crear botones de color
+    struct ColorButton {
+        QString name;
+        QColor color;
+    };
+    QVector<ColorButton> colors = {
+        {"Red", QColor("#e74c3c")},
+        {"Orange", QColor("#e67e22")},
+        {"Green", QColor("#7cb342")},
+        {"Blue", QColor("#00acc1")},
+        {"Cyan", QColor("#3498db")},
+        {"Pink", QColor("#d81b60")}
+    };
+
+    for (const auto &c : colors) {
+        QPushButton *btn = new QPushButton(createColorIcon(c.color), "");
+        btn->setFlat(true);
+        btn->setToolTip(c.name); // Opcional, para mostrar nombre al pasar el mouse
+        colorLayout->addWidget(btn);
+
+        // Conectar clic al color
+        connect(btn, &QPushButton::clicked, this, [this, c]() {
+            // Obtener items seleccionados
+               QList<AudioItemMaxi*> items = this->findChildren<AudioItemMaxi*>();
+               bool hasSelection = false;
+
+               for (AudioItemMaxi* item : items) {
+                   if (item->isSelect()) {
+                       item->framecolor->setColor(c.color);
+                       hasSelection = true;
+                   }
+               }
+
+               // Si no hay selección, aplicar al item bajo el cursor
+               if (!hasSelection) {
+                   QWidget *widget = childAt(mousePos);
+                   while (widget && !qobject_cast<AudioItemMaxi*>(widget))
+                       widget = widget->parentWidget();
+
+                   if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+                       item->framecolor->setColor(c.color);
+                   }
+               }
+
+               // 🔹 Deseleccionar todos los items
+               for (AudioItemMaxi* item : items) {
+                   item->setIsSelect(false);
+               }
+
+
+               // 🔹 Cerrar el submenú de colores
+               if (menu->isVisible()) {
+                   menu->close();
+               }
+        });
+    }
+
+    // Asignar widget al QWidgetAction y añadirlo al submenu
+    colorWidgetAction->setDefaultWidget(colorWidget);
+    colorSubmenu->addAction(colorWidgetAction);
+
+    // Asignar el submenú al QAction colorAction
+    colorAction->setMenu(colorSubmenu);
+
 
 
     copyAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_C)); // Establecer atajo de teclado
@@ -146,31 +228,82 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
 
     connect(deleteAction, &QAction::triggered,this, [this]{
-        // Buscar todos los AudioItemMaxi seleccionados
-          QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
-          bool hasSelection = false;
+        QList<AudioItemMaxi*> selectedItems;
 
-          for (AudioItemMaxi* item : std::as_const(items)) {
-              if (item->isSelect()) {
-                  item->deleteLater();
-                  hasSelection = true;
-              }
-          }
+         // Recoger seleccionados
+         QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
+         for (AudioItemMaxi* item : std::as_const(items)) {
+             if (item->isSelect()) {
+                 selectedItems.append(item);
+             }
+         }
 
-          // Si no hay seleccionados, borrar el item bajo el cursor
-          if (!hasSelection) {
-              QWidget *widget = childAt(mousePos);
+         // Caso 1: hay selección -> mostrar solo el número
+         if (!selectedItems.isEmpty()) {
 
-              while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
-                  widget = widget->parentWidget();
-              }
+             QString text = QString("¿Seguro que quieres borrar los %1 items seleccionados?")
+                                .arg(selectedItems.size());
 
-              if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
-                  item->deleteLater();
-              }
-          }
+             QMessageBox::StandardButton reply = QMessageBox::question(
+                 this,
+                 "Borrar Item",
+                 text,
+                 QMessageBox::Yes | QMessageBox::No
+             );
+
+             if (reply == QMessageBox::No)
+                 return;
+
+             for (AudioItemMaxi* item : std::as_const(selectedItems)) {
+                 deleteItem(item);
+             }
+
+             return;
+         }
+
+         // Caso 2: no hay selección, borrar item bajo el cursor -> mostrar nombre
+         QWidget *widget = childAt(mousePos);
+
+         while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
+             widget = widget->parentWidget();
+         }
+
+         if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+
+             QString nombre = item->nameFile();
+
+             QString text = nombre.isEmpty()
+                 ? "¿Seguro que quieres borrar este item?"
+                 : QString("¿Seguro que quieres borrar \"%1\"?").arg(nombre);
+
+             QMessageBox::StandardButton reply = QMessageBox::question(
+                 this,
+                 "Borrar Item",
+                 text,
+                 QMessageBox::Yes | QMessageBox::No
+             );
+
+             if (reply == QMessageBox::No)
+                 return;
+
+             deleteItem(item);
+         }
 
     });
+
+
+    connect(selectallAction, &QAction::triggered, this, [this]{
+
+        QList<AudioItemMaxi*> items = this->findChildren<AudioItemMaxi*>();
+
+        for (AudioItemMaxi* item : std::as_const(items)) {
+            item->setIsSelect(true);
+        }
+
+    });
+
+
+
 
 
 
@@ -284,12 +417,15 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
     menu->addAction(addAction);
     menu->addSeparator(); // Añadir un separador
+    menu->addAction(selectallAction);
     menu->addAction(cutAction);
     menu->addAction(copyAction);
     menu->addAction(pasteAction);
     menu->addAction(deleteAction);
     menu->addSeparator(); // Añadir un separador
     menu->addAction(propertiesAction);
+    menu->addSeparator(); // Añadir un separador
+    menu->addAction(colorAction);
 
 
 }
@@ -350,6 +486,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 
        // Si no hay widget, oculta todas las opciones y retorna
        if (!widget) {
+           selectallAction->setVisible(false);
            copyAction->setVisible(false);
            cutAction->setVisible(false);
            deleteAction->setVisible(false);
@@ -360,6 +497,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
        }
 
        // Mostrar acciones por defecto
+       selectallAction->setVisible(true);
        copyAction->setVisible(true);
        cutAction->setVisible(true);
        deleteAction->setVisible(true);
@@ -381,3 +519,19 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 
 }
 
+
+// color para los menus
+
+QIcon ContentsPlayer::createColorIcon(const QColor &color)
+{
+    QPixmap pixmap(16, 16);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawRoundedRect(2, 2, 12, 12, 3, 3);
+
+    return QIcon(pixmap);
+}

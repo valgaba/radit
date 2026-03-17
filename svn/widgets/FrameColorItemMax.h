@@ -2,14 +2,15 @@
 #define FRAMECOLORITEMMAX_H
 
 
-
-
-
 #include <QPainter>
 
 #include "widgets/frame.h"
 
 class FrameColorItemMax : public Frame {
+
+private:
+   QColor m_color=Qt::blue;
+
 public:
     FrameColorItemMax(QWidget *parent = nullptr) : Frame(parent) {
         setFixedSize(100, 10); // Tamaño del QFrame
@@ -20,14 +21,23 @@ public:
 
     }
 
+    void setColor(QColor color){
+        m_color=color;
+         update();
+    }
+
+    QColor color(){
+        return m_color;
+    }
+
+
 protected:
     void paintEvent(QPaintEvent *event) override {
         QFrame::paintEvent(event);
 
         QPainter painter(this);
            painter.setPen(Qt::NoPen);
-
-           painter.setBrush(Qt::blue);
+           painter.setBrush(m_color);
 
            // Coordenadas de la linea larga
                  QPointF topLeft(0, 0);

@@ -52,6 +52,7 @@ AudioItemMaxi* AudioItemFileMaxi::copy(QWidget* newParent) const  {
       audioitem->setFilePath(this->filePath());
       audioitem->setSecond(this->second());
       audioitem->setToolTip(this->filePath());
+      audioitem->framecolor->setColor(this->framecolor->color());
 
 
 

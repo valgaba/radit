@@ -27,7 +27,7 @@ private:
 
     QVBoxLayout *layout; //general
 
-    FrameColorItemMax *framecolor;
+
     Frame *frametop;
     Frame *framecenter;
     Frame *framedown;
@@ -87,6 +87,8 @@ private:
 
 
 public:
+
+      FrameColorItemMax *framecolor; // esto es para cambiar
 
     void setNameFile(const QString &NameFile);
     void setTiempoFile(double segundos);
@@ -152,24 +154,6 @@ public:
     bool isLoop() const {
           return m_isLoop;
        }
-
-
-
-
-  /*  void setIsSelect(bool isSelect) {
-           m_isSelect = isSelect;
-           btnselect->setProperty("active", m_isSelect); //active viene del css
-           btnselect->style()->polish(btnselect);
-           btnselect->update();
-
-       }
-
-    bool isSelect() const {
-          return m_isSelect;
-       }*/
-
-
-
 
 
 

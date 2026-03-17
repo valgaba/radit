@@ -85,9 +85,9 @@ void AudioItem::dragEnterEvent(QDragEnterEvent *event)
             event->acceptProposedAction();
 }
 
-void AudioItem::dropEvent(QDropEvent *event)
-{
-    if (event->mimeData()->hasFormat("text/plain")) {
+void AudioItem::dropEvent(QDropEvent *event){
+
+
         // Obtener el widget que se está arrastrando
         QWidget *source = qobject_cast<QWidget*>(event->source());
 
@@ -113,7 +113,7 @@ void AudioItem::dropEvent(QDropEvent *event)
                 event->acceptProposedAction();
             }
         }
-    }
+
 }
 
 

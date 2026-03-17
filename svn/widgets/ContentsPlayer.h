@@ -29,15 +29,21 @@ private:
     QPoint mousePos;
 
     //opciones del menu contectual
+
+    QAction *selectallAction;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
     QAction *deleteAction;
     QAction *propertiesAction;
+    QAction *colorAction;
+
 
     bool isCut;  //para las operaciones de cortar pegar
 
    // AudioItemMaxi* createItem(AudioItemMaxi* item);
+
+    static QIcon createColorIcon(const QColor &color);
 
 public:
 

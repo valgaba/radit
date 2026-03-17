@@ -42,7 +42,7 @@ private:
 
     Button * btnclose;
 
-    Label *labelplayernombre;
+    Label *labeltitle;
 
     TabPlayer *tabplayer;
 
@@ -52,7 +52,8 @@ public:
     explicit Player(QWidget *parent = nullptr);
     ~Player();
 
-
+    void setTitle(QString title);
+    QString title() const;
 
     protected:
 

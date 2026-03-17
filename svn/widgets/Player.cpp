@@ -19,7 +19,7 @@
 #include <QMessageBox>
 
 #include "widgets/Player.h"
-#include "widgets/container.h"
+//#include "widgets/container.h"
 
 
 
@@ -79,9 +79,9 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
 
 
-      labelplayernombre =new Label(this);
-      labelplayernombre->setText("Player [noname]");
-      labelplayernombre->setStyleSheet("font-size: 14px;");
+      labeltitle =new Label(this);
+      labeltitle->setText("Player [noname]");
+      labeltitle->setStyleSheet("font-size: 14px;");
       btnclose = new Button(this);
       btnclose->setStyleSheet(
           "QPushButton {"
@@ -97,7 +97,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       btnclose->SetIcon("Close-hover.svg");
       btnclose->setToolTip("Close player");
 
-      layoutbarra->addWidget(labelplayernombre);
+      layoutbarra->addWidget(labeltitle);
       layoutbarra->addStretch();
       layoutbarra->addWidget(btnclose);
 
@@ -126,4 +126,24 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
 
 Player::~Player(){}
+
+void Player::setTitle(QString title)
+{
+    if (labeltitle) {
+        labeltitle->setText(title);
+    }
+}
+
+QString Player::title() const
+{
+    if (labeltitle) {
+        return labeltitle->text();
+    }
+    return "";
+}
+
+
+
+
+
 

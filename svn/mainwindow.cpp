@@ -131,9 +131,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splitterdown->setHandleWidth(1);
 
 
-
-
-
     QList<int> sizes;
     sizes << 1 << 2; // permite especificar los tamaños de los widgets secundarios del divisor.
     splitterprincipal->setSizes(sizes);
@@ -146,54 +143,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     layoutprincipal->addWidget(splitterprincipal);
 
 
-
-
-    TabPlayer *tab = new TabPlayer;
-
-    for (int i = 0; i < 4; ++i) {
-        Container *container = new Container;
-        tab->addTab(container, "lista " + QString::number(i + 1));
-    }
-
-
-   TabPlayer *tab2 = new TabPlayer;
-
-    for (int i = 0; i < 4; ++i) {
-       // Container *container = new Container;
-        Container *container = new Container;
-        tab2->addTab(container, "lista " + QString::number(i + 1));
-    }
-
-    TabPlayer *tab3 = new TabPlayer;
-
-    for (int i = 0; i < 4; ++i) {
-        Container *container = new Container;
-        tab3->addTab(container, "lista " + QString::number(i + 1));
-    }
-
-
-
-    TabPlayer *tab4 = new TabPlayer;
-
-    for (int i = 0; i < 4; ++i) {
-        Container *container = new Container;
-        tab4->addTab(container, "lista " + QString::number(i + 1));
-    }
-
-
-   // Player *player = new Player;
-
-
-    //splitterdown->addWidget(tab4);
-    splitterdown->addWidget(new Player);
-    splitterdown->addWidget(new Player);
-    splitterdown->addWidget(new Player);
-
-
-
-    splittertop->addWidget(tab);
+    splittertop->addWidget(new Player);
     splittertop->addWidget(new TabAuto);
 
+
+    splitterdown->addWidget(new Player);
+    splitterdown->addWidget(new Player);
+    splitterdown->addWidget(new Player);
 
 
     // Ajustar tamaños equitativos

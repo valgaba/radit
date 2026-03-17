@@ -29,6 +29,7 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QMessageBox>
 
 //#include <QtConcurrent/QtConcurrentMap>
 //#include <QFuture>
@@ -162,17 +163,39 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
 {
     layout->addWidget(item);
 
-    connect(item, &AudioItemMaxi::requestDelete,
-            this, [this](AudioItemMaxi* item)
-    {
-        layout->removeWidget(item);
-        item->deleteLater();
+    connect(item, &AudioItemMaxi::requestDelete, //viene de pulsar boton de borrado de audioitemMaxi
+            this, [this](AudioItemMaxi* item){
+
+        QString nombre = item->nameFile();
+
+          QMessageBox::StandardButton reply = QMessageBox::question(
+              this,
+              "Borrar Item",
+              QString("¿Seguro que quieres borrar \"%1\"?").arg(nombre),
+              QMessageBox::Yes | QMessageBox::No
+          );
+
+          if (reply == QMessageBox::Yes) {
+              deleteItem(item);
+          }
     });
 
     return item;
 }
 
 
+
+void ContentsBase::deleteItem(AudioItemMaxi* item)
+{
+    if (!item) return;
+
+
+    if (item->parentWidget() && item->parentWidget()->layout()) {
+        item->parentWidget()->layout()->removeWidget(item);
+    }
+
+    item->deleteLater();
+}
 
 
 

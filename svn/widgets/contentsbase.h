@@ -40,6 +40,7 @@ public:
     ~ContentsBase();
 
     virtual AudioItemMaxi* createItem(AudioItemMaxi* item);
+    virtual void deleteItem(AudioItemMaxi* item);
 
 
 protected:
