@@ -34,13 +34,22 @@ private:
 
     // Acciones principales
     QAction *addMenuAction;
-    QAction *colorAction;
+
     QAction *selectallAction;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
     QAction *deleteAction;
+
     QAction *propertiesAction;
+    QAction *colorAction;
+
+    QAction *loadAction;
+    QAction *saveAction;
+    QAction *saveasAction;
+
+
+
 
     void setupAddMenu();
     void setupColorMenu();

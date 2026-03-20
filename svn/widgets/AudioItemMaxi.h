@@ -85,6 +85,9 @@ private:
      QTimer* m_pauseBlinkTimer = nullptr;
      bool m_labelVisible = true;
 
+     double  m_secondstart;
+
+
 
 public:
 
@@ -155,6 +158,15 @@ public:
           return m_isLoop;
        }
 
+
+
+    void setSecondStart(double secondStart) {
+        m_secondstart = secondStart;
+    }
+
+    double secondStart() const {
+        return m_secondstart;
+    }
 
 
     protected:

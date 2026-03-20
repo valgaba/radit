@@ -37,7 +37,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
          this->labeltiempocue->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
-
+         this->setSecondStart(frame.position); //guardamos los segundos de pause para luego el play
 
          if (!m_userIsSeeking && m_duration > 0.0)
          {

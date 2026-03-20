@@ -45,6 +45,11 @@ public:
     void pasteClipboard();
     void applyColor(const QColor &color);
 
+    void loadItems()   { /* TODO: implementar */ }
+    void saveItems()   { /* TODO: implementar */ }
+    void saveAsItems() { /* TODO: implementar */ }
+
+
 
 protected:
 

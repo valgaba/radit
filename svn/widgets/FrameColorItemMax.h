@@ -9,7 +9,7 @@
 class FrameColorItemMax : public Frame {
 
 private:
-   QColor m_color=Qt::blue;
+   QColor m_color=Qt::transparent;
 
 public:
     FrameColorItemMax(QWidget *parent = nullptr) : Frame(parent) {

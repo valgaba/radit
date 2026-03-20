@@ -15,6 +15,7 @@
    along with radit.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+// ContentsMenu.cpp
 #include "ContentsMenu.h"
 #include "ContentsPlayer.h"
 #include "widgets/AudioItemFileMaxi.h"
@@ -39,68 +40,60 @@ void ContentsMenu::showAt(const QPoint &pos) {
     exec(player->mapToGlobal(pos));
 }
 
-void ContentsMenu::setColorVisible(bool visible) {
-    if (colorAction) colorAction->setVisible(visible);
-}
-
-void ContentsMenu::setSelectAllVisible(bool visible) {
-    if (selectallAction) selectallAction->setVisible(visible);
-}
-
-void ContentsMenu::setCopyVisible(bool visible) {
-    if (copyAction) copyAction->setVisible(visible);
-}
-
-void ContentsMenu::setCutVisible(bool visible) {
-    if (cutAction) cutAction->setVisible(visible);
-}
-
-void ContentsMenu::setDeleteVisible(bool visible) {
-    if (deleteAction) deleteAction->setVisible(visible);
-}
-
-void ContentsMenu::setPropertiesVisible(bool visible) {
-    if (propertiesAction) propertiesAction->setVisible(visible);
-}
-
-void ContentsMenu::setPasteVisible(bool visible) {
-    if (pasteAction) pasteAction->setVisible(visible);
-}
-
-
-
+void ContentsMenu::setColorVisible(bool visible) { if (colorAction) colorAction->setVisible(visible); }
+void ContentsMenu::setSelectAllVisible(bool visible) { if (selectallAction) selectallAction->setVisible(visible); }
+void ContentsMenu::setCopyVisible(bool visible) { if (copyAction) copyAction->setVisible(visible); }
+void ContentsMenu::setCutVisible(bool visible) { if (cutAction) cutAction->setVisible(visible); }
+void ContentsMenu::setDeleteVisible(bool visible) { if (deleteAction) deleteAction->setVisible(visible); }
+void ContentsMenu::setPropertiesVisible(bool visible) { if (propertiesAction) propertiesAction->setVisible(visible); }
+void ContentsMenu::setPasteVisible(bool visible) { if (pasteAction) pasteAction->setVisible(visible); }
 
 // ---------------------------
 // Submenu "Añadir"
-void ContentsMenu::setupAddMenu() {
-    addMenuAction = createAddAction();
-}
+void ContentsMenu::setupAddMenu() { addMenuAction = createAddAction(); }
 
 // Submenu "Color"
-void ContentsMenu::setupColorMenu() {
-    colorAction = createColorAction();
-}
+void ContentsMenu::setupColorMenu() { colorAction = createColorAction(); }
 
 // Acciones generales
 void ContentsMenu::setupActions() {
-       selectallAction = new QAction("SelectAll", this);
-       cutAction = new QAction("Cut", this);
-       copyAction = new QAction("Copy", this);
-       pasteAction = new QAction("Paste", this);
-       deleteAction = new QAction("Delete", this);
-       propertiesAction = new QAction("Properties", this);
+    selectallAction = new QAction("SelectAll", this);
+    cutAction = new QAction("Cut", this);
+    copyAction = new QAction("Copy", this);
+    pasteAction = new QAction("Paste", this);
+    deleteAction = new QAction("Delete", this);
+    propertiesAction = new QAction("Properties", this);
 
-       QMenu::addAction(addMenuAction);
-       addSeparator();
-       QMenu::addAction(selectallAction);
-       QMenu::addAction(cutAction);
-       QMenu::addAction(copyAction);
-       QMenu::addAction(pasteAction);
-       QMenu::addAction(deleteAction);
-       addSeparator();
-       QMenu::addAction(propertiesAction);
-       addSeparator();
-       QMenu::addAction(colorAction);
+    selectallAction->setIcon(QIcon(":/icons/Selectall.svg"));
+    cutAction->setIcon(QIcon(":/icons/ActionCut.svg"));
+    copyAction->setIcon(QIcon(":/icons/ActionCopy.svg"));
+    pasteAction->setIcon(QIcon(":/icons/ActionPaste.svg"));
+    deleteAction->setIcon(QIcon(":/icons/Remove.svg"));
+
+    loadAction = new QAction("Load", this);
+    saveAction = new QAction("Save", this);
+    saveasAction = new QAction("Save As", this);
+
+    loadAction->setIcon(QIcon(":/icons/Load.svg"));
+    saveAction->setIcon(QIcon(":/icons/Save.svg"));
+    saveasAction->setIcon(QIcon(":/icons/SaveAs.svg"));
+
+    QMenu::addAction(addMenuAction);
+    addSeparator();
+    QMenu::addAction(selectallAction);
+    QMenu::addAction(cutAction);
+    QMenu::addAction(copyAction);
+    QMenu::addAction(pasteAction);
+    QMenu::addAction(deleteAction);
+    addSeparator();
+    QMenu::addAction(loadAction);
+    QMenu::addAction(saveAction); // Puedes añadirlo luego
+    QMenu::addAction(saveasAction); // Puedes añadirlo luego
+
+    addSeparator();
+    QMenu::addAction(propertiesAction);
+    addSeparator();
+    QMenu::addAction(colorAction);
 }
 
 // Conectar acciones
@@ -110,12 +103,16 @@ void ContentsMenu::connectActions() {
     connect(copyAction, &QAction::triggered, player, &ContentsPlayer::copySelected);
     connect(cutAction, &QAction::triggered, player, &ContentsPlayer::cutSelected);
     connect(pasteAction, &QAction::triggered, player, &ContentsPlayer::pasteClipboard);
-   // connect(propertiesAction, &QAction::triggered, player, &ContentsPlayer::showPropertiesForHoveredItem);
 }
+
+
+
 
 // Crear submenú "Añadir"
 QAction* ContentsMenu::createAddAction() {
     QAction *action = new QAction("Añadir", this);
+    action->setIcon(QIcon(":/icons/Add.svg"));
+
     QMenu *submenu = new QMenu(this);
 
     QAction *addAudiofile = new QAction("Audio File", submenu);
@@ -141,46 +138,69 @@ QAction* ContentsMenu::createAddAction() {
     return action;
 }
 
+
+
+
+
+
 // Crear submenú "Color"
 QAction* ContentsMenu::createColorAction() {
-    QAction *action = new QAction("Color Item", this);
-    QMenu *submenu = new QMenu(this);
+    // Creamos un QWidgetAction que contendrá todos los botones
+       QWidgetAction *widgetAction = new QWidgetAction(this);
 
-    QWidgetAction *widgetAction = new QWidgetAction(submenu);
-    QWidget *widget = new QWidget(submenu);
-    QHBoxLayout *layout = new QHBoxLayout(widget);
-    layout->setContentsMargins(0,0,0,0);
-    layout->setSpacing(0);
+       QWidget *widget = new QWidget(this);
+       QHBoxLayout *layout = new QHBoxLayout(widget);
+       layout->setContentsMargins(2, 2, 2, 2);
+       layout->setSpacing(4);
 
-    QVector<ColorButton> colors = {
-        {"Red", QColor(231, 76, 60)},
-        {"Orange", QColor(230, 126, 34)},
-        {"Green", QColor(124, 179, 66)},
-        {"Blue", QColor(0, 172, 193)},
-        {"Cyan", QColor(52, 152, 219)},
-        {"Pink", QColor(216, 27, 96)}
-    };
+       // Paleta de colores
+       QVector<ColorButton> colors = {
+           {"Red", QColor(231, 76, 60)},
+           {"Orange", QColor(230, 126, 34)},
+           {"Green", QColor(124, 179, 66)},
+           {"Blue", QColor(0, 172, 193)},
+           {"Cyan", QColor(52, 152, 219)},
+           {"Pink", QColor(216, 27, 96)}
+       };
 
-    for (const auto &c : colors) {
-        QPushButton *btn = new QPushButton(createColorIcon(c.color), "");
-        btn->setFlat(true);
-        btn->setToolTip(c.name);
-        btn->setFixedSize(32, 32);
-        btn->setIconSize(QSize(32,32));
-        layout->addWidget(btn);
+       // Botón "sin color" / transparente
+       QPushButton *btnTransparent = new QPushButton();
+       btnTransparent->setIcon(QIcon(":/icons/CheckBox.svg"));
+       btnTransparent->setToolTip("No Color");
+       btnTransparent->setFlat(true);
+       btnTransparent->setIconSize(QSize(16,16));
+       layout->addWidget(btnTransparent);
 
-        connect(btn, &QPushButton::clicked, player, [this, c]{
+       connect(btnTransparent, &QPushButton::clicked, player, [this]{
+           player->applyColor(Qt::transparent);
+           this->close(); // cierra TODO el menú principal
+       });
+
+       // Botones de colores
+       for (const auto &c : colors) {
+           QPushButton *btn = new QPushButton();
+           btn->setIcon(createColorIcon(c.color));
+           btn->setFlat(true);
+           btn->setToolTip(c.name);
+           btn->setIconSize(QSize(16,16));
+           layout->addWidget(btn);
+
+           connect(btn, &QPushButton::clicked, player, [this, c]{
                player->applyColor(c.color);
-               this->close();
+               this->close(); // cierra TODO el menú principal
            });
-    }
+       }
 
-    widgetAction->setDefaultWidget(widget);
-    submenu->addAction(widgetAction);
-    action->setMenu(submenu);
+       widget->setLayout(layout);
+       widgetAction->setDefaultWidget(widget);
 
-    return action;
+       return widgetAction; // devolvemos directamente el QWidgetAction
 }
+
+
+
+
+
 
 // Icono redondo de color
 QIcon ContentsMenu::createColorIcon(const QColor &color) {
@@ -193,7 +213,3 @@ QIcon ContentsMenu::createColorIcon(const QColor &color) {
     painter.drawRoundedRect(4, 4, 16, 16, 4, 4);
     return QIcon(pixmap);
 }
-
-
-
-
