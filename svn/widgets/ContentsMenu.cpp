@@ -27,9 +27,9 @@
 struct ColorButton { QString name; QColor color; };
 
 ContentsMenu::ContentsMenu(ContentsPlayer *parent)
-    : QMenu(parent), player(parent)
+    : Menu(parent), player(parent)
 {
-    setFixedWidth(200);
+   // setFixedWidth(200);
     setupAddMenu();
     setupColorMenu();
     setupActions();
@@ -47,6 +47,11 @@ void ContentsMenu::setCutVisible(bool visible) { if (cutAction) cutAction->setVi
 void ContentsMenu::setDeleteVisible(bool visible) { if (deleteAction) deleteAction->setVisible(visible); }
 void ContentsMenu::setPropertiesVisible(bool visible) { if (propertiesAction) propertiesAction->setVisible(visible); }
 void ContentsMenu::setPasteVisible(bool visible) { if (pasteAction) pasteAction->setVisible(visible); }
+
+void ContentsMenu::setLoadVisible(bool visible) { if (loadAction) loadAction->setVisible(visible); }
+void ContentsMenu::setSaveVisible(bool visible) { if (saveAction) saveAction->setVisible(visible); }
+void ContentsMenu::setSaveAsVisible(bool visible) { if (saveasAction) saveasAction->setVisible(visible); }
+
 
 // ---------------------------
 // Submenu "Añadir"
@@ -78,22 +83,22 @@ void ContentsMenu::setupActions() {
     saveAction->setIcon(QIcon(":/icons/Save.svg"));
     saveasAction->setIcon(QIcon(":/icons/SaveAs.svg"));
 
-    QMenu::addAction(addMenuAction);
+    Menu::addAction(addMenuAction);
     addSeparator();
-    QMenu::addAction(selectallAction);
-    QMenu::addAction(cutAction);
-    QMenu::addAction(copyAction);
-    QMenu::addAction(pasteAction);
-    QMenu::addAction(deleteAction);
+    Menu::addAction(selectallAction);
+    Menu::addAction(cutAction);
+    Menu::addAction(copyAction);
+    Menu::addAction(pasteAction);
+    Menu::addAction(deleteAction);
     addSeparator();
-    QMenu::addAction(loadAction);
-    QMenu::addAction(saveAction); // Puedes añadirlo luego
-    QMenu::addAction(saveasAction); // Puedes añadirlo luego
+    Menu::addAction(loadAction);
+    Menu::addAction(saveAction); // Puedes añadirlo luego
+    Menu::addAction(saveasAction); // Puedes añadirlo luego
 
     addSeparator();
-    QMenu::addAction(propertiesAction);
+    Menu::addAction(propertiesAction);
     addSeparator();
-    QMenu::addAction(colorAction);
+    Menu::addAction(colorAction);
 }
 
 // Conectar acciones
@@ -113,7 +118,7 @@ QAction* ContentsMenu::createAddAction() {
     QAction *action = new QAction("Añadir", this);
     action->setIcon(QIcon(":/icons/Add.svg"));
 
-    QMenu *submenu = new QMenu(this);
+    Menu *submenu = new Menu(this);
 
     QAction *addAudiofile = new QAction("Audio File", submenu);
     QAction *addAudioFolder = new QAction("Audio Folder", submenu);

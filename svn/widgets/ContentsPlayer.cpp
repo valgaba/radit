@@ -112,6 +112,10 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             contentsMenu->setPropertiesVisible(false);
             contentsMenu->setPasteVisible(!this->clipboard.lista.isEmpty());
 
+          //  contentsMenu->setLoadVisible(false);
+            contentsMenu->setSaveVisible(false);
+            contentsMenu->setSaveAsVisible(false);
+
             contentsMenu->exec(mapToGlobal(mousePos));
             return;
         }
@@ -123,6 +127,11 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         contentsMenu->setCutVisible(true);
         contentsMenu->setDeleteVisible(true);
         contentsMenu->setPropertiesVisible(true);
+
+      //  contentsMenu->setLoadVisible(true);
+        contentsMenu->setSaveVisible(true);
+        contentsMenu->setSaveAsVisible(true);
+
 
 
         // Mostrar u ocultar Paste según clipboard

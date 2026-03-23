@@ -40,9 +40,9 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
     menu = new Menu(this);
     menu->setFixedWidth(200); // Establecer anchura del menú en píxeles
 
-    QAction *addAction = new QAction("Añadir pestaña", this);
-    QAction *removeAction = new QAction("Eliminar pestaña", this);
-    QAction *renameAction = new QAction("Renombrar la pestaña", this);
+    QAction *addAction = new QAction("Add list", this);
+    QAction *removeAction = new QAction("Delete list", this);
+    QAction *renameAction = new QAction("Rename list", this);
 
     addAction->setIcon(QIcon(":/icons/Add.svg"));
     removeAction->setIcon(QIcon(":/icons/Remove.svg"));

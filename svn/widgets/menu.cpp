@@ -23,7 +23,7 @@
 
 Menu::Menu(QWidget *parent):QMenu(parent){
     this->setObjectName("Menu"); //para qss
-
+    setAttribute(Qt::WA_StyledBackground, true);
 
  }
 

@@ -9,11 +9,13 @@
 #include <QColor>
 #include <QVector>
 
+#include "widgets/menu.h"
+
 
 class ContentsPlayer;
 struct ColorButton;
 
-class ContentsMenu : public QMenu
+class ContentsMenu : public Menu
 {
     Q_OBJECT
 public:
@@ -28,6 +30,11 @@ public:
     void setDeleteVisible(bool visible);
     void setPropertiesVisible(bool visible);
     void setPasteVisible(bool visible);
+
+    void setLoadVisible(bool visible);
+    void setSaveVisible(bool visible);
+    void setSaveAsVisible(bool visible);
+
 
 private:
     ContentsPlayer *player;

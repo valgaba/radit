@@ -990,7 +990,7 @@ QMenu::separator{
 	
 }
 #Menu::item {
-	color:rgb(223,219,210);
+	color: #80a4ae;
 	background-color: transparent;
 	padding-left:20px;
 	padding-top:4px;
@@ -1013,4 +1013,7 @@ QMenu::separator{
 
 #Menu{
 	background-color: #39385b;
+    color: #80a4ae;
+
+	
 }
