@@ -63,28 +63,60 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
             QDataStream stream(&data, QIODevice::ReadOnly);
 
             QList<AudioItem*> movedItems;
+            QList<AudioItemMaxi*> itemsToDeleteFromSource; // <-- borrar después
 
             while (!stream.atEnd()) {
 
                 quintptr ptr;
                 stream >> ptr;
 
-                AudioItem *item = reinterpret_cast<AudioItem*>(ptr);
-                if (!item)
+                AudioItem *itemBase = reinterpret_cast<AudioItem*>(ptr);
+                if (!itemBase)
                     continue;
 
-                if (item->parentWidget() && item->parentWidget()->layout())
-                    item->parentWidget()->layout()->removeWidget(item);
+                // Ver si viene del mismo ContentsPlayer o de otro
+                ContentsPlayer* sourceContents = qobject_cast<ContentsPlayer*>(itemBase->parentWidget());
 
-                layout->addWidget(item);
-                item->setParent(this);
+                if (sourceContents == this) {
+                    // MISMO CONTENTSPLAYER => mover
+                    if (itemBase->parentWidget() && itemBase->parentWidget()->layout())
+                        itemBase->parentWidget()->layout()->removeWidget(itemBase);
 
-                movedItems.append(item);
+                    layout->addWidget(itemBase);
+                    itemBase->setParent(this);
+
+                    itemBase->setIsSelect(false);
+                    movedItems.append(itemBase);
+                }
+                else {
+                    // OTRO CONTENTSPLAYER => copiar y luego borrar original
+                    AudioItemMaxi* itemMaxi = qobject_cast<AudioItemMaxi*>(itemBase);
+                    if (!itemMaxi)
+                        continue;
+
+                    AudioItemMaxi* newItem = itemMaxi->copy(this);
+                    createItem(newItem);
+                    newItem->setIsSelect(false);
+
+                    itemsToDeleteFromSource.append(itemMaxi);
+                }
             }
 
-            // Desmarcar los items seleccionados después del drag
+            // Desmarcar los movidos dentro del mismo player
             for (AudioItem* item : movedItems) {
                 item->setIsSelect(false);
+            }
+
+            // Borrar los originales del otro player (CUT/PASTE)
+            for (AudioItemMaxi* oldItem : itemsToDeleteFromSource) {
+                if (!oldItem)
+                    continue;
+
+                if (oldItem->parentWidget() && oldItem->parentWidget()->layout()) {
+                    oldItem->parentWidget()->layout()->removeWidget(oldItem);
+                }
+
+                oldItem->deleteLater();
             }
 
             event->acceptProposedAction();
@@ -344,9 +376,9 @@ void ContentsPlayer::applyColor(const QColor &color)
 }
 
 
-void ContentsPlayer::setPlayer(Player *player)
+/*void ContentsPlayer::setPlayer(Player *player)
 {
     m_player = player;
-}
+}*/
 
 

@@ -171,17 +171,17 @@ void Player::playItem(AudioItemMaxi *item)
     if (!item)
            return;
 
-       if (currentItem == item) {
+      /* if (currentItem == item) {
            mediamanager->stop();
            mediamanager->seek(0.0);
            mediamanager->play();
            return;
-       }
+       }*/
 
-       if (currentItem) {
-           mediamanager->stop();
-           mediamanager->seek(0.0);
-       }
+    if (currentItem && currentItem != item) {
+        mediamanager->stop();
+        mediamanager->seek(0.0);
+   }
 
        mediamanager->setDevice(-1);
        mediamanager->loadFile(item->filePath());

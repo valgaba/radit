@@ -106,25 +106,29 @@ void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
 // suelta evento
 void ContentsBase::dropEvent(QDropEvent *event){
 
-   // QWidget* source = qobject_cast< QWidget*>(event->source());
     AudioItemMaxi* source = qobject_cast<AudioItemMaxi*>(event->source());
 
-    if(source) {
+   /* if(source) {
 
             if(source->parentWidget() && source->parentWidget()->layout()) {
                  source->parentWidget()->layout()->removeWidget(source);
               }
 
-            layout->addWidget(source);
-            return;
-    }
+            // Crear una copia del item en lugar de mover el original
+                    AudioItemMaxi* newItem = source->copy(this);
+                    createItem(newItem);
+                    qDebug() <<"dentro1";
+                    event->acceptProposedAction();
+                    return;
+
+           // layout->addWidget(source);
+            //return;
+    }*/
 
   //////////// viene del sistema de archivos
    if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
-
-
-             foreach(QUrl url, urls) {
+            foreach(QUrl url, urls) {
 
                QString filePath = url.toLocalFile();
                double duration = mediamanager->getDurationSecond(filePath);

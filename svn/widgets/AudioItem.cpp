@@ -104,7 +104,9 @@ void AudioItem::dropEvent(QDropEvent *event){
                 }
 
                 // Insertar en la nueva posición (antes del widget actual)
+
                 int targetIndex = targetLayout->indexOf(this);
+                qDebug() <<targetIndex;
                 targetLayout->insertWidget(targetIndex, source);
 
                 // Establecer el nuevo padre del widget
