@@ -17,6 +17,8 @@
 //#include "widgets/AudioItemMaxi.h"
 #include "widgets/ContentsMenu.h"
 
+class Player;
+
 
 class ContentsPlayer: public ContentsBase
 {
@@ -29,8 +31,7 @@ private:
     QPoint mousePos;
     bool isCut;  //para las operaciones de cortar pegar
     ContentsMenu *contentsMenu = nullptr;
-
-
+    Player *m_player = nullptr;
 
 public:
 
@@ -49,7 +50,7 @@ public:
     void saveItems()   { /* TODO: implementar */ }
     void saveAsItems() { /* TODO: implementar */ }
 
-
+    void setPlayer(Player *player);
 
 
 

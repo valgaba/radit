@@ -29,6 +29,28 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
   //  this->setStyleSheet("background-color: none;");
 
+
+       mediamanager = new MediaManager(this);
+
+     connect(mediamanager, &MediaManager::audioFrameUpdated,
+               this, [this](const AudioFrame &frame) {
+
+
+
+       });
+
+
+       connect(mediamanager, &MediaManager::playbackFinished,
+               this, [this]() {
+                   mediamanager->stop();
+                   mediamanager->seek(0.0);
+                   currentItem = nullptr;
+               });
+
+
+
+
+
       layout = new QVBoxLayout(this);  // layout general
       layout->setContentsMargins(0, 0, 0, 0);
       layout->setSpacing(0);
@@ -116,9 +138,9 @@ Player::Player(QWidget *parent) : Frame(parent) {
       });
 
 
+     tabplayer = new TabPlayer(this);
 
-
-      layout->addWidget(new TabPlayer);
+      layout->addWidget(tabplayer);
 
 
 }
@@ -144,6 +166,48 @@ QString Player::title() const
 
 
 
+void Player::playItem(AudioItemMaxi *item)
+{
+    if (!item)
+           return;
 
+       if (currentItem == item) {
+           mediamanager->stop();
+           mediamanager->seek(0.0);
+           mediamanager->play();
+           return;
+       }
+
+       if (currentItem) {
+           mediamanager->stop();
+           mediamanager->seek(0.0);
+       }
+
+       mediamanager->setDevice(-1);
+       mediamanager->loadFile(item->filePath());
+       mediamanager->play();
+
+       currentItem = item;
+}
+
+void Player::pauseMain()
+{
+    if (!currentItem)
+        return;
+
+    if (mediamanager->isPlaying()) {
+        mediamanager->pause();
+    }
+}
+
+void Player::stopMain()
+{
+    if (!currentItem)
+        return;
+
+    mediamanager->stop();
+    mediamanager->seek(0.0);
+    currentItem = nullptr;
+}
 
 

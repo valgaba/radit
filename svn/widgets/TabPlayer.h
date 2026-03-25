@@ -8,9 +8,10 @@
 
 #include "widgets/tab.h"
 #include "widgets/menu.h"
+class AudioItemMaxi;
 
 
-    class TabPlayer: public Tab
+class TabPlayer: public Tab
 {
 
     Q_OBJECT
@@ -38,7 +39,8 @@ private slots:
 
 public slots:
 
-
+    signals:
+        void requestPlayItem(AudioItemMaxi* item);
 
 };
 

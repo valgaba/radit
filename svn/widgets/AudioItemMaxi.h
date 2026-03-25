@@ -181,6 +181,7 @@ public:
 
     signals:
       void requestDelete(AudioItemMaxi* item);
+      void requestPlay(AudioItemMaxi *item);
 
 
 

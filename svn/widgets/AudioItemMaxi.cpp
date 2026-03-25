@@ -61,6 +61,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
 
+
      m_pauseBlinkTimer = new QTimer(this);
      m_pauseBlinkTimer->setInterval(500); // parpadeo cada 500ms
 
@@ -219,6 +220,11 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnplay->setIconSize(QSize(50, 60));  // ajusta al tamaño que quieras
         btnplay->setFixedSize(60, 35);  //Tamaño fijo
         btnplay->setToolTip("Properties");
+
+
+        connect(btnplay, &QPushButton::clicked, this, [this]() {
+            emit requestPlay(this);
+        });
 
 
 

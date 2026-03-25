@@ -40,7 +40,11 @@ Container::Container(QWidget *parent):QScrollArea(parent){
 
 
 
-   this->setWidget(new ContentsPlayer); // contenido por defecto
+   //this->setWidget(new ContentsPlayer(this)); // contenido por defecto
+
+
+        contentsplayer = new ContentsPlayer(this);
+        this->setWidget(contentsplayer);
 
 
 }

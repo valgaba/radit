@@ -5,6 +5,8 @@
 #include <QWidget>
 #include <QVBoxLayout>
 
+#include "widgets/ContentsPlayer.h"
+#include "widgets/AudioItemMaxi.h"
 
 
 
@@ -15,6 +17,7 @@ class Container: public QScrollArea
 
     private:
      QVBoxLayout *layout;
+     ContentsPlayer* contentsplayer;
 
 
     public:
@@ -35,6 +38,9 @@ class Container: public QScrollArea
     private slots:
 
     public slots:
+
+    signals:
+
 
 
 

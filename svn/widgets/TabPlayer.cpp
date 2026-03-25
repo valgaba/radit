@@ -118,7 +118,6 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
 
 
 
-
 }
 
 

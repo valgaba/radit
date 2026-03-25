@@ -140,10 +140,8 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
                    audioItem->setFilePath(filePath);
                    audioItem->setSecond(duration);
-
                    audioItem->setNameFile(fileInfo.completeBaseName());
                    audioItem->setTiempoFile(duration);
-
                    audioItem->setToolTip(filePath);
 
                    createItem(audioItem );
@@ -178,7 +176,31 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
           if (reply == QMessageBox::Yes) {
               deleteItem(item);
           }
+
     });
+
+    //  NUEVO: conectar play grande del item
+      connect(item, &AudioItemMaxi::requestPlay,
+              this, [this](AudioItemMaxi* item) {
+
+                 QWidget* w = this;
+                 Player* player = nullptr;
+
+                 while (w) {
+                     player = qobject_cast<Player*>(w);
+                     if (player)
+                         break;
+                     w = w->parentWidget();
+                 }
+
+                 if (player) {
+                     player->playItem(item);
+                 }
+
+      });
+
+
+
 
     return item;
 }

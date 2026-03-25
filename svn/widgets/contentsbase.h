@@ -13,6 +13,7 @@
 #include "core/Clipboard.h"
 #include "widgets/AudioItemMaxi.h"
 #include "core/MediaManager.h"
+#include "widgets/Player.h"
 
 
 class ContentsBase: public QWidget{
@@ -56,7 +57,8 @@ private slots:
 
 public slots:
 
-
+  signals:
+   void requestPlayItem(AudioItemMaxi* item);
 
 
 

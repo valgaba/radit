@@ -342,3 +342,11 @@ void ContentsPlayer::applyColor(const QColor &color)
         item->setIsSelect(false);
     }
 }
+
+
+void ContentsPlayer::setPlayer(Player *player)
+{
+    m_player = player;
+}
+
+

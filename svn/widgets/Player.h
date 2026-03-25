@@ -11,6 +11,8 @@
 #include "widgets/label.h"
 #include "widgets/frame.h"
 #include "widgets/TabPlayer.h"
+#include "widgets/AudioItemMaxi.h"
+#include "core/MediaManager.h"
 
 
 
@@ -46,6 +48,9 @@ private:
 
     TabPlayer *tabplayer;
 
+    MediaManager *mediamanager;
+    AudioItemMaxi *currentItem;
+
 
 public:
 
@@ -54,6 +59,10 @@ public:
 
     void setTitle(QString title);
     QString title() const;
+
+    void playItem(AudioItemMaxi *item);
+    void pauseMain();
+    void stopMain();
 
     protected:
 
