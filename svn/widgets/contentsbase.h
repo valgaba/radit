@@ -28,7 +28,6 @@ private:
     QList<QWidget*>  list;
    // QString formatTimeHhMmSsDd(double duration);
     MediaManager *mediamanager;
-   Player* findPlayer() const;   //necesitamos el padre player para difentes operaciones
 
 
 public:
@@ -42,6 +41,7 @@ public:
 
     virtual AudioItemMaxi* createItem(AudioItemMaxi* item);
     virtual void deleteItem(AudioItemMaxi* item);
+    Player* findPlayer() const;   //necesitamos el padre player para difentes operaciones
 
 
 protected:

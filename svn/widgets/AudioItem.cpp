@@ -22,7 +22,7 @@
 AudioItem::AudioItem(QWidget *parent): QWidget(parent){
 
     // Aceptar operaciones de drag and drop
-    setAcceptDrops(true);
+   // setAcceptDrops(true);
 }
 
 void AudioItem::mousePressEvent(QMouseEvent *event)

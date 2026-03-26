@@ -59,72 +59,132 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
 {
     if (event->mimeData()->hasFormat("application/x-audioitems")) {
 
-            QByteArray data = event->mimeData()->data("application/x-audioitems");
-            QDataStream stream(&data, QIODevice::ReadOnly);
+           QByteArray data = event->mimeData()->data("application/x-audioitems");
+           QDataStream stream(&data, QIODevice::ReadOnly);
 
-            QList<AudioItem*> movedItems;
-            QList<AudioItemMaxi*> itemsToDeleteFromSource; // <-- borrar después
+           QList<AudioItem*> draggedItems;
+           QList<AudioItemMaxi*> itemsToDeleteFromSource;
 
-            while (!stream.atEnd()) {
+           while (!stream.atEnd()) {
+               quintptr ptr;
+               stream >> ptr;
 
-                quintptr ptr;
-                stream >> ptr;
+               AudioItem *itemBase = reinterpret_cast<AudioItem*>(ptr);
+               if (!itemBase)
+                   continue;
 
-                AudioItem *itemBase = reinterpret_cast<AudioItem*>(ptr);
-                if (!itemBase)
-                    continue;
+               draggedItems.append(itemBase);
+           }
 
-                // Ver si viene del mismo ContentsPlayer o de otro
-                ContentsPlayer* sourceContents = qobject_cast<ContentsPlayer*>(itemBase->parentWidget());
+           // Buscar item destino bajo el cursor
+   #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+           QPoint dropPos = event->position().toPoint();
+   #else
+           QPoint dropPos = event->pos();
+   #endif
 
-                if (sourceContents == this) {
-                    // MISMO CONTENTSPLAYER => mover
-                    if (itemBase->parentWidget() && itemBase->parentWidget()->layout())
-                        itemBase->parentWidget()->layout()->removeWidget(itemBase);
+           QWidget *targetWidget = childAt(dropPos);
 
-                    layout->addWidget(itemBase);
-                    itemBase->setParent(this);
+           while (targetWidget && !qobject_cast<AudioItemMaxi*>(targetWidget)) {
+               targetWidget = targetWidget->parentWidget();
+           }
 
-                    itemBase->setIsSelect(false);
-                    movedItems.append(itemBase);
-                }
-                else {
-                    // OTRO CONTENTSPLAYER => copiar y luego borrar original
-                    AudioItemMaxi* itemMaxi = qobject_cast<AudioItemMaxi*>(itemBase);
-                    if (!itemMaxi)
-                        continue;
+           int insertIndex = -1;
+           if (targetWidget) {
+               insertIndex = layout->indexOf(targetWidget);
+           }
 
-                    AudioItemMaxi* newItem = itemMaxi->copy(this);
-                    createItem(newItem);
-                    newItem->setIsSelect(false);
+           // Si no cae sobre un item, añadir al final
+           if (insertIndex < 0) {
+               insertIndex = layout->count();
+           }
 
-                    itemsToDeleteFromSource.append(itemMaxi);
-                }
-            }
+           for (AudioItem *itemBase : std::as_const(draggedItems)) {
 
-            // Desmarcar los movidos dentro del mismo player
-            for (AudioItem* item : movedItems) {
-                item->setIsSelect(false);
-            }
+               ContentsPlayer* sourceContents = nullptr;
 
-            // Borrar los originales del otro player (CUT/PASTE)
-            for (AudioItemMaxi* oldItem : itemsToDeleteFromSource) {
-                if (!oldItem)
-                    continue;
+               QWidget *p = itemBase->parentWidget();
+               while (p) {
+                   sourceContents = qobject_cast<ContentsPlayer*>(p);
+                   if (sourceContents)
+                       break;
+                   p = p->parentWidget();
+               }
 
-                if (oldItem->parentWidget() && oldItem->parentWidget()->layout()) {
-                    oldItem->parentWidget()->layout()->removeWidget(oldItem);
-                }
+               if (sourceContents == this) {
+                   // MISMO PLAYER -> mover
+                   if (itemBase->parentWidget() && itemBase->parentWidget()->layout()) {
+                       itemBase->parentWidget()->layout()->removeWidget(itemBase);
+                   }
 
-                oldItem->deleteLater();
-            }
+                   layout->insertWidget(insertIndex, itemBase);
+                   itemBase->setParent(this);
+                   itemBase->setIsSelect(false);
 
-            event->acceptProposedAction();
-            return;
-        }
+                   insertIndex++;
+               }
+               else {
+                   // OTRO PLAYER -> copiar
+                   AudioItemMaxi* itemMaxi = qobject_cast<AudioItemMaxi*>(itemBase);
+                   if (!itemMaxi)
+                       continue;
 
-        // Si no es drag interno, usar el comportamiento del padre
-        ContentsBase::dropEvent(event);
+                   AudioItemMaxi* newItem = itemMaxi->copy(this);
+
+                   // createItem(newItem) hace addWidget al final,
+                   // así que aquí NO lo usamos directamente
+                   layout->insertWidget(insertIndex, newItem);
+
+                   // reconectar señales manualmente
+                   connect(newItem, &AudioItemMaxi::requestDelete,
+                           this, [this](AudioItemMaxi* item){
+
+                       QString nombre = item->nameFile();
+
+                       QMessageBox::StandardButton reply = QMessageBox::question(
+                           this,
+                           "Borrar Item",
+                           QString("¿Seguro que quieres borrar \"%1\"?").arg(nombre),
+                           QMessageBox::Yes | QMessageBox::No
+                       );
+
+                       if (reply == QMessageBox::Yes) {
+                           deleteItem(item);
+                       }
+                   });
+
+                   connect(newItem, &AudioItemMaxi::requestPlay,
+                           this, [this](AudioItemMaxi* item) {
+                       if (Player* player = findPlayer()) {
+                           player->playItem(item);
+                       }
+                   });
+
+                   newItem->setIsSelect(false);
+
+                   itemsToDeleteFromSource.append(itemMaxi);
+                   insertIndex++;
+               }
+           }
+
+           // Borrar originales si vienen de otro player (cut/move)
+           for (AudioItemMaxi* oldItem : std::as_const(itemsToDeleteFromSource)) {
+               if (!oldItem)
+                   continue;
+
+               if (oldItem->parentWidget() && oldItem->parentWidget()->layout()) {
+                   oldItem->parentWidget()->layout()->removeWidget(oldItem);
+               }
+
+               oldItem->deleteLater();
+           }
+
+           event->acceptProposedAction();
+           return;
+       }
+
+       // Drag externo (archivos) -> lo maneja ContentsBase
+       ContentsBase::dropEvent(event);
 }
 
 
