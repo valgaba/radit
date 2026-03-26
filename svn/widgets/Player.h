@@ -43,6 +43,7 @@ private:
 
 
     Button * btnclose;
+    Button * btnstop;
 
     Label *labeltitle;
 

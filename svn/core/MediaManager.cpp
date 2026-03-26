@@ -251,7 +251,6 @@ void MediaManager::stop()
 
         BASS_ChannelStop(m_stream);
         m_timer->stop();
-
         emit positionChanged(0.0);
 }
 
@@ -336,33 +335,26 @@ void MediaManager::seekRelative(double deltaSeconds)
 //**************************
 bool MediaManager::setDevice(int deviceId){
 
-    if (deviceId == m_currentDevice)
-        return true;
-
-
-    // Verificar que el dispositivo existe
     BASS_DEVICEINFO info;
-    if (!BASS_GetDeviceInfo(deviceId, &info))
-        return false;
+    BASS_GetDeviceInfo(deviceId, &info);
 
-    // Si no está inicializado → inicializar
-    if (!(info.flags & BASS_DEVICE_INIT))
-    {
-        if (!BASS_Init(deviceId, 44100, 0, nullptr, nullptr))
-        {
-            qDebug() << "Error initializing device:" << BASS_ErrorGetCode();
-            return false;
-        }
-    }
 
-    // Cambiar dispositivo actual
-    if (!BASS_SetDevice(deviceId))
-    {
-        qDebug() << "Error setting device:" << BASS_ErrorGetCode();
-        return false;
-    }
+     // Solo inicializar si NO está inicializado
+         if (!(info.flags & BASS_DEVICE_INIT)){
 
-    m_currentDevice = deviceId;
+             if (!BASS_Init(deviceId, 44100, 0, nullptr, nullptr)){
+                 qDebug() << "Error initializing device:" << BASS_ErrorGetCode();
+                 return false;
+             }
+         }
+
+         // SIEMPRE cambiar al dispositivo
+             if (!BASS_SetDevice(deviceId)){
+                qDebug() << "Error setting device:" << BASS_ErrorGetCode();
+                 return false;
+             }
+
+
 
     return true;
 }

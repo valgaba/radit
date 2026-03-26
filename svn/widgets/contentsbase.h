@@ -28,7 +28,7 @@ private:
     QList<QWidget*>  list;
    // QString formatTimeHhMmSsDd(double duration);
     MediaManager *mediamanager;
-
+   Player* findPlayer() const;   //necesitamos el padre player para difentes operaciones
 
 
 public:

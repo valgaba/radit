@@ -88,9 +88,9 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
       // partes fijas
       framebarra->setFixedHeight(25);
-      frametop->setFixedHeight(30);
-      framecenter->setFixedHeight(50);
-      framedown->setFixedHeight(30);
+      frametop->setFixedHeight(25);
+      framecenter->setFixedHeight(40);
+      framedown->setFixedHeight(25);
 
       // parte flexible
       layout->setStretch(4, 1); // frametab
@@ -138,9 +138,28 @@ Player::Player(QWidget *parent) : Frame(parent) {
       });
 
 
-     tabplayer = new TabPlayer(this);
 
-      layout->addWidget(tabplayer);
+    //parte central
+      btnstop = new Button(this);
+      btnstop->SetIcon("Stop.svg");
+      btnstop->setIconSize(QSize(50, 50));  // ajusta al tamaño que quieras
+      btnstop->setFixedSize(60, 35);  //Tamaño fijo
+      btnstop->setToolTip("Stop");
+
+      layoutcenter->addWidget(btnstop);
+
+      layoutcenter->addStretch(); // todo a la izquierda
+
+      connect(btnstop, &QPushButton::clicked, this, &Player::stopMain);
+
+
+
+
+
+    //parte del tabplayer
+
+     tabplayer = new TabPlayer(this);
+     layout->addWidget(tabplayer);
 
 
 }
@@ -171,20 +190,15 @@ void Player::playItem(AudioItemMaxi *item)
     if (!item)
            return;
 
-      /* if (currentItem == item) {
-           mediamanager->stop();
-           mediamanager->seek(0.0);
-           mediamanager->play();
-           return;
-       }*/
 
     if (currentItem && currentItem != item) {
         mediamanager->stop();
         mediamanager->seek(0.0);
    }
 
-       mediamanager->setDevice(-1);
+       mediamanager->setDevice(1);
        mediamanager->loadFile(item->filePath());
+       mediamanager->seek(item->secondStart());
        mediamanager->play();
 
        currentItem = item;

@@ -142,37 +142,39 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
        btnselect = new Button;
       // btnproperties->SetIcon("GuiTabMenu.svg");
-       btnselect->setFixedSize(30, 29);  //Tamaño fijo
+       btnselect->setFixedSize(21, 21);  //Tamaño fijo
        btnselect->setToolTip("Select item");
 
 
         btnproperties = new Button;
         btnproperties->SetIcon("more.svg");
-        btnproperties->setFixedSize(30, 29);  //Tamaño fijo
+        btnproperties->setIconSize(QSize(18, 18));
+        btnproperties->setFixedSize(21, 21);  //Tamaño fijo
         btnproperties->setToolTip("Properties");
 
         btndelete = new Button;
         btndelete->SetIcon("Remove.svg");
-        btndelete->setFixedSize(30, 29);  //Tamaño fijo
+        btndelete->setIconSize(QSize(18, 18));
+        btndelete->setFixedSize(21, 21);  //Tamaño fijo
         btndelete->setToolTip("Delete item");
 
 
         btnloop = new Button;
         btnloop->SetIcon("Loop.svg");
-        btnloop->setIconSize(QSize(20, 20));   // no termina de gustarme el tamaño del icono por defecto
-        btnloop->setFixedSize(30, 29);  //Tamaño fijo
+        btnloop->setIconSize(QSize(18, 18));   // no termina de gustarme el tamaño del icono por defecto
+        btnloop->setFixedSize(21, 21);  //Tamaño fijo
         btnloop->setToolTip("Repeat the item indefinitely.");
 
         btnpurge = new Button;
         btnpurge->SetIcon("Purge.svg");
-        btnpurge->setIconSize(QSize(20, 20));   // no termina de gustarme el tamaño del icono por defecto
-        btnpurge->setFixedSize(30, 29);  //Tamaño fijo
+        btnpurge->setIconSize(QSize(18, 18));   // no termina de gustarme el tamaño del icono por defecto
+        btnpurge->setFixedSize(21, 21);  //Tamaño fijo 30,29
         btnpurge->setToolTip("Delete the item once it has been played.");
 
         btnnext = new Button;
         btnnext->SetIcon("Next.svg");
-        btnnext->setIconSize(QSize(20, 20));   // no termina de gustarme el tamaño del icono por defecto
-        btnnext->setFixedSize(30, 29);  //Tamaño fijo
+        btnnext->setIconSize(QSize(18, 18));   // no termina de gustarme el tamaño del icono por defecto
+        btnnext->setFixedSize(21, 21);  //Tamaño fijo
         btnnext->setToolTip("Play the item once the previous one has finished");
 
 
@@ -218,8 +220,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnplay = new Button;
         btnplay->SetIcon("playpause2.svg");
         btnplay->setIconSize(QSize(50, 60));  // ajusta al tamaño que quieras
-        btnplay->setFixedSize(60, 35);  //Tamaño fijo
-        btnplay->setToolTip("Properties");
+        btnplay->setFixedSize(60, 35);  //Tamaño fijo 35
+        btnplay->setToolTip("Play");
 
 
         connect(btnplay, &QPushButton::clicked, this, [this]() {
@@ -244,7 +246,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         labeltiempo->setText("00:03:12.00");
 
-        labeltiempo->setFixedHeight(45);
+        labeltiempo->setFixedHeight(45); //45
         labelnombre->setFixedHeight(45);
 
         layoutcenterleft->addWidget(btnplay);
@@ -271,9 +273,6 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnstopcue->setToolTip("Stop cue");
 
 
-
-
-
         btnrewind = new Button;
         btnrewind->SetIcon("rewind.svg");
         btnrewind->setFixedSize(30, 29);  //Tamaño fijo
@@ -292,7 +291,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
          labeltiempocue->setFixedWidth(125);   // Fija solo el ancho
          font.setPointSize(14);
          labeltiempocue->setFont(font);
-         labeltiempocue->setText("00:04:23.30");
+         labeltiempocue->setText("00:00:00.00");
 
         layoutdown->addWidget(btnplaycue);
         layoutdown->addWidget(btnstopcue);
@@ -306,7 +305,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
             if (!mediamanager->isPlaying() && !mediamanager->isPaused()){
 
-                   mediamanager->setDevice(-1);
+                   mediamanager->setDevice(0);
                    mediamanager->loadFile(this->filePath());
                    m_duration = this->second();
                    mediamanager->play();

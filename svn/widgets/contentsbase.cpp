@@ -106,7 +106,7 @@ void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
 // suelta evento
 void ContentsBase::dropEvent(QDropEvent *event){
 
-    AudioItemMaxi* source = qobject_cast<AudioItemMaxi*>(event->source());
+   // AudioItemMaxi* source = qobject_cast<AudioItemMaxi*>(event->source());
 
    /* if(source) {
 
@@ -161,8 +161,8 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
 
 
-AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
-{
+AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
+
     layout->addWidget(item);
 
     connect(item, &AudioItemMaxi::requestDelete, //viene de pulsar boton de borrado de audioitemMaxi
@@ -187,32 +187,18 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item)
       connect(item, &AudioItemMaxi::requestPlay,
               this, [this](AudioItemMaxi* item) {
 
-                 QWidget* w = this;
-                 Player* player = nullptr;
-
-                 while (w) {
-                     player = qobject_cast<Player*>(w);
-                     if (player)
-                         break;
-                     w = w->parentWidget();
-                 }
-
-                 if (player) {
-                     player->playItem(item);
-                 }
+          if (Player* player = findPlayer()) {
+              player->playItem(item);
+          }
 
       });
-
-
-
 
     return item;
 }
 
 
+void ContentsBase::deleteItem(AudioItemMaxi* item){
 
-void ContentsBase::deleteItem(AudioItemMaxi* item)
-{
     if (!item) return;
 
 
@@ -220,9 +206,26 @@ void ContentsBase::deleteItem(AudioItemMaxi* item)
         item->parentWidget()->layout()->removeWidget(item);
     }
 
+    if (Player* player = findPlayer()) {
+        player->stopMain();
+    }
+
+
     item->deleteLater();
 }
 
+//*****************************************
+Player* ContentsBase::findPlayer() const{
 
+    QWidget* w = const_cast<ContentsBase*>(this);
 
+    while (w) {
+        if (Player* player = qobject_cast<Player*>(w)) {
+            return player;
+        }
+        w = w->parentWidget();
+    }
+
+    return nullptr;
+}
 
