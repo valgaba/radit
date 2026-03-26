@@ -142,8 +142,8 @@ Player::Player(QWidget *parent) : Frame(parent) {
     //parte central
       btnstop = new Button(this);
       btnstop->SetIcon("Stop.svg");
-      btnstop->setIconSize(QSize(50, 50));  // ajusta al tamaño que quieras
-      btnstop->setFixedSize(60, 35);  //Tamaño fijo
+      btnstop->setIconSize(QSize(50, 40));  // ajusta al tamaño que quieras
+      btnstop->setFixedSize(60, 25);  //Tamaño fijo
       btnstop->setToolTip("Stop");
 
       layoutcenter->addWidget(btnstop);
