@@ -35,7 +35,13 @@ Player::Player(QWidget *parent) : Frame(parent) {
      connect(mediamanager, &MediaManager::audioFrameUpdated,
                this, [this](const AudioFrame &frame) {
 
+         this->labeltiempo->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
 
+         if (!m_userIsSeeking && m_duration > 0.0)
+         {
+             int value = static_cast<int>((frame.position / m_duration) * 1000.0);
+             slider->setValue(value);
+         }
 
        });
 
@@ -77,7 +83,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       layoutbarra->setSpacing(0);
       layouttop->setSpacing(0);
       layoutcenter->setSpacing(0);
-      layoutdown->setSpacing(0);
+      layoutdown->setSpacing(5);
      // layouttab->setSpacing(0);
 
       layout->addWidget(framebarra);
@@ -89,8 +95,8 @@ Player::Player(QWidget *parent) : Frame(parent) {
       // partes fijas
       framebarra->setFixedHeight(25);
       frametop->setFixedHeight(25);
-      framecenter->setFixedHeight(40);
-      framedown->setFixedHeight(25);
+      framecenter->setFixedHeight(45);
+      framedown->setFixedHeight(30);
 
       // parte flexible
       layout->setStretch(4, 1); // frametab
@@ -143,10 +149,30 @@ Player::Player(QWidget *parent) : Frame(parent) {
       btnstop = new Button(this);
       btnstop->SetIcon("Stop.svg");
       btnstop->setIconSize(QSize(50, 40));  // ajusta al tamaño que quieras
-      btnstop->setFixedSize(60, 25);  //Tamaño fijo
+      btnstop->setFixedSize(60, 30);  //Tamaño fijo
       btnstop->setToolTip("Stop");
 
+      labelnombre = new Label;
+      labelnombre->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+      labeltiempo = new Label;
+      labeltiempo->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+      labeltiempo->setFixedWidth(125);   // Fija solo el ancho
+      // Cambiar tamaño de fuente
+      QFont font = labeltiempo->font();
+      font.setPointSize(16);
+      font.setBold(true);
+      labeltiempo->setFont(font);
+      labeltiempo->setText("00:00:00.00");
+
+      labeltiempo->setFixedHeight(25); //45
+      labelnombre->setFixedHeight(45);
+
+
+
+
       layoutcenter->addWidget(btnstop);
+      layoutcenter->addWidget(labelnombre);
+      layoutcenter->addWidget(labeltiempo);
 
       layoutcenter->addStretch(); // todo a la izquierda
 
@@ -154,6 +180,58 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
 
 
+      ///***************** botonera parte baja ****************
+              btnpause = new Button;
+              btnpause->SetIcon("Pausemini.svg");
+            //  btnpause->setIconSize(QSize(35, 35));   // no termina de gustarme el tamaño del icono por defecto
+              btnpause->setFixedSize(30, 29);  //Tamaño fijo
+              btnpause->setToolTip("Pause");
+
+              btnrewind = new Button;
+              btnrewind->SetIcon("rewind.svg");
+              btnrewind->setFixedSize(30, 29);  //Tamaño fijo
+              btnrewind->setToolTip("Properties");
+
+              btnforward = new Button;
+              btnforward->SetIcon("forward.svg");
+              btnforward->setFixedSize(30, 29);  //Tamaño fijo
+              btnforward->setToolTip("Properties");
+
+
+               slider = new Slider;
+
+
+               connect(btnpause, &QPushButton::clicked, this, &Player::pauseMain);
+
+               connect(btnrewind, &QPushButton::clicked,
+                       mediamanager, &MediaManager::rewind);
+
+               connect(btnforward, &QPushButton::clicked,
+                       mediamanager, &MediaManager::forward);
+
+
+
+
+               connect(slider, &QSlider::sliderPressed, this, [this]() {
+                  m_userIsSeeking = true;
+
+               });
+
+               connect(slider, &QSlider::sliderReleased, this, [this]() {
+                  m_userIsSeeking = false;
+
+                   double percent = slider->value() / 1000.0;
+                   mediamanager->seek(percent * m_duration);
+               });
+
+
+
+
+              layoutdown->addWidget(btnpause);
+              layoutdown->addWidget(btnrewind);
+              layoutdown->addWidget(btnforward);
+              layoutdown->addWidget(slider,1);
+              layoutdown->addStretch(); // todo a la izquierda
 
 
     //parte del tabplayer
@@ -202,16 +280,26 @@ void Player::playItem(AudioItemMaxi *item)
        mediamanager->play();
 
        currentItem = item;
+
+       m_duration=item->second();
+       labelnombre->setText(item->nameFile());
+       btnpause->SetIcon("Pausemini.svg");
 }
 
 void Player::pauseMain()
 {
     if (!currentItem)
-        return;
+            return;
 
-    if (mediamanager->isPlaying()) {
-        mediamanager->pause();
-    }
+        if (mediamanager->isPlaying()) {
+            mediamanager->pause();
+            btnpause->SetIcon("Playmini.svg");   // opcional: cambia icono a play
+
+        } else {
+            mediamanager->play();
+            btnpause->SetIcon("Pausemini.svg");  // opcional: vuelve icono pause
+
+        }
 }
 
 void Player::stopMain()
@@ -222,6 +310,33 @@ void Player::stopMain()
     mediamanager->stop();
     mediamanager->seek(0.0);
     currentItem = nullptr;
+    labelnombre->setText("");
+    labeltiempo->setText("00:00:00.00");
 }
 
+QString Player::SecondToTime(double segundos){
 
+    if (segundos < 0) {
+          return "00:00:00.00";
+        }
+
+        // Convertimos a milisegundos para mayor precisión
+      //  qint64 totalMilliseconds = static_cast<qint64>(segundos * 1000.0);
+        qint64 totalMilliseconds = qRound64(segundos * 1000.0);
+
+        int horas = totalMilliseconds / 3600000;
+        int minutos = (totalMilliseconds % 3600000) / 60000;
+        int seg = (totalMilliseconds % 60000) / 1000;
+        int centesimas = (totalMilliseconds % 1000) / 10;
+
+        QString tiempo = QString("%1:%2:%3.%4")
+                .arg(horas, 2, 10, QChar('0'))
+                .arg(minutos, 2, 10, QChar('0'))
+                .arg(seg, 2, 10, QChar('0'))
+                .arg(centesimas, 2, 10, QChar('0'));
+
+        return tiempo;
+
+
+
+}

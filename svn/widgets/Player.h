@@ -43,14 +43,27 @@ private:
 
 
     Button * btnclose;
-    Button * btnstop;
-
     Label *labeltitle;
 
     TabPlayer *tabplayer;
-
     MediaManager *mediamanager;
     AudioItemMaxi *currentItem;
+
+
+
+    Button * btnstop;
+    Label *labelnombre;
+    Label *labeltiempo;
+
+
+    Button * btnpause;
+    Button * btnrewind;
+    Button * btnforward;
+    Slider * slider;
+
+    bool m_userIsSeeking = false;
+    double m_duration = 0.0;
+    QString SecondToTime(double segundos);
 
 
 public:

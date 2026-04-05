@@ -25,10 +25,6 @@ public:
     // Constructor
     explicit AudioItem(QWidget *parent = nullptr);
 
-    // virtual AudioItem* copy(QWidget* newParent) const = 0; // Método virtual puro
-
-
-
     // --- SETTERS ---
       void setFilePath(const QString &filePath);
       void setSecond(double second);
@@ -48,11 +44,6 @@ protected:
     // Eventos de ratón para implementar el arrastre
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
-
-    // Eventos de drag and drop
-    void dragEnterEvent(QDragEnterEvent *event) override;
-    void dropEvent(QDropEvent *event) override;
-
 
 
 };

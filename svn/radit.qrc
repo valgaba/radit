@@ -53,5 +53,7 @@
         <file>icons/playpause.svg</file>
         <file>icons/playpause2.svg</file>
         <file>icons/palette.svg</file>
+        <file>icons/Pausemini.svg</file>
+        <file>icons/Playmini.svg</file>
     </qresource>
 </RCC>

@@ -78,47 +78,6 @@ void AudioItem::mouseMoveEvent(QMouseEvent *event)
         drag->exec(Qt::MoveAction);
 }
 
-void AudioItem::dragEnterEvent(QDragEnterEvent *event)
-{
-    // Aceptar solo si el formato es texto plano
-    if (event->mimeData()->hasFormat("application/x-audioitems"))
-            event->acceptProposedAction();
-}
-
-void AudioItem::dropEvent(QDropEvent *event){
-
-
-        // Obtener el widget que se está arrastrando
-        QWidget *source = qobject_cast<QWidget*>(event->source());
-
-        if (source && source != this) {
-            // Obtener el layout de destino (donde se suelta)
-            QVBoxLayout *targetLayout = qobject_cast<QVBoxLayout*>(this->parentWidget()->layout());
-
-            if (targetLayout) {
-                // Remover el widget de su posición original
-                if (source->parentWidget()) {
-                    if (QLayout *sourceLayout = source->parentWidget()->layout()) {
-                        sourceLayout->removeWidget(source);
-                    }
-                }
-
-                // Insertar en la nueva posición (antes del widget actual)
-
-                int targetIndex = targetLayout->indexOf(this);
-                qDebug() <<targetIndex;
-                targetLayout->insertWidget(targetIndex, source);
-
-                // Establecer el nuevo padre del widget
-                source->setParent(this->parentWidget());
-
-                event->acceptProposedAction();
-            }
-        }
-
-}
-
-
 //***********************************************
 
 void AudioItem::setFilePath(const QString &filePath)
