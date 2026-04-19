@@ -609,11 +609,19 @@ TabBar::tab {
 	border: 1px solid #686b74;
     background-color: #262c3b;
    
-	padding: 5px;
+	/*padding: 5px;
 	margin-left: 5px;
 	margin-top: 5px;
 	margin-bottom: 5px;
- 
+    height: 12px;*/
+
+
+	padding: 3px;
+	margin-left: 3px;
+	margin-top: 3px;
+	margin-bottom: 3px;
+    
+
 
    
 }
@@ -661,8 +669,8 @@ TabBar::close-button:pressed {
 
  TabBar QToolButton{
 
-	width: 50px; /* Ajusta el ancho del botón según tus necesidades */
-	height: 50px; /* Ajusta la altura del botón según tus necesidades */
+	width: 10px; /* Ajusta el ancho del botón según tus necesidades */
+	height: 10px; /* Ajusta la altura del botón según tus necesidades */
 
 }
 

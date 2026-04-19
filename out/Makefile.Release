@@ -268,6 +268,7 @@ compiler_rcc_clean:
 release/qrc_radit.cpp: ../svn/radit.qrc \
 		../../../../mingw64/share/qt6/bin/rcc.exe \
 		../svn/icons/RemoveFavorite.svg \
+		../svn/icons/Pausemini.svg \
 		../svn/icons/Next.svg \
 		../svn/icons/ActionPaste.svg \
 		../svn/icons/Selectall.svg \
@@ -299,6 +300,7 @@ release/qrc_radit.cpp: ../svn/radit.qrc \
 		../svn/icons/ActionCopy.svg \
 		../svn/icons/properties.svg \
 		../svn/icons/rewind.svg \
+		../svn/icons/Playmini.svg \
 		../svn/icons/Filesystem.svg \
 		../svn/icons/MoveLeft.svg \
 		../svn/icons/Close.svg \

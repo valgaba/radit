@@ -254,7 +254,12 @@ void ContentsPlayer::deleteSelected(){
     // Recoger seleccionados
     QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
     for (AudioItemMaxi* item : std::as_const(items)) {
-        if (item->isSelect()) {
+
+       /*  if (item->isSelect() && !item->isPlaying()) {
+            selectedItems.append(item);
+        }*/
+
+         if (item->isSelect()) {
             selectedItems.append(item);
         }
     }
@@ -290,6 +295,10 @@ void ContentsPlayer::deleteSelected(){
     }
 
     if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+
+      /*  if (item->isPlaying())
+             return;*/
+
 
         QString nombre = item->nameFile();
 
@@ -386,7 +395,8 @@ void ContentsPlayer::pasteClipboard()
             newItem->setIsSelect(false); // deseleccionar pegado
 
             if (isCutOperation) {
-                itemBase->deleteLater();
+               itemBase->deleteLater();
+               //  deleteItem(itemBase);   //
                 it = clipboard.lista.erase(it);
             } else {
                 ++it;

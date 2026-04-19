@@ -87,6 +87,8 @@ private:
 
      double  m_secondstart;
 
+     bool m_isPlaying = false;
+
 
 
 public:
@@ -168,6 +170,9 @@ public:
         return m_secondstart;
     }
 
+
+    void setPlaying(bool playing);
+    bool isPlaying() const;
 
     protected:
 

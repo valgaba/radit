@@ -219,8 +219,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         btnplay = new Button;
         btnplay->SetIcon("playpause2.svg");
-        btnplay->setIconSize(QSize(50, 60));  // ajusta al tamaño que quieras
-        btnplay->setFixedSize(60, 35);  //Tamaño fijo 35
+        btnplay->setIconSize(QSize(40, 50));  // ajusta al tamaño que quieras
+        btnplay->setFixedSize(50, 35);  //Tamaño fijo 35
         btnplay->setToolTip("Play");
 
 
@@ -239,14 +239,14 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         labeltiempo->setFixedWidth(125);   // Fija solo el ancho
         // Cambiar tamaño de fuente
         QFont font = labeltiempo->font();
-        font.setPointSize(16);
+        font.setPointSize(16); //16
         font.setBold(true);
         labeltiempo->setFont(font);
 
 
         labeltiempo->setText("00:03:12.00");
 
-        labeltiempo->setFixedHeight(45); //45
+        labeltiempo->setFixedHeight(35); //45
         labelnombre->setFixedHeight(45);
 
         layoutcenterleft->addWidget(btnplay);
@@ -262,29 +262,32 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 ///***************** botonera parte baja ****************
         btnplaycue = new Button;
         btnplaycue->SetIcon("playpause.svg");
-        btnplaycue->setIconSize(QSize(35, 35));   // no termina de gustarme el tamaño del icono por defecto
-        btnplaycue->setFixedSize(30, 29);  //Tamaño fijo
+        btnplaycue->setIconSize(QSize(25, 25));   // no termina de gustarme el tamaño del icono por defecto
+        btnplaycue->setFixedSize(23, 23);  //Tamaño fijo
         btnplaycue->setToolTip("Properties");
 
         btnstopcue = new Button;
         btnstopcue->SetIcon("Stop.svg");
-        btnstopcue->setIconSize(QSize(35, 35));   // no termina de gustarme el tamaño del icono por defecto
-        btnstopcue->setFixedSize(30, 29);  //Tamaño fijo
+        btnstopcue->setIconSize(QSize(25, 25));   // no termina de gustarme el tamaño del icono por defecto
+        btnstopcue->setFixedSize(23, 23);  //Tamaño fijo
         btnstopcue->setToolTip("Stop cue");
 
 
         btnrewind = new Button;
         btnrewind->SetIcon("rewind.svg");
-        btnrewind->setFixedSize(30, 29);  //Tamaño fijo
+        btnrewind->setIconSize(QSize(20, 20));
+        btnrewind->setFixedSize(23, 23);  //Tamaño fijo
         btnrewind->setToolTip("Properties");
 
         btnforward = new Button;
         btnforward->SetIcon("forward.svg");
-        btnforward->setFixedSize(30, 29);  //Tamaño fijo
+        btnforward->setIconSize(QSize(20, 20));
+        btnforward->setFixedSize(23, 23);  //Tamaño fijo
         btnforward->setToolTip("Properties");
 
 
          slider = new Slider;
+
 
          labeltiempocue = new Label;
          labeltiempocue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -368,7 +371,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         //añadimos al principal
 
         layout->addWidget(frametop,1);
-        layout->addWidget(framecenter,3);
+        layout->addWidget(framecenter,2);
         layout->addWidget(framedown,1);
 
 
@@ -448,4 +451,15 @@ void AudioItemMaxi::onDeleteClicked(){  // pulsamos boton borrar
 }
 
 
+
+
+bool AudioItemMaxi::isPlaying() const {
+    return m_isPlaying;
+}
+
+void AudioItemMaxi::setPlaying(bool playing) {
+
+    m_isPlaying = playing;
+
+}
 

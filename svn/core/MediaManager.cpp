@@ -247,10 +247,13 @@ void MediaManager::pause()
 
 void MediaManager::stop()
 {
-    if (!m_stream) return;
+    if (!m_stream)
+         return;
+
 
         BASS_ChannelStop(m_stream);
         m_timer->stop();
+
         emit positionChanged(0.0);
 }
 

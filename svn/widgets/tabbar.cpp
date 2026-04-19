@@ -29,7 +29,7 @@ TabBar::TabBar(QWidget *parent):QTabBar(parent){
     this->setObjectName("TabBar"); //para qss
 
     QFont font;
-         font.setPointSize(12);
+         font.setPointSize(10);
          font.setBold(false);
 
          this->setFont(font);

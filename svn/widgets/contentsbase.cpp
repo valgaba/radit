@@ -106,25 +106,6 @@ void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
 // suelta evento
 void ContentsBase::dropEvent(QDropEvent *event){
 
-   // AudioItemMaxi* source = qobject_cast<AudioItemMaxi*>(event->source());
-
-   /* if(source) {
-
-            if(source->parentWidget() && source->parentWidget()->layout()) {
-                 source->parentWidget()->layout()->removeWidget(source);
-              }
-
-            // Crear una copia del item en lugar de mover el original
-                    AudioItemMaxi* newItem = source->copy(this);
-                    createItem(newItem);
-                    qDebug() <<"dentro1";
-                    event->acceptProposedAction();
-                    return;
-
-           // layout->addWidget(source);
-            //return;
-    }*/
-
   //////////// viene del sistema de archivos
    if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
@@ -168,6 +149,9 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
     connect(item, &AudioItemMaxi::requestDelete, //viene de pulsar boton de borrado de audioitemMaxi
             this, [this](AudioItemMaxi* item){
 
+      //  if(item->isPlaying())
+        //    return;
+
         QString nombre = item->nameFile();
 
           QMessageBox::StandardButton reply = QMessageBox::question(
@@ -202,12 +186,14 @@ void ContentsBase::deleteItem(AudioItemMaxi* item){
     if (!item) return;
 
 
+
     if (item->parentWidget() && item->parentWidget()->layout()) {
         item->parentWidget()->layout()->removeWidget(item);
     }
 
     if (Player* player = findPlayer()) {
-        player->stopMain();
+        if(item->isPlaying())
+           player->stopMain();
     }
 
 

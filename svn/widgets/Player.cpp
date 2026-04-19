@@ -65,7 +65,13 @@ Player::Player(QWidget *parent) : Frame(parent) {
       frametop = new Frame(this);
       framecenter = new Frame(this);
       framedown = new Frame(this);
-    //  frametab = new Frame(this);
+
+      //personalizamos un poco la barra
+        //framecenter->setStyleSheet("background-color: rgb(38, 44, 59);");
+        framecenter->setStyleSheet("background-color: #181e2c;");
+        frametop->setStyleSheet("background-color: #181e2c;");
+        framedown->setStyleSheet("background-color: #181e2c;");
+
 
       layoutbarra = new QHBoxLayout(framebarra);
       layouttop = new QHBoxLayout(frametop);
@@ -278,8 +284,9 @@ void Player::playItem(AudioItemMaxi *item)
        mediamanager->loadFile(item->filePath());
        mediamanager->seek(item->secondStart());
        mediamanager->play();
-
+       item->setPlaying(true);
        currentItem = item;
+
 
        m_duration=item->second();
        labelnombre->setText(item->nameFile());
@@ -305,11 +312,15 @@ void Player::pauseMain()
 void Player::stopMain()
 {
     if (!currentItem)
-        return;
+         return;
+
+
 
     mediamanager->stop();
     mediamanager->seek(0.0);
+    currentItem->setPlaying(false);
     currentItem = nullptr;
+
     labelnombre->setText("");
     labeltiempo->setText("00:00:00.00");
 }

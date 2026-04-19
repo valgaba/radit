@@ -78,6 +78,11 @@ public:
     void pauseMain();
     void stopMain();
 
+    AudioItemMaxi* getCurrentItem() const {
+        return currentItem;
+    }
+
+
     protected:
 
 
