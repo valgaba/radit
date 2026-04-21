@@ -47,7 +47,7 @@ private:
 
     TabPlayer *tabplayer;
     MediaManager *mediamanager;
-    AudioItemMaxi *currentItem;
+    AudioItemMaxi* currentItem = nullptr;
 
 
 

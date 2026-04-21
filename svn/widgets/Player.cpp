@@ -17,7 +17,6 @@
 
 #include <QDebug>
 #include <QMessageBox>
-
 #include "widgets/Player.h"
 //#include "widgets/container.h"
 
@@ -48,9 +47,10 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
        connect(mediamanager, &MediaManager::playbackFinished,
                this, [this]() {
-                   mediamanager->stop();
-                   mediamanager->seek(0.0);
-                   currentItem = nullptr;
+                  // mediamanager->stop();
+                  // mediamanager->seek(0.0);
+                   //currentItem = nullptr;
+                   this->stopMain();
                });
 
 
@@ -154,8 +154,8 @@ Player::Player(QWidget *parent) : Frame(parent) {
     //parte central
       btnstop = new Button(this);
       btnstop->SetIcon("Stop.svg");
-      btnstop->setIconSize(QSize(50, 40));  // ajusta al tamaño que quieras
-      btnstop->setFixedSize(60, 30);  //Tamaño fijo
+      btnstop->setIconSize(QSize(40, 50));  // ajusta al tamaño que quieras
+      btnstop->setFixedSize(50, 30);  //Tamaño fijo
       btnstop->setToolTip("Stop");
 
       labelnombre = new Label;
@@ -190,17 +190,22 @@ Player::Player(QWidget *parent) : Frame(parent) {
               btnpause = new Button;
               btnpause->SetIcon("Pausemini.svg");
             //  btnpause->setIconSize(QSize(35, 35));   // no termina de gustarme el tamaño del icono por defecto
-              btnpause->setFixedSize(30, 29);  //Tamaño fijo
+              btnpause->setIconSize(QSize(25, 25));
+              btnpause->setFixedSize(23, 23);  //Tamaño fijo
+
               btnpause->setToolTip("Pause");
+
 
               btnrewind = new Button;
               btnrewind->SetIcon("rewind.svg");
-              btnrewind->setFixedSize(30, 29);  //Tamaño fijo
+              btnrewind->setIconSize(QSize(20, 20));
+              btnrewind->setFixedSize(23, 23);  //30 29 Tamaño fijo
               btnrewind->setToolTip("Properties");
 
               btnforward = new Button;
               btnforward->SetIcon("forward.svg");
-              btnforward->setFixedSize(30, 29);  //Tamaño fijo
+              btnforward->setIconSize(QSize(20, 20));
+              btnforward->setFixedSize(23, 23);  //Tamaño fijo
               btnforward->setToolTip("Properties");
 
 
@@ -276,8 +281,10 @@ void Player::playItem(AudioItemMaxi *item)
 
 
     if (currentItem && currentItem != item) {
-        mediamanager->stop();
-        mediamanager->seek(0.0);
+       // mediamanager->stop();
+       // mediamanager->seek(0.0);
+       //  currentItem->setPlaying(false);
+        this->stopMain();
    }
 
        mediamanager->setDevice(1);
@@ -312,17 +319,19 @@ void Player::pauseMain()
 void Player::stopMain()
 {
     if (!currentItem)
-         return;
+            return;
 
+        mediamanager->stop();
+        mediamanager->seek(0.0);
 
+        if (currentItem) {  // <-- protección extra
+            currentItem->setPlaying(false);
+        }
 
-    mediamanager->stop();
-    mediamanager->seek(0.0);
-    currentItem->setPlaying(false);
-    currentItem = nullptr;
+        currentItem = nullptr;
 
-    labelnombre->setText("");
-    labeltiempo->setText("00:00:00.00");
+        labelnombre->setText("");
+        labeltiempo->setText("00:00:00.00");
 }
 
 QString Player::SecondToTime(double segundos){

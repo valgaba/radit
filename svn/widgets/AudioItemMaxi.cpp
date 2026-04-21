@@ -217,10 +217,11 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         // botonera parte centro**********************************
 
+        framecenter->setFixedHeight(43);  // prueba 35–50
         btnplay = new Button;
         btnplay->SetIcon("playpause2.svg");
         btnplay->setIconSize(QSize(40, 50));  // ajusta al tamaño que quieras
-        btnplay->setFixedSize(50, 35);  //Tamaño fijo 35
+        btnplay->setFixedSize(50, 30);  //Tamaño fijo 35
         btnplay->setToolTip("Play");
 
 
@@ -242,6 +243,13 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         font.setPointSize(16); //16
         font.setBold(true);
         labeltiempo->setFont(font);
+
+        QFont fontnombre = labelnombre->font();
+        fontnombre.setPointSize(13); //16
+        fontnombre.setBold(true);
+        labelnombre->setFont(fontnombre);
+
+
 
 
         labeltiempo->setText("00:03:12.00");
@@ -371,7 +379,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         //añadimos al principal
 
         layout->addWidget(frametop,1);
-        layout->addWidget(framecenter,2);
+        layout->addWidget(framecenter,1);
         layout->addWidget(framedown,1);
 
 
