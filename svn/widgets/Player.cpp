@@ -318,11 +318,13 @@ void Player::pauseMain()
 
 void Player::stopMain()
 {
+
     if (!currentItem)
-            return;
+           return;
 
         mediamanager->stop();
         mediamanager->seek(0.0);
+
 
         if (currentItem) {  // <-- protección extra
             currentItem->setPlaying(false);

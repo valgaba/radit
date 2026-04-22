@@ -182,22 +182,29 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
 
 
 void ContentsBase::deleteItem(AudioItemMaxi* item){
-
     if (!item) return;
 
+        //  Buscar el player REAL del item
+        Player* itemPlayer = nullptr;
+        QWidget* w = item;
 
+        while (w) {
+            if (Player* p = qobject_cast<Player*>(w)) {
+                itemPlayer = p;
+                break;
+            }
+            w = w->parentWidget();
+        }
 
-    if (item->parentWidget() && item->parentWidget()->layout()) {
-        item->parentWidget()->layout()->removeWidget(item);
-    }
+        if (itemPlayer && item->isPlaying()) {
+            itemPlayer->stopMain();
+        }
 
-    if (Player* player = findPlayer()) {
-        if(item->isPlaying())
-           player->stopMain();
-    }
+        if (item->parentWidget() && item->parentWidget()->layout()) {
+            item->parentWidget()->layout()->removeWidget(item);
+        }
 
-
-    item->deleteLater();
+        item->deleteLater();
 }
 
 //*****************************************

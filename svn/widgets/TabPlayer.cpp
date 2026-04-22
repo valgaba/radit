@@ -128,22 +128,48 @@ void TabPlayer::closeTab(int index){
 
     if (index == -1) return;
 
-    QMessageBox::StandardButton reply;
-    reply = QMessageBox::question(
-        this,
-        "Cerrar Pestaña",
-        "¿Seguro que quieres cerrar esta pestaña?",
-        QMessageBox::Yes | QMessageBox::No
-    );
+       QMessageBox::StandardButton reply;
+       reply = QMessageBox::question(
+           this,
+           "Cerrar Pestaña",
+           "¿Seguro que quieres cerrar esta pestaña?",
+           QMessageBox::Yes | QMessageBox::No
+       );
 
-    if (reply == QMessageBox::Yes) {
+       if (reply != QMessageBox::Yes)
+           return;
 
-        QWidget *widgetToRemove = this->widget(index);
-          if (!widgetToRemove) return;
-          this->removeTab(index);
-          delete widgetToRemove;
+       QWidget *widgetToRemove = this->widget(index);
+       if (!widgetToRemove)
+           return;
 
-    }
+       //  Buscar todos los items de audio en esta pestaña
+       auto items = widgetToRemove->findChildren<AudioItemMaxi*>();
+
+       for (AudioItemMaxi* item : std::as_const(items)) {
+           if (!item) continue;
+
+           //  Si está reproduciendo → parar
+           if (item->isPlaying()) {
+
+               // buscar player que lo está reproduciendo
+               QWidget *w = item;
+               Player *player = nullptr;
+
+               while (w) {
+                   player = qobject_cast<Player*>(w);
+                   if (player) break;
+                   w = w->parentWidget();
+               }
+
+               if (player) {
+                   player->stopMain();
+               }
+           }
+       }
+
+       this->removeTab(index);
+       widgetToRemove->deleteLater();
 
 }
 

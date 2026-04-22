@@ -395,8 +395,8 @@ void ContentsPlayer::pasteClipboard()
             newItem->setIsSelect(false); // deseleccionar pegado
 
             if (isCutOperation) {
-               itemBase->deleteLater();
-               //  deleteItem(itemBase);   //
+               //itemBase->deleteLater();
+                 deleteItem(itemBase);   //
                 it = clipboard.lista.erase(it);
             } else {
                 ++it;
