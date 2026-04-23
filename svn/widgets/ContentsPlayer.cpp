@@ -77,12 +77,12 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
            }
 
            // Buscar item destino bajo el cursor
-   #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+  /* #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
            QPoint dropPos = event->position().toPoint();
    #else
            QPoint dropPos = event->pos();
-   #endif
-
+   #endif*/
+           QPoint dropPos = event->position().toPoint();
            QWidget *targetWidget = childAt(dropPos);
 
            while (targetWidget && !qobject_cast<AudioItemMaxi*>(targetWidget)) {
@@ -176,7 +176,8 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
                    oldItem->parentWidget()->layout()->removeWidget(oldItem);
                }
 
-               oldItem->deleteLater();
+              // oldItem->deleteLater();
+                deleteItem(oldItem);   //
            }
 
            event->acceptProposedAction();

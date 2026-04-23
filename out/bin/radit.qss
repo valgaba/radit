@@ -528,7 +528,8 @@ Button:hover{
 
 
 Button[active="true"] {
-    background-color: #39385b;
+    background-color: #3a5958;
+    border: 2px solid #4caf50;
 }
 
 
