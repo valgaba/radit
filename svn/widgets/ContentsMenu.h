@@ -23,6 +23,8 @@ public:
 
     void showAt(const QPoint &pos);
 
+
+
     void setColorVisible(bool visible);
     void setSelectAllVisible(bool visible);
     void setCopyVisible(bool visible);
@@ -35,12 +37,22 @@ public:
     void setSaveVisible(bool visible);
     void setSaveAsVisible(bool visible);
 
+    void setnextVisible(bool visible);
+    void setpurgeVisible(bool visible);
+    void setloopVisible(bool visible);
+    void setselectVisible(bool visible);
+
 
 private:
     ContentsPlayer *player;
 
     // Acciones principales
     QAction *addMenuAction;
+
+    QAction *nextItemAction;
+    QAction *purgeItemAction;
+    QAction *loopItemAction;
+    QAction *selectItemAction;
 
     QAction *selectallAction;
     QAction *cutAction;

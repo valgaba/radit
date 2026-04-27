@@ -53,6 +53,12 @@ void ContentsMenu::setSaveVisible(bool visible) { if (saveAction) saveAction->se
 void ContentsMenu::setSaveAsVisible(bool visible) { if (saveasAction) saveasAction->setVisible(visible); }
 
 
+void ContentsMenu::setnextVisible(bool visible) { if (purgeItemAction) purgeItemAction->setVisible(visible); }
+void ContentsMenu::setpurgeVisible(bool visible) { if (nextItemAction) nextItemAction->setVisible(visible); }
+void ContentsMenu::setloopVisible(bool visible) { if (loopItemAction)  loopItemAction->setVisible(visible); }
+void ContentsMenu::setselectVisible(bool visible) { if (selectItemAction) selectItemAction->setVisible(visible); }
+
+
 // ---------------------------
 // Submenu "Añadir"
 void ContentsMenu::setupAddMenu() { addMenuAction = createAddAction(); }
@@ -62,12 +68,23 @@ void ContentsMenu::setupColorMenu() { colorAction = createColorAction(); }
 
 // Acciones generales
 void ContentsMenu::setupActions() {
+
+    nextItemAction = new QAction("Next Item", this) ;
+    purgeItemAction = new QAction("Purge Item", this);
+    loopItemAction = new QAction("Loop Item", this);
+    selectItemAction = new QAction("Select Item", this);
+
     selectallAction = new QAction("SelectAll", this);
     cutAction = new QAction("Cut", this);
     copyAction = new QAction("Copy", this);
     pasteAction = new QAction("Paste", this);
     deleteAction = new QAction("Delete", this);
     propertiesAction = new QAction("Properties", this);
+
+    nextItemAction->setIcon(QIcon(":/icons/Next.svg"));
+    purgeItemAction->setIcon(QIcon(":/icons/Purge.svg"));
+    loopItemAction->setIcon(QIcon(":/icons/Loop.svg"));
+   // selectItemAction->setIcon(QIcon(":/icons/Loop.svg"));
 
     selectallAction->setIcon(QIcon(":/icons/Selectall.svg"));
     cutAction->setIcon(QIcon(":/icons/ActionCut.svg"));
@@ -84,12 +101,22 @@ void ContentsMenu::setupActions() {
     saveasAction->setIcon(QIcon(":/icons/SaveAs.svg"));
 
     Menu::addAction(addMenuAction);
+
+     addSeparator();
+     Menu::addAction(selectallAction);
+
     addSeparator();
-    Menu::addAction(selectallAction);
+    Menu::addAction(nextItemAction);
+    Menu::addAction(purgeItemAction);
+    Menu::addAction(loopItemAction);
+    Menu::addAction(selectItemAction);
+
+    addSeparator();
     Menu::addAction(cutAction);
     Menu::addAction(copyAction);
     Menu::addAction(pasteAction);
     Menu::addAction(deleteAction);
+
     addSeparator();
     Menu::addAction(loadAction);
     Menu::addAction(saveAction); // Puedes añadirlo luego
@@ -97,12 +124,20 @@ void ContentsMenu::setupActions() {
 
     addSeparator();
     Menu::addAction(propertiesAction);
+
     addSeparator();
     Menu::addAction(colorAction);
 }
 
 // Conectar acciones
 void ContentsMenu::connectActions() {
+
+    connect(nextItemAction, &QAction::triggered, player, &ContentsPlayer::nextAllItems);
+    connect(purgeItemAction, &QAction::triggered, player, &ContentsPlayer::purgeAllItems);
+    connect(loopItemAction, &QAction::triggered, player, &ContentsPlayer::loopAllItems);
+    connect(selectItemAction, &QAction::triggered, player, &ContentsPlayer::selectItems);
+
+
     connect(selectallAction, &QAction::triggered, player, &ContentsPlayer::selectAllItems);
     connect(deleteAction, &QAction::triggered, player, &ContentsPlayer::deleteSelected);
     connect(copyAction, &QAction::triggered, player, &ContentsPlayer::copySelected);

@@ -39,6 +39,11 @@ public:
     explicit ContentsPlayer(QWidget *parent = 0);
     ~ContentsPlayer();
 
+    void nextAllItems();
+    void purgeAllItems();
+    void loopAllItems();
+    void selectItems();
+
     void selectAllItems();
     void deleteSelected();
     void copySelected();

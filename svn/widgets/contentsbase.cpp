@@ -167,6 +167,12 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
 
     });
 
+    //borrado para el purge
+   connect(item, &AudioItemMaxi::requestAutoDelete,
+           this, [this](AudioItemMaxi* item){
+             deleteItem(item);
+   });
+
     //  NUEVO: conectar play grande del item
       connect(item, &AudioItemMaxi::requestPlay,
               this, [this](AudioItemMaxi* item) {
@@ -182,7 +188,9 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
 
 
 void ContentsBase::deleteItem(AudioItemMaxi* item){
+
     if (!item) return;
+
 
         //  Buscar el player REAL del item
         Player* itemPlayer = nullptr;
@@ -222,3 +230,30 @@ Player* ContentsBase::findPlayer() const{
     return nullptr;
 }
 
+AudioItemMaxi* ContentsBase::findNextPlayItem(AudioItemMaxi* current)
+{
+    if (!current || !layout)
+            return nullptr;
+
+        int index = layout->indexOf(current);
+
+        //  1. Buscar hacia abajo
+        for (int i = index + 1; i < layout->count(); ++i) {
+            QWidget* w = layout->itemAt(i)->widget();
+            if (auto *item = qobject_cast<AudioItemMaxi*>(w)) {
+                if (item->isPlayNext())
+                    return item;
+            }
+        }
+
+        //  2. Si no encuentra, buscar desde arriba
+        for (int i = 0; i < index; ++i) {
+            QWidget* w = layout->itemAt(i)->widget();
+            if (auto *item = qobject_cast<AudioItemMaxi*>(w)) {
+                if (item->isPlayNext())
+                    return item;
+            }
+        }
+
+        return nullptr;
+}

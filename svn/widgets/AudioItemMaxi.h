@@ -127,6 +127,14 @@ public:
            btnpurge->setProperty("active", m_isPurge); //active viene del css
            btnpurge->style()->polish(btnpurge);
            btnpurge->update();
+
+           btnpurge->setStyleSheet(
+               "QPushButton[active=\"true\"] {"
+               "   background-color: #3a5958;"
+               "   border: 2px solid #f44336;"
+               "}"
+           );
+
        }
 
     bool isPurge() const {
@@ -141,6 +149,13 @@ public:
            btnloop->setProperty("active", m_isLoop); //active viene del css
            btnloop->style()->polish(btnloop);
            btnloop->update();
+
+           btnloop->setStyleSheet(
+               "QPushButton[active=\"true\"] {"
+               "   background-color: #3a5958;"
+               "   border: 2px solid #2196f3;"
+               "}"
+           );
 
            // Control de visibilidad
               if (btnpurge) {
@@ -185,7 +200,8 @@ public:
 
 
     signals:
-      void requestDelete(AudioItemMaxi* item);
+      void requestDelete(AudioItemMaxi* item); //pregunta antes
+      void requestAutoDelete(AudioItemMaxi* item); //no pregunta
       void requestPlay(AudioItemMaxi *item);
 
 

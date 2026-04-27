@@ -180,15 +180,17 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         connect(btnnext, &QPushButton::clicked, this, [=](){
              this->setIsPlayNext(!this->isPlayNext());
-             this->mediamanager->fadeOut(2000);
+             //this->mediamanager->fadeOut(2000);
         });
 
         connect(btnpurge, &QPushButton::clicked, this, [=](){
              this->setIsPurge(!this->isPurge());
+
         });
 
         connect(btnloop, &QPushButton::clicked, this, [=](){
              this->setIsLoop(!this->isLoop());
+
         });
 
         connect(btnselect, &QPushButton::clicked, this, [=](){

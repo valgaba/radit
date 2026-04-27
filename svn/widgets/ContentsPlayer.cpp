@@ -153,6 +153,13 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
                        }
                    });
 
+                    //borrado para el purge
+                   connect(newItem, &AudioItemMaxi::requestAutoDelete,
+                           this, [this](AudioItemMaxi* item){
+                             deleteItem(item);
+                   });
+
+
                    connect(newItem, &AudioItemMaxi::requestPlay,
                            this, [this](AudioItemMaxi* item) {
                        if (Player* player = findPlayer()) {
@@ -203,6 +210,12 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             contentsMenu->setCutVisible(false);
             contentsMenu->setDeleteVisible(false);
             contentsMenu->setPropertiesVisible(false);
+
+            contentsMenu->setnextVisible(false);
+            contentsMenu->setpurgeVisible(false);
+            contentsMenu->setloopVisible(false);
+            contentsMenu->setselectVisible(false);
+
             contentsMenu->setPasteVisible(!this->clipboard.lista.isEmpty());
 
           //  contentsMenu->setLoadVisible(false);
@@ -221,6 +234,11 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         contentsMenu->setDeleteVisible(true);
         contentsMenu->setPropertiesVisible(true);
 
+        contentsMenu->setnextVisible(true);
+        contentsMenu->setpurgeVisible(true);
+        contentsMenu->setloopVisible(true);
+        contentsMenu->setselectVisible(true);
+
       //  contentsMenu->setLoadVisible(true);
         contentsMenu->setSaveVisible(true);
         contentsMenu->setSaveAsVisible(true);
@@ -236,6 +254,129 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 }
 
 //************************ menus ************
+void ContentsPlayer::nextAllItems(){
+
+    QList<AudioItemMaxi*> selectedItems;
+
+        // Recoger seleccionados
+        QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
+        for (AudioItemMaxi* item : std::as_const(items)) {
+            if (item->isSelect()) {
+                selectedItems.append(item);
+            }
+        }
+
+        // Caso 1: hay selección
+        if (!selectedItems.isEmpty()) {
+            for (AudioItemMaxi* item : std::as_const(selectedItems)) {
+                item->setIsPlayNext(!item->isPlayNext());
+                // quitar selección
+                 item->setIsSelect(false);
+            }
+            return;
+        }
+
+        // Caso 2: no hay selección → item bajo el cursor
+        QWidget *widget = childAt(mousePos);
+
+        while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
+            widget = widget->parentWidget();
+        }
+
+        if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+            item->setIsPlayNext(!item->isPlayNext());
+        }
+
+}
+
+void ContentsPlayer::purgeAllItems(){
+
+    QList<AudioItemMaxi*> selectedItems;
+
+        // Recoger seleccionados
+        QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
+        for (AudioItemMaxi* item : std::as_const(items)) {
+            if (item->isSelect()) {
+                selectedItems.append(item);
+            }
+        }
+
+        // Caso 1: hay selección
+        if (!selectedItems.isEmpty()) {
+            for (AudioItemMaxi* item : std::as_const(selectedItems)) {
+                item->setIsPurge(!item->isPurge());
+                // quitar selección
+                 item->setIsSelect(false);
+            }
+            return;
+        }
+
+        // Caso 2: no hay selección → item bajo el cursor
+        QWidget *widget = childAt(mousePos);
+
+        while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
+            widget = widget->parentWidget();
+        }
+
+        if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+            item->setIsPurge(!item->isPurge());
+        }
+
+}
+
+
+void ContentsPlayer::loopAllItems(){
+
+    QList<AudioItemMaxi*> selectedItems;
+
+        // Recoger seleccionados
+        QList<AudioItemMaxi*> items = findChildren<AudioItemMaxi*>();
+        for (AudioItemMaxi* item : std::as_const(items)) {
+            if (item->isSelect()) {
+                selectedItems.append(item);
+            }
+        }
+
+        // Caso 1: hay selección
+        if (!selectedItems.isEmpty()) {
+            for (AudioItemMaxi* item : std::as_const(selectedItems)) {
+                item->setIsLoop(!item->isLoop());
+                // quitar selección
+                 item->setIsSelect(false);
+            }
+            return;
+        }
+
+        // Caso 2: no hay selección → item bajo el cursor
+        QWidget *widget = childAt(mousePos);
+
+        while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
+            widget = widget->parentWidget();
+        }
+
+        if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+             item->setIsLoop(!item->isLoop());
+        }
+
+}
+
+void ContentsPlayer::selectItems(){
+
+    // Caso 2: no hay selección → item bajo el cursor
+    QWidget *widget = childAt(mousePos);
+
+    while (widget && !qobject_cast<AudioItemMaxi*>(widget)) {
+        widget = widget->parentWidget();
+    }
+
+    if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
+         item->setIsSelect(!item->isSelect());
+    }
+
+
+}
+
+
 void ContentsPlayer::selectAllItems()
 {
 

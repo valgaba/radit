@@ -43,6 +43,7 @@ public:
     virtual void deleteItem(AudioItemMaxi* item);
     Player* findPlayer() const;   //necesitamos el padre player para difentes operaciones
 
+    AudioItemMaxi* findNextPlayItem(AudioItemMaxi* current);
 
 protected:
 

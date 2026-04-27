@@ -18,6 +18,7 @@
 #include <QDebug>
 #include <QMessageBox>
 #include "widgets/Player.h"
+#include "widgets/contentsbase.h"
 //#include "widgets/container.h"
 
 
@@ -47,10 +48,47 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
        connect(mediamanager, &MediaManager::playbackFinished,
                this, [this]() {
-                  // mediamanager->stop();
-                  // mediamanager->seek(0.0);
-                   //currentItem = nullptr;
-                   this->stopMain();
+
+           if (!currentItem)
+                  return;
+
+              if (currentItem->isLoop()) {
+
+                  // LOOP
+                  mediamanager->seek(currentItem->secondStart());
+                  mediamanager->play();
+                  return;
+              }
+
+              // guardar antes de parar
+              AudioItemMaxi* finishedItem = currentItem;
+
+              this->stopMain();
+
+              // PURGE
+              if (finishedItem->isPurge()) {
+                  emit finishedItem->requestAutoDelete(finishedItem);
+              }
+
+              //  PLAY NEXT
+              ContentsBase* contents = nullptr;
+              QWidget* w = finishedItem;
+
+              while (w) {
+                  contents = qobject_cast<ContentsBase*>(w);
+                  if (contents)
+                      break;
+                  w = w->parentWidget();
+              }
+
+              if (contents) {
+                  AudioItemMaxi* nextItem = contents->findNextPlayItem(finishedItem);
+
+                  if (nextItem) {
+                      nextItem->setIsPlayNext(false);
+                      playItem(nextItem);
+                  }
+              }
                });
 
 
