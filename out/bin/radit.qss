@@ -534,6 +534,26 @@ Button[active="true"] {
 
 
 
+
+Button[playing="true"] {
+    background-color: #593a3a;
+    border: 2px solid #f44336;
+}
+
+Button[playing="false"] {
+    border: 1px solid #686b74;
+    background-color: #262c3b;
+
+}
+
+
+
+
+
+
+
+
+
 VuMeter{
 border: 1px solid #686b74;
 
@@ -828,18 +848,12 @@ AudioItemFile{
 AudioItemFileMini{
 
 
-
-
 }
 
 AudioItemFileMaxi{
 
 
-
-
 }
-
-
 
 
 

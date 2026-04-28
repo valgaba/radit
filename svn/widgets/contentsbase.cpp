@@ -170,6 +170,9 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
     //borrado para el purge
    connect(item, &AudioItemMaxi::requestAutoDelete,
            this, [this](AudioItemMaxi* item){
+             //if(item->isPlayNext()) // si esta en playnext no borra el item
+                // return;
+
              deleteItem(item);
    });
 
@@ -238,7 +241,7 @@ AudioItemMaxi* ContentsBase::findNextPlayItem(AudioItemMaxi* current)
         int index = layout->indexOf(current);
 
         //  1. Buscar hacia abajo
-        for (int i = index + 1; i < layout->count(); ++i) {
+        for (int i = index; i < layout->count(); ++i) {
             QWidget* w = layout->itemAt(i)->widget();
             if (auto *item = qobject_cast<AudioItemMaxi*>(w)) {
                 if (item->isPlayNext())

@@ -50,46 +50,58 @@ Player::Player(QWidget *parent) : Frame(parent) {
                this, [this]() {
 
            if (!currentItem)
-                  return;
+               return;
 
-              if (currentItem->isLoop()) {
+           if (currentItem->isLoop()) {
 
-                  // LOOP
-                  mediamanager->seek(currentItem->secondStart());
-                  mediamanager->play();
-                  return;
-              }
+               // LOOP
+               mediamanager->seek(currentItem->secondStart());
+               mediamanager->play();
+               return;
+           }
 
-              // guardar antes de parar
-              AudioItemMaxi* finishedItem = currentItem;
+           // guardar antes de parar
+           AudioItemMaxi* finishedItem = currentItem;
 
-              this->stopMain();
+           //  PRIORIDAD: NEXT + PURGE → repetir y NO borrar
+           if (finishedItem->isPlayNext() && finishedItem->isPurge()) {
 
-              // PURGE
-              if (finishedItem->isPurge()) {
-                  emit finishedItem->requestAutoDelete(finishedItem);
-              }
+               this->stopMain();
+               playItem(finishedItem);
+               return;
+           }
 
-              //  PLAY NEXT
-              ContentsBase* contents = nullptr;
-              QWidget* w = finishedItem;
+           // 1️⃣ Buscar el siguiente
+           AudioItemMaxi* nextItem = nullptr;
 
-              while (w) {
-                  contents = qobject_cast<ContentsBase*>(w);
-                  if (contents)
-                      break;
-                  w = w->parentWidget();
-              }
+           ContentsBase* contents = nullptr;
+           QWidget* w = finishedItem;
 
-              if (contents) {
-                  AudioItemMaxi* nextItem = contents->findNextPlayItem(finishedItem);
+           while (w) {
+               contents = qobject_cast<ContentsBase*>(w);
+               if (contents)
+                   break;
+               w = w->parentWidget();
+           }
 
-                  if (nextItem) {
-                      nextItem->setIsPlayNext(false);
-                      playItem(nextItem);
-                  }
-              }
-               });
+           if (contents) {
+               nextItem = contents->findNextPlayItem(finishedItem);
+           }
+
+           // 2️⃣ parar
+           this->stopMain();
+
+           // 3️⃣ reproducir siguiente
+           if (nextItem) {
+               playItem(nextItem);
+           }
+
+           // 4️⃣ PURGE (solo si no era NEXT prioritario)
+           if (finishedItem->isPurge()) {
+               emit finishedItem->requestAutoDelete(finishedItem);
+           }
+
+        });
 
 
 
@@ -319,10 +331,7 @@ void Player::playItem(AudioItemMaxi *item)
 
 
     if (currentItem && currentItem != item) {
-       // mediamanager->stop();
-       // mediamanager->seek(0.0);
-       //  currentItem->setPlaying(false);
-        this->stopMain();
+          this->stopMain();
    }
 
        mediamanager->setDevice(1);
@@ -330,6 +339,13 @@ void Player::playItem(AudioItemMaxi *item)
        mediamanager->seek(item->secondStart());
        mediamanager->play();
        item->setPlaying(true);
+       item->playColor(true);
+
+        // en caso de estar next activado se quita
+       if (item->isPlayNext()) {
+               item->setIsPlayNext(false);
+           }
+
        currentItem = item;
 
 
@@ -366,12 +382,14 @@ void Player::stopMain()
 
         if (currentItem) {  // <-- protección extra
             currentItem->setPlaying(false);
+            currentItem->playColor(false);
         }
 
         currentItem = nullptr;
 
         labelnombre->setText("");
         labeltiempo->setText("00:00:00.00");
+
 }
 
 QString Player::SecondToTime(double segundos){

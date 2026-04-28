@@ -95,6 +95,7 @@ public:
 
       FrameColorItemMax *framecolor; // esto es para cambiar
 
+    void playColor(bool playing);
     void setNameFile(const QString &NameFile);
     void setTiempoFile(double segundos);
 
