@@ -55,5 +55,10 @@
         <file>icons/palette.svg</file>
         <file>icons/Pausemini.svg</file>
         <file>icons/Playmini.svg</file>
+        <file>icons/Nexton.svg</file>
+        <file>icons/Loopon.svg</file>
+        <file>icons/Purgeon.svg</file>
+        <file>icons/playpause2on.svg</file>
+        <file>icons/eject.svg</file>
     </qresource>
 </RCC>

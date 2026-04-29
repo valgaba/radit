@@ -527,24 +527,39 @@ Button:hover{
 }
 
 
-Button[active="true"] {
-    background-color: #3a5958;
-    border: 2px solid #4caf50;
+Button[nextcolor="true"] {
+    background-color: #1e7e34;
 }
+
+Button[purgecolor="true"] {
+    background-color: #7e1e34;
+}
+
+Button[loopcolor="true"] {
+    background-color: #5a4fc2;
+}
+
+Button[selectcolor="true"] {
+    background-color: #745df7;
+}
+
 
 
 
 
 Button[playing="true"] {
-    background-color: #593a3a;
-    border: 2px solid #f44336;
+
+      border-radius: 20px;
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #5ecf73,
+        stop:0.4 #28a745,
+        stop:1 #1e7e34
+    );
+    border: 1px solid #1c7430;
+    
 }
 
-Button[playing="false"] {
-    border: 1px solid #686b74;
-    background-color: #262c3b;
-
-}
 
 
 

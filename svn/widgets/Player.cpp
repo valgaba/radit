@@ -203,10 +203,10 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
     //parte central
       btnstop = new Button(this);
-      btnstop->SetIcon("Stop.svg");
-      btnstop->setIconSize(QSize(40, 50));  // ajusta al tamaño que quieras
+      btnstop->SetIcon("eject.svg");
+      btnstop->setIconSize(QSize(30, 40));  // ajusta al tamaño que quieras
       btnstop->setFixedSize(50, 30);  //Tamaño fijo
-      btnstop->setToolTip("Stop");
+      btnstop->setToolTip("Eject");
 
       labelnombre = new Label;
       labelnombre->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -391,6 +391,25 @@ void Player::stopMain()
         labeltiempo->setText("00:00:00.00");
 
 }
+
+
+int Player::devicePlay() const {
+    return m_deviceplay;
+}
+
+void Player::setDevicePlay(int device) {
+    m_deviceplay = device;
+}
+
+int Player::deviceCue() const {
+    return m_devicecue;
+}
+
+void Player::setDeviceCue(int device) {
+    m_devicecue = device;
+}
+
+
 
 QString Player::SecondToTime(double segundos){
 

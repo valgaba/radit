@@ -65,6 +65,9 @@ private:
     double m_duration = 0.0;
     QString SecondToTime(double segundos);
 
+    int m_deviceplay;
+    int m_devicecue;
+
 
 public:
 
@@ -77,6 +80,13 @@ public:
     void playItem(AudioItemMaxi *item);
     void pauseMain();
     void stopMain();
+
+    int devicePlay() const;
+    void setDevicePlay(int device);
+
+    int deviceCue() const;
+    void setDeviceCue(int device);
+
 
     AudioItemMaxi* getCurrentItem() const {
         return currentItem;

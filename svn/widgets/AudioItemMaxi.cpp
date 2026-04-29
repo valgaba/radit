@@ -448,7 +448,7 @@ void AudioItemMaxi::setIsSelect(bool value)
 {
     AudioItem::setIsSelect(value); // guardar estado en la base
 
-    btnselect->setProperty("active", isSelect());
+    btnselect->setProperty("selectcolor", isSelect());
     btnselect->style()->polish(btnselect);
     btnselect->update();
 }
@@ -484,10 +484,16 @@ void AudioItemMaxi::playColor(bool playing){
     btnplay->update();
 
 
-    this->setProperty("playing", playing);
-    this->style()->unpolish(this);
-    this->style()->polish(this);
-    this->update();
+    if (playing) {
+           btnplay->SetIcon("playpause2on.svg");
+           btnplay->setIconSize(QSize(40, 50));
+
+       } else {
+           btnplay->SetIcon("playpause2.svg");
+           btnplay->setIconSize(QSize(40, 50));
+
+
+       }
 
 
 }

@@ -113,9 +113,19 @@ public:
     void setIsPlayNext(bool isPlayNext) {
         m_isPlayNext = isPlayNext;
 
-            btnnext->setProperty("active", m_isPlayNext);
+            btnnext->setProperty("nextcolor", m_isPlayNext);
             btnnext->style()->polish(btnnext);
             btnnext->update();
+
+            if (m_isPlayNext) {
+                   btnnext->SetIcon("Nexton.svg");
+                   btnnext->setIconSize(QSize(18, 18));
+               } else {
+                   btnnext->SetIcon("Next.svg");
+                   btnnext->setIconSize(QSize(18, 18));
+
+               }
+
        }
 
     bool isPlayNext() const {
@@ -125,16 +135,19 @@ public:
 
     void setIsPurge(bool isPurge) {
            m_isPurge = isPurge;
-           btnpurge->setProperty("active", m_isPurge); //active viene del css
+           btnpurge->setProperty("purgecolor", m_isPurge); //active viene del css
            btnpurge->style()->polish(btnpurge);
            btnpurge->update();
 
-           btnpurge->setStyleSheet(
-               "QPushButton[active=\"true\"] {"
-               "   background-color: #3a5958;"
-               "   border: 2px solid #f44336;"
-               "}"
-           );
+           if (m_isPurge) {
+                  btnpurge->SetIcon("Purgeon.svg");
+                  btnpurge->setIconSize(QSize(18, 18));
+              } else {
+                  btnpurge->SetIcon("Purge.svg");
+                  btnpurge->setIconSize(QSize(18, 18));
+
+              }
+
 
        }
 
@@ -147,16 +160,20 @@ public:
     void setIsLoop(bool isLoop) {
            m_isLoop = isLoop;
 
-           btnloop->setProperty("active", m_isLoop); //active viene del css
+           btnloop->setProperty("loopcolor", m_isLoop); //active viene del css
            btnloop->style()->polish(btnloop);
            btnloop->update();
 
-           btnloop->setStyleSheet(
-               "QPushButton[active=\"true\"] {"
-               "   background-color: #3a5958;"
-               "   border: 2px solid #2196f3;"
-               "}"
-           );
+
+           if (m_isLoop) {
+                  btnloop->SetIcon("Loopon.svg");
+                  btnloop->setIconSize(QSize(18, 18));
+              } else {
+                  btnloop->SetIcon("Loop.svg");
+                  btnloop->setIconSize(QSize(18, 18));
+
+              }
+
 
            // Control de visibilidad
               if (btnpurge) {
