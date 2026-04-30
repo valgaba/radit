@@ -476,13 +476,26 @@ QInputDialog QPushButton:pressed {
 AudioItem
 {
 	background-color: #39385b;
+	
    
 }
 
 
+
 AudioItemMaxi {
 	
-   background-color: #39385b;
+   background-color: #262c3b;
+ 
+}  
+
+
+AudioItemMaxi[playing="true"] {
+    border: 2px solid #59da3f;
+     
+}
+
+AudioItemMaxi[playing="false"] {
+    border: 2px solid transparent;
 }
 
 
@@ -492,6 +505,14 @@ Frame {
    
 	
 	
+}
+
+
+
+Frame#framecenter,
+Frame#frametop,
+Frame#framedown {
+    background-color: #181e2c;
 }
 
 
@@ -543,28 +564,23 @@ Button[selectcolor="true"] {
     background-color: #745df7;
 }
 
-
+QPushButton#btnstop:pressed {
+    background-color: #ebeaf3;
+}
 
 
 
 Button[playing="true"] {
 
-      border-radius: 20px;
+   border-radius: 20px;
     background: qlineargradient(
         x1:0, y1:0, x2:0, y2:1,
-        stop:0 #5ecf73,
-        stop:0.4 #28a745,
-        stop:1 #1e7e34
+        stop:0 #6f8f98,   /* brillo más apagado */
+        stop:0.5 #5a7a83, /* base más oscura */
+        stop:1 #3e585f    /* sombra profunda */
     );
-    border: 1px solid #1c7430;
-    
+    border: 1px solid #354a50;
 }
-
-
-
-
-
-
 
 
 

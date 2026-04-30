@@ -81,7 +81,19 @@ private:
     );
 
 
+    float m_silenceThresholdDb = -45.0f;
+    int   m_silenceDurationMs  = 400;
 
+
+    float m_soundThresholdDb = -40.0f;
+    int m_silenceCounter = 0;
+    bool m_hadSound = false;
+
+    // margen dinámico
+    double m_tailSeconds = 6.0;
+    float  m_tailPercent = 0.10f;
+
+   bool shouldStopBySilence(const AudioFrame& frame);
 
 };
 

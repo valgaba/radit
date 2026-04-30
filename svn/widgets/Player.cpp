@@ -22,12 +22,8 @@
 //#include "widgets/container.h"
 
 
-
-
-
 Player::Player(QWidget *parent) : Frame(parent) {
 
-  //  this->setStyleSheet("background-color: none;");
 
 
        mediamanager = new MediaManager(this);
@@ -45,7 +41,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
        });
 
-
+            //emite el final
        connect(mediamanager, &MediaManager::playbackFinished,
                this, [this]() {
 
@@ -117,10 +113,10 @@ Player::Player(QWidget *parent) : Frame(parent) {
       framedown = new Frame(this);
 
       //personalizamos un poco la barra
-        //framecenter->setStyleSheet("background-color: rgb(38, 44, 59);");
-        framecenter->setStyleSheet("background-color: #181e2c;");
-        frametop->setStyleSheet("background-color: #181e2c;");
-        framedown->setStyleSheet("background-color: #181e2c;");
+
+       // framecenter->setStyleSheet("background-color: #181e2c;");
+       // frametop->setStyleSheet("background-color: #181e2c;");
+        //framedown->setStyleSheet("background-color: #181e2c;");
 
 
       layoutbarra = new QHBoxLayout(framebarra);
@@ -203,6 +199,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
     //parte central
       btnstop = new Button(this);
+      btnstop->setObjectName("btnstop");
       btnstop->SetIcon("eject.svg");
       btnstop->setIconSize(QSize(30, 40));  // ajusta al tamaño que quieras
       btnstop->setFixedSize(50, 30);  //Tamaño fijo

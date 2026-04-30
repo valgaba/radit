@@ -28,6 +28,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
    this->setObjectName("AudioItemMaxi"); //para qss
+   this->setAttribute(Qt::WA_StyledBackground, true);
    this->setFixedHeight(100); //alto del item fijo
    //this->setStyleSheet("background-color: #262c3b;");
 
@@ -82,7 +83,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
    layout = new QVBoxLayout; //layout general
-   layout->setContentsMargins(0, 0, 0, 0);
+   layout->setContentsMargins(2, 2, 2, 2);
    layout->setSpacing(0); // espacios entre  item dentro del contenedor
    this->setLayout(layout);
 
@@ -482,6 +483,13 @@ void AudioItemMaxi::playColor(bool playing){
     btnplay->style()->unpolish(btnplay);
     btnplay->style()->polish(btnplay);
     btnplay->update();
+
+
+    // ITEM COMPLETO
+      this->setProperty("playing", playing);
+      this->style()->unpolish(this);
+      this->style()->polish(this);
+      this->update();
 
 
     if (playing) {

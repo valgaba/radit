@@ -56,6 +56,18 @@ MediaManager::MediaManager(QObject *parent)
                frame.left  = 20.0f * log10f(leftLinear);
                frame.right = 20.0f * log10f(rightLinear);
 
+               //  detección de finales
+                      if (shouldStopBySilence(frame))
+                      {
+                          BASS_ChannelStop(m_stream);
+                          m_timer->stop();
+
+                          emit playbackFinished();
+                          return;
+                      }
+
+
+
                emit audioFrameUpdated(frame);
            }
 
@@ -452,3 +464,42 @@ void CALLBACK MediaManager::FadeOutSyncCallback(
             );
 }
 
+bool MediaManager::shouldStopBySilence(const AudioFrame& frame)
+{
+    float maxDb = std::max(frame.left, frame.right);
+
+    // 1. Detectar si hubo audio real
+    if (maxDb > m_soundThresholdDb)
+    {
+        m_hadSound = true;
+    }
+
+    // 2. Duración total
+    double duration = BASS_ChannelBytes2Seconds(
+        m_stream,
+        BASS_ChannelGetLength(m_stream, BASS_POS_BYTE)
+    );
+
+    double current = frame.position;
+
+    // margen dinámico
+    double tailMargin = std::max(m_tailSeconds, duration * m_tailPercent);
+
+    bool nearEnd = (duration - current) < tailMargin;
+
+    // 3. Contador de silencio
+    if (maxDb < m_silenceThresholdDb)
+    {
+        m_silenceCounter += 50;
+    }
+    else
+    {
+        m_silenceCounter = 0;
+    }
+
+
+    // 4. Decisión final
+    return (nearEnd &&
+            m_hadSound &&
+            m_silenceCounter >= m_silenceDurationMs);
+}
