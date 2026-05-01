@@ -81,8 +81,8 @@ private:
     );
 
 
-    float m_silenceThresholdDb = -45.0f;
-    int   m_silenceDurationMs  = 400;
+    float m_silenceThresholdDb = -25.0f; //45
+    int   m_silenceDurationMs  = 300; //400
 
 
     float m_soundThresholdDb = -40.0f;

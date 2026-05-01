@@ -112,11 +112,9 @@ Player::Player(QWidget *parent) : Frame(parent) {
       framecenter = new Frame(this);
       framedown = new Frame(this);
 
-      //personalizamos un poco la barra
-
-       // framecenter->setStyleSheet("background-color: #181e2c;");
-       // frametop->setStyleSheet("background-color: #181e2c;");
-        //framedown->setStyleSheet("background-color: #181e2c;");
+      framecenter->setObjectName("framecenter");
+      frametop->setObjectName("frametop");
+      framedown->setObjectName("framedown");
 
 
       layoutbarra = new QHBoxLayout(framebarra);
@@ -210,6 +208,9 @@ Player::Player(QWidget *parent) : Frame(parent) {
       labeltiempo = new Label;
       labeltiempo->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
       labeltiempo->setFixedWidth(125);   // Fija solo el ancho
+      labelnombre->setObjectName("labelnombre");
+      labeltiempo->setObjectName("labeltiempo");
+
       // Cambiar tamaño de fuente
       QFont font = labeltiempo->font();
       font.setPointSize(16);

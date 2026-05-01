@@ -490,7 +490,7 @@ AudioItemMaxi {
 
 
 AudioItemMaxi[playing="true"] {
-    border: 2px solid #59da3f;
+    border: 2px solid #3ad5ff;
      
 }
 
@@ -549,15 +549,15 @@ Button:hover{
 
 
 Button[nextcolor="true"] {
-    background-color: #1e7e34;
+    background-color: #38b0d1;
 }
 
 Button[purgecolor="true"] {
-    background-color: #7e1e34;
+    background-color: #d13838
 }
 
 Button[loopcolor="true"] {
-    background-color: #5a4fc2;
+    background-color: #38d17a;
 }
 
 Button[selectcolor="true"] {
@@ -624,6 +624,13 @@ Label#labelinfo{
 border: none;
 
 
+}
+
+
+
+Label#labelnombre,
+Label#labeltiempo{
+   color: #8a8d96;
 }
 
 
