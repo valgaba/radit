@@ -128,6 +128,11 @@ void TabPlayer::closeTab(int index){
 
     if (index == -1) return;
 
+    if (this->count() <= 1) return; // si solo queda una pestaña no se puede borrar
+
+
+
+
        QMessageBox::StandardButton reply;
        reply = QMessageBox::question(
            this,

@@ -79,7 +79,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
 
-
+//***************************************************
 
 
    layout = new QVBoxLayout; //layout general

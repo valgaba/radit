@@ -136,11 +136,14 @@ Player::Player(QWidget *parent) : Frame(parent) {
       layoutdown->setSpacing(5);
      // layouttab->setSpacing(0);
 
+
       layout->addWidget(framebarra);
       layout->addWidget(frametop);
       layout->addWidget(framecenter);
       layout->addWidget(framedown);
       //layout->addWidget(frametab);
+
+
 
       // partes fijas
       framebarra->setFixedHeight(25);
@@ -154,6 +157,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       // pintar frametop de azul
       framebarra->setStyleSheet("background-color: #4e4d7a;");
     // this->setStyleSheet("background-color: #343434;");
+
 
 
 
@@ -194,6 +198,17 @@ Player::Player(QWidget *parent) : Frame(parent) {
       });
 
 
+     // Parte alta
+
+      layouttop->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum)); //espaciador
+      btnoption= new Button(this);
+      btnoption->SetIcon("Tools.svg");
+      btnoption->setIconSize(QSize(20, 20));
+      btnoption->setFixedSize(21, 21);  //Tamaño fijo
+      btnoption->setToolTip("Repeat the item indefinitely.");
+
+
+      layouttop->addWidget(btnoption);
 
     //parte central
       btnstop = new Button(this);

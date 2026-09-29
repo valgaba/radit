@@ -57,14 +57,14 @@ MediaManager::MediaManager(QObject *parent)
                frame.right = 20.0f * log10f(rightLinear);
 
                //  detección de finales
-                      if (shouldStopBySilence(frame))
+                    /*  if (shouldStopBySilence(frame)) //cuidado corta estrevistas etc.
                       {
                           BASS_ChannelStop(m_stream);
                           m_timer->stop();
 
                           emit playbackFinished();
                           return;
-                      }
+                      }*/
 
 
 

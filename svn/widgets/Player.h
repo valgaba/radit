@@ -40,7 +40,7 @@ private:
     QHBoxLayout *layoutdown;
     QVBoxLayout *layouttab;
 
-
+    Button * btnoption;
 
     Button * btnclose;
     Label *labeltitle;
