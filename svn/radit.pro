@@ -36,6 +36,7 @@ SOURCES += \
     widgets/container.cpp \
     widgets/contentsbase.cpp \
     widgets/frame.cpp \
+    widgets/frameoptionsplayer.cpp \
     widgets/label.cpp \
     widgets/menu.cpp \
     widgets/scrollbar.cpp \
@@ -68,6 +69,7 @@ HEADERS += \
     widgets/container.h \
     widgets/contentsbase.h \
     widgets/frame.h \
+    widgets/frameoptionsplayer.h \
     widgets/label.h \
     widgets/menu.h \
     widgets/scrollbar.h \

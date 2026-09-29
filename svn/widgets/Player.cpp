@@ -19,6 +19,7 @@
 #include <QMessageBox>
 #include "widgets/Player.h"
 #include "widgets/contentsbase.h"
+
 //#include "widgets/container.h"
 
 
@@ -26,7 +27,14 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
 
 
+    frameoptionsplayer = new FrameOptionsPlayer(nullptr);
+  //  frameoptionsplayer->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+   // frameoptionsplayer->setFixedSize(300, 250);
+
+
+
        mediamanager = new MediaManager(this);
+
 
      connect(mediamanager, &MediaManager::audioFrameUpdated,
                this, [this](const AudioFrame &frame) {
@@ -131,7 +139,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
      // layouttab->setContentsMargins(0, 0, 0, 0);
 
       layoutbarra->setSpacing(0);
-      layouttop->setSpacing(0);
+      layouttop->setSpacing(5);
       layoutcenter->setSpacing(0);
       layoutdown->setSpacing(5);
      // layouttab->setSpacing(0);
@@ -147,7 +155,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
       // partes fijas
       framebarra->setFixedHeight(25);
-      frametop->setFixedHeight(25);
+      frametop->setFixedHeight(30);
       framecenter->setFixedHeight(45);
       framedown->setFixedHeight(30);
 
@@ -198,17 +206,75 @@ Player::Player(QWidget *parent) : Frame(parent) {
       });
 
 
-     // Parte alta
+     // Parte alta********************************
 
       layouttop->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum)); //espaciador
       btnoption= new Button(this);
       btnoption->SetIcon("Tools.svg");
       btnoption->setIconSize(QSize(20, 20));
-      btnoption->setFixedSize(21, 21);  //Tamaño fijo
-      btnoption->setToolTip("Repeat the item indefinitely.");
-
+      btnoption->setFixedSize(23, 23);  //Tamaño fijo
+      btnoption->setToolTip("options.");
 
       layouttop->addWidget(btnoption);
+
+      connect(btnoption, &QPushButton::clicked,
+              this, [this](){
+
+        //  if (!frameoptionsplayer)
+        //  {
+             /* frameoptionsplayer = new FrameOptionsPlayer(nullptr);
+
+              frameoptionsplayer->setWindowFlags(
+                  Qt::Popup | Qt::FramelessWindowHint
+              );
+
+              frameoptionsplayer->setFixedSize(300, 150);*/
+         // }
+
+          QPoint posGlobal = btnoption->mapToGlobal(
+              QPoint(0, btnoption->height())
+          );
+
+          QScreen *screen = QGuiApplication::screenAt(posGlobal);
+
+          if (!screen)
+              screen = QGuiApplication::primaryScreen();
+
+          QRect area = screen->availableGeometry();
+
+          int x = posGlobal.x();
+          int y = posGlobal.y();
+
+          // Evitar que salga por la derecha
+          if (x + frameoptionsplayer->width() > area.right() + 1)
+          {
+              x = area.right() + 1
+                  - frameoptionsplayer->width();
+          }
+
+          // Evitar que salga por la izquierda
+          if (x < area.left())
+              x = area.left();
+
+          // Si no cabe debajo, colocarlo encima
+          if (y + frameoptionsplayer->height() > area.bottom() + 1)
+          {
+              y = btnoption->mapToGlobal(
+                  QPoint(0, -frameoptionsplayer->height())
+              ).y();
+          }
+
+          // Evitar que salga por arriba
+          if (y < area.top())
+              y = area.top();
+
+          frameoptionsplayer->move(x, y);
+          frameoptionsplayer->show();
+          frameoptionsplayer->raise();
+      });
+
+
+
 
     //parte central
       btnstop = new Button(this);

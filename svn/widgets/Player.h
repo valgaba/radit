@@ -13,6 +13,7 @@
 #include "widgets/TabPlayer.h"
 #include "widgets/AudioItemMaxi.h"
 #include "core/MediaManager.h"
+#include "widgets/frameoptionsplayer.h"
 
 
 
@@ -68,6 +69,8 @@ private:
     int m_deviceplay;
     int m_devicecue;
 
+
+    FrameOptionsPlayer *frameoptionsplayer = nullptr; // si no esta a nullptr hace crack
 
 public:
 
