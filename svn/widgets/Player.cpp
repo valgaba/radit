@@ -27,9 +27,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
 
 
-    frameoptionsplayer = new FrameOptionsPlayer(nullptr);
-  //  frameoptionsplayer->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-   // frameoptionsplayer->setFixedSize(300, 250);
+    frameoptionsplayer = new FrameOptionsPlayer(this);
 
 
 
@@ -413,7 +411,7 @@ void Player::playItem(AudioItemMaxi *item)
           this->stopMain();
    }
 
-       mediamanager->setDevice(1);
+       mediamanager->setDevice(this->devicePlay());
        mediamanager->loadFile(item->filePath());
        mediamanager->seek(item->secondStart());
        mediamanager->play();

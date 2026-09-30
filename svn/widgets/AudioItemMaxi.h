@@ -89,7 +89,7 @@ private:
 
      bool m_isPlaying = false;
 
-
+     int devicePlay() const;
 
 public:
 

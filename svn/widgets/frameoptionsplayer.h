@@ -5,6 +5,7 @@
 #include "widgets/frame.h"
 
 #include <QFormLayout>
+#include <QComboBox>
 #include "widgets/button.h"
 
 
@@ -29,6 +30,8 @@ class FrameOptionsPlayer: public Frame
 
     Button * btncancel;
     Button * btnacept;
+    QComboBox *comboplay;
+    QComboBox *combocue;
 
 
     public:

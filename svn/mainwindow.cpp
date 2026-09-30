@@ -34,7 +34,7 @@
 #include "widgets/container.h"
 #include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
-#include "widgets/Player.h";
+#include "widgets/Player.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){

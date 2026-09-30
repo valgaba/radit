@@ -66,8 +66,8 @@ private:
     double m_duration = 0.0;
     QString SecondToTime(double segundos);
 
-    int m_deviceplay;
-    int m_devicecue;
+    int m_deviceplay=0;
+    int m_devicecue=0;
 
 
     FrameOptionsPlayer *frameoptionsplayer = nullptr; // si no esta a nullptr hace crack

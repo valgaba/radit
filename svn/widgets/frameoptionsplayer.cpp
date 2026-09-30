@@ -16,12 +16,12 @@
 */
 
 #include <QDebug>
-#include <QComboBox>
 #include <QLabel>
 
 #include "widgets/frameoptionsplayer.h"
 #include "widgets/label.h"
-
+#include "widgets/Player.h"
+#include "bass.h"
 
 
 
@@ -30,7 +30,7 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
     this->setObjectName("FrameOptionsPlayer"); //para qss
     this->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-    this->setFixedSize(300, 250);
+    this->setFixedSize(350, 250);
 
     layout = new QVBoxLayout(this);  // layout general
     layout->setContentsMargins(0, 0, 0, 0);
@@ -72,7 +72,7 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
     //parte alta
 
-    frametop->setStyleSheet("background-color: #3E3E5C; border: none;");
+    frametop->setStyleSheet("background-color: #4e4d7a; border: none;");
 
 
      Label * labeltext = new Label(this);
@@ -87,41 +87,36 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
      layouttop->addWidget(labeltext);
 
 
-
-
-    //
-   // layout->setContentsMargins(10, 10, 10, 10);
-   // layout->setSpacing(8);
-
-
     Label *labelplay= new Label(this);
-
-   labelplay->setMaximumHeight(QWIDGETSIZE_MAX);
-   labelplay->setWordWrap(false);
-   labelplay->setText("Play Out");
-
-    QComboBox *comboplay = new QComboBox(this);
-    comboplay->addItems({
-        "España",
-        "Francia",
-        "Italia"
-    });
-
-    layoutcenter->addRow(labelplay, comboplay);
+    labelplay->setMaximumHeight(QWIDGETSIZE_MAX);
+    labelplay->setWordWrap(false);
+    labelplay->setFont(font);
+    labelplay->setText("Play device");
 
     Label *labelcue= new Label(this);
+    labelcue->setMaximumHeight(QWIDGETSIZE_MAX);
+    labelcue->setWordWrap(false);
+    labelcue->setFont(font);
+    labelcue->setText("Cue device");
 
-   labelcue->setMaximumHeight(QWIDGETSIZE_MAX);
-   labelcue->setWordWrap(false);
-   labelcue->setText("Play Cue");
+     comboplay = new QComboBox(this);
+     comboplay->setObjectName("Combo"); //para qss
 
-    QComboBox *combocue = new QComboBox(this);
-    combocue->addItems({
-        "España",
-        "Francia",
-        "Italia"
-    });
+     combocue = new QComboBox(this);
+     combocue->setObjectName("Combo"); //para qss
 
+    BASS_DEVICEINFO info;
+      for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
+          if (info.flags & BASS_DEVICE_ENABLED) {
+              QString deviceName = QString::fromUtf8(info.name);
+
+              // Añadimos el dispositivo a ambos combos
+              comboplay->addItem(deviceName, i);
+              combocue->addItem(deviceName, i);
+          }
+      }
+
+    layoutcenter->addRow(labelplay, comboplay);
     layoutcenter->addRow(labelcue, combocue);
 
 
@@ -165,10 +160,25 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
 
 
-    // aceptar -> ocultar el panel
-    connect(btnacept, &QPushButton::clicked,
-            this, &FrameOptionsPlayer::hide);
+    // aceptar ->
+    connect(btnacept, &QPushButton::clicked, this, [this]() {
 
+           int selectedPlay = comboplay->currentData().toInt();
+           int selectedCue = combocue->currentData().toInt();
+
+           // 2. Intentar hacer un cast seguro al tipo de tu clase padre
+           // Reemplaza "TuClasePadre" por el nombre real de la clase que tiene los métodos set
+          Player *player = qobject_cast<Player*>(this->parent());
+
+           if (player) {
+               player->setDevicePlay(selectedPlay);
+               player->setDeviceCue(selectedCue);
+
+           }
+
+
+           this->hide();
+       });
 
 
 

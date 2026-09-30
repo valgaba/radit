@@ -22,6 +22,7 @@
 
 
 #include "widgets/AudioItemMaxi.h"
+#include "widgets/Player.h"
 
 
 AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
@@ -321,7 +322,10 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
             if (!mediamanager->isPlaying() && !mediamanager->isPaused()){
 
-                   mediamanager->setDevice(0);
+
+
+
+                   mediamanager->setDevice(devicePlay());
                    mediamanager->loadFile(this->filePath());
                    m_duration = this->second();
                    mediamanager->play();
@@ -505,3 +509,29 @@ void AudioItemMaxi::playColor(bool playing){
 
 
 }
+
+
+
+int AudioItemMaxi::devicePlay() const {
+
+    QWidget *widget = this->parentWidget();
+    Player *player = nullptr;
+
+    while (widget) {
+        player = qobject_cast<Player*>(widget);
+        if (player) {
+            break; // ¡Lo encontramos!
+        }
+        widget = widget->parentWidget(); // Seguimos subiendo
+    }
+
+    // 2. Si lo encontramos, le pedimos el dispositivo asignado
+    if (player){
+           return player->deviceCue();
+    }
+
+    return 0;
+
+}
+
+

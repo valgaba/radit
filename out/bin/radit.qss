@@ -1002,7 +1002,63 @@ AudioItemFileMaxi{
 
 
 
+/* Estilo base para el cuadro del combo (Cerrado) */
+#Combo {
+    background-color: #39385b;   /* Tu color morado oscuro de fondo */
+    color: #9AA0A6;               /* El color gris claro para la letra */
+    font-family: "Segoe UI", sans-serif; /* Tipografía limpia estilo Radit */
+    font-size: 12px;
+    border: 1px solid #4e4d7a;    /* Borde sutil */
+    border-radius: 2px;
+ 
+    outline: none;
+}
 
+/* Evitar cambios bruscos o anillos azules al enfocar o abrir el combo */
+#Combo:focus, #Combo:on {
+    background-color: #39385b;
+    color: #9AA0A6;
+    border: 1px solid #4e4d7a;
+}
+
+/* Ocultar completamente la flecha nativa */
+#Combo::drop-down {
+    width: 0px;
+    border: none;
+    background: transparent;
+}
+
+/* ================================================================= */
+/* CONFIGURACIÓN DE LA LISTA DESPLEGABLE (Estilo idéntico al menú) */
+/* ================================================================= */
+
+#Combo QAbstractItemView {
+    background-color: #39385b;   /* Mismo fondo morado plano */
+    color: #9AA0A6;               /* Mismo color de texto gris claro */
+    border: 1px solid #4e4d7a;    /* El mismo borde exterior del menú */
+    border-radius: 2px;
+    outline: none;
+  
+}
+
+/* Estilo para cada dispositivo individual dentro de la lista */
+#Combo QAbstractItemView::item {
+ 
+    border: 1px solid transparent;/* Borde invisible por defecto para evitar saltos */
+    background-color: transparent;
+}
+
+/* 
+   Efecto Hover / Selección: 
+   
+*/
+#Combo QAbstractItemView::item:hover,
+#Combo QAbstractItemView::item:selected {
+    background-color: transparent;    /* Fondo transparente obligatorio */
+    color: #ffffff;                    /* El texto cambia a blanco puro como en tu menú */
+    border: 1px solid #80a4ae;         /* Tu color aguamarina para el contorno */
+    border-radius: 2px;                /* Esquinas ligeramente suavizadas */
+}
 
 
 QMenu {
