@@ -265,7 +265,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
           // Evitar que salga por arriba
           if (y < area.top())
               y = area.top();
-
+          //frameoptionsplayer->UpdateDevice();
           frameoptionsplayer->move(x, y);
           frameoptionsplayer->show();
           frameoptionsplayer->raise();
@@ -476,6 +476,8 @@ int Player::devicePlay() const {
 
 void Player::setDevicePlay(int device) {
     m_deviceplay = device;
+
+
 }
 
 int Player::deviceCue() const {
@@ -484,6 +486,10 @@ int Player::deviceCue() const {
 
 void Player::setDeviceCue(int device) {
     m_devicecue = device;
+
+
+
+
 }
 
 

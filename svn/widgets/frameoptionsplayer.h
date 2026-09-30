@@ -33,6 +33,9 @@ class FrameOptionsPlayer: public Frame
     QComboBox *comboplay;
     QComboBox *combocue;
 
+    void ApplySelectedDevices();
+
+
 
     public:
 
@@ -42,12 +45,12 @@ class FrameOptionsPlayer: public Frame
       ~FrameOptionsPlayer();
 
 
-
+       void UpdateDevice();
 
 
     protected:
 
-
+   void showEvent(QShowEvent *event) override;
 
 
     private slots:
