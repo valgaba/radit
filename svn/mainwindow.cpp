@@ -30,11 +30,12 @@
 #include <QUrl>
 
 
-#include "widgets/TabPlayer.h"
-#include "widgets/container.h"
+//#include "widgets/TabPlayer.h"
+//#include "widgets/container.h"
 #include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
-#include "widgets/Player.h"
+#include "core/config.h"
+//#include "widgets/Player.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -143,14 +144,64 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     layoutprincipal->addWidget(splitterprincipal);
 
 
-    splittertop->addWidget(new Player);
+    // ----------------------------------------
+    // Crear Players
+    // ----------------------------------------
+
+    Player *player1 = new Player;
+    Player *player2 = new Player;
+    Player *player3 = new Player;
+    Player *player4 = new Player;
+
+
+
+    player1->setObjectName("Player1");
+    player2->setObjectName("Player2");
+    player3->setObjectName("Player3");
+    player4->setObjectName("Player4");
+
+
+
+
+
+    // Guardar referencias
+    players << player1
+            << player2
+            << player3
+            << player4;
+
+
+
+    // Conectar cambios de configuración
+    for (Player *player : players) {
+
+        connect(player,
+                &Player::configurationChanged,
+                this,
+                [this]() {
+                    Config::saveConfig("config.ini",players);
+                });
+    }
+
+
+
+
+    // ----------------------------------------
+    // Añadir Players a la interfaz
+    // ----------------------------------------
+
+    splittertop->addWidget(player1);
     splittertop->addWidget(new TabAuto);
 
+    splitterdown->addWidget(player2);
+    splitterdown->addWidget(player3);
+    splitterdown->addWidget(player4);
 
-    splitterdown->addWidget(new Player);
-    splitterdown->addWidget(new Player);
-    splitterdown->addWidget(new Player);
 
+   /* connect(player, &Player::configurationChanged,
+            this, [this]() {
+                Config::saveConfig(players);
+            });*/
 
     // Ajustar tamaños equitativos
     QList<int> sizesTop;
@@ -158,6 +209,8 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splittertop->setSizes(sizesTop);
 
 
+// cargar configuracion de los player*******************
+    Config::loadConfig("config.ini",players);
 
 
 }

@@ -470,27 +470,14 @@ void Player::stopMain()
 }
 
 
-int Player::devicePlay() const {
-    return m_deviceplay;
-}
+int Player::devicePlay() const {return m_deviceplay;}
 
-void Player::setDevicePlay(int device) {
-    m_deviceplay = device;
+void Player::setDevicePlay(int device) {m_deviceplay = device;}
 
+int Player::deviceCue() const {return m_devicecue;}
 
-}
+void Player::setDeviceCue(int device) {m_devicecue = device;}
 
-int Player::deviceCue() const {
-    return m_devicecue;
-}
-
-void Player::setDeviceCue(int device) {
-    m_devicecue = device;
-
-
-
-
-}
 
 
 

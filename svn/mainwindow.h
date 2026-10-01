@@ -3,9 +3,12 @@
 
 #include <QMainWindow>
 #include <QSplitter>
+#include <QList>
+
 
 #include "core/MediaManager.h"
 
+class Player;
 
 class MainWindow : public QMainWindow
 {
@@ -31,7 +34,7 @@ private:
     QSplitter *splitterdown;
     MediaManager * mediamanager;
 
-
+    QList<Player*> players;
 
 
 };

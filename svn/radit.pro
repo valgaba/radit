@@ -15,6 +15,7 @@ TARGET = radit
 SOURCES += \
     core/Clipboard.cpp \
     core/MediaManager.cpp \
+    core/config.cpp \
     core/io.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -47,6 +48,7 @@ SOURCES += \
 HEADERS += \
     core/Clipboard.h \
     core/MediaManager.h \
+    core/config.h \
     core/io.h \
     mainwindow.h \
     widgets/AudioItem.h \

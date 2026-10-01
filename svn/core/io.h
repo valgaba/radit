@@ -20,6 +20,9 @@ public:
 
   void saveWidgetsToJson(QLayout* layout, const QString& filename);
   void loadWidgetsFromJson(QLayout* layout, const QString& filename);
+
+
+
 private:
 
 

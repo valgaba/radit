@@ -70,7 +70,7 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
     frametop->setFixedHeight(23);
 
-    //parte alta
+    //parte alta********************************************
 
     frametop->setStyleSheet("background-color: #4e4d7a; border: none;");
 
@@ -86,6 +86,7 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
      labeltext->setText("Player options");
      layouttop->addWidget(labeltext);
 
+//parte media **************************************
 
     Label *labelplay= new Label(this);
     labelplay->setMaximumHeight(QWIDGETSIZE_MAX);
@@ -105,31 +106,13 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
      combocue = new QComboBox(this);
      combocue->setObjectName("Combo"); //para qss
 
-    // this->UpdateDevice();
-
-  /*  BASS_DEVICEINFO info;
-      for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
-          if (info.flags & BASS_DEVICE_ENABLED) {
-              QString deviceName = QString::fromUtf8(info.name);
-
-              // Añadimos el dispositivo a ambos combos
-              comboplay->addItem(deviceName, i);
-              combocue->addItem(deviceName, i);
-          }
-      }*/
-
     layoutcenter->addRow(labelplay, comboplay);
     layoutcenter->addRow(labelcue, combocue);
 
 
 
 
-
-
-
-
-
-    //parte baja
+    //parte baja********************************************
 
     btncancel = new Button(this);
     btncancel->setText("Cancel");
@@ -168,17 +151,21 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
            int selectedPlay = comboplay->currentData().toInt();
            int selectedCue = combocue->currentData().toInt();
 
-           // 2. Intentar hacer un cast seguro al tipo de tu clase padre
-           // Reemplaza "TuClasePadre" por el nombre real de la clase que tiene los métodos set
+           // cast  clase padre
+
           Player *player = qobject_cast<Player*>(this->parent());
 
            if (player) {
-               this->ApplySelectedDevices();
+              // this->ApplySelectedDevices();
                player->setDevicePlay(selectedPlay);
                player->setDeviceCue(selectedCue);
+               emit player->configurationChanged();
+
+
+
+
 
            }
-
 
            this->hide();
        });
@@ -227,10 +214,52 @@ void FrameOptionsPlayer::UpdateDevice(){
           }
       }
 
+
+      // ----------------------------------------
+          // Obtener Player propietario del panel
+          // ----------------------------------------
+
+          Player *player = qobject_cast<Player*>(this->parent());
+
+          if (!player)
+              return;
+
+
+          // ----------------------------------------
+          // Recuperar configuración actual
+          // ----------------------------------------
+
+          int currentPlay = player->devicePlay();
+          int currentCue  = player->deviceCue();
+
+
+          // ----------------------------------------
+          // Seleccionar dispositivo PLAY
+          // ----------------------------------------
+
+          int playComboIndex =
+              comboplay->findData(currentPlay);
+
+          if (playComboIndex >= 0)
+              comboplay->setCurrentIndex(playComboIndex);
+
+
+          // ----------------------------------------
+          // Seleccionar dispositivo CUE
+          // ----------------------------------------
+
+          int cueComboIndex =
+              combocue->findData(currentCue);
+
+          if (cueComboIndex >= 0)
+              combocue->setCurrentIndex(cueComboIndex);
+
+
+
 }
 
 
-// Para poner y quitar USB en caliente
+// Para poner y quitar USB en caliente -- esto hay que revisar
 void FrameOptionsPlayer::ApplySelectedDevices() {
     // Obtenemos los índices que el usuario tiene seleccionados en la interfaz gráfica
     int playDevice = comboplay->currentData().toInt();
@@ -239,7 +268,7 @@ void FrameOptionsPlayer::ApplySelectedDevices() {
     // Inicializamos el dispositivo de REPRODUCCIÓN (Play)
     if (playDevice >= 0) {
         BASS_SetDevice(playDevice);
-        BASS_Free(); //  libera el estado "fantasma" del USB anterior
+      //  BASS_Free(); //  libera el estado "fantasma" del USB anterior
         if (!BASS_Init(playDevice, 44100, 0, nullptr, nullptr)) {
             qDebug() << "BASS_Init Play error:" << BASS_ErrorGetCode();
         }
@@ -248,7 +277,7 @@ void FrameOptionsPlayer::ApplySelectedDevices() {
     // Inicializamos el dispositivo de PREESCUCHA (Cue) si es diferente al de Play
     if (cueDevice >= 0 && cueDevice != playDevice) {
         BASS_SetDevice(cueDevice);
-        BASS_Free();
+        //BASS_Free();
         if (!BASS_Init(cueDevice, 44100, 0, nullptr, nullptr)) {
             qDebug() << "BASS_Init Cue error:" << BASS_ErrorGetCode();
         }

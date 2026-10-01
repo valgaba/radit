@@ -106,8 +106,7 @@ public:
 
 
     signals:
-
-
+    void configurationChanged();
 
 
 };
