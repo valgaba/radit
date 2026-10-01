@@ -25,7 +25,10 @@ class TabBar: public QTabBar
 
 
 
-    protected:
+      protected:
+
+        void dragEnterEvent(QDragEnterEvent *event) override;
+        void dragMoveEvent(QDragMoveEvent *event) override;
 
 
     private slots:

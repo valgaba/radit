@@ -37,6 +37,8 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
     TabBar *tabbar=new TabBar(this);
     this->setTabBar(tabbar);
 
+
+
     menu = new Menu(this);
     menu->setFixedWidth(200); // Establecer anchura del menú en píxeles
 
@@ -177,7 +179,6 @@ void TabPlayer::closeTab(int index){
        widgetToRemove->deleteLater();
 
 }
-
 
 
 

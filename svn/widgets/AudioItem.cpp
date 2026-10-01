@@ -17,6 +17,7 @@
 
 
 #include <QApplication>
+#include <QPainter>
 #include "widgets/AudioItem.h"
 
 AudioItem::AudioItem(QWidget *parent): QWidget(parent){
@@ -72,8 +73,25 @@ void AudioItem::mouseMoveEvent(QMouseEvent *event)
 
         QPixmap pixmap(size());
         render(&pixmap);
+
+        pixmap = pixmap.scaled(
+            300, 300,
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation
+        );
+
+        // Capa blanca semitransparente
+        QPainter painter(&pixmap);
+        painter.fillRect(
+            pixmap.rect(),
+            QColor(150, 190, 255, 45)
+        );
+        painter.end();
+
         drag->setPixmap(pixmap);
-        drag->setHotSpot(event->pos());
+        drag->setHotSpot(QPoint(0, 0));
+
+
 
         drag->exec(Qt::MoveAction);
 }

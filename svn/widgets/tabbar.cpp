@@ -21,12 +21,15 @@
 #include <QDebug>
 #include <QIcon>
 #include <QFont>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
 
 
 #include "widgets/tabbar.h"
 
 TabBar::TabBar(QWidget *parent):QTabBar(parent){
     this->setObjectName("TabBar"); //para qss
+    setAcceptDrops(true);
 
     QFont font;
          font.setPointSize(10);
@@ -44,3 +47,36 @@ TabBar::TabBar(QWidget *parent):QTabBar(parent){
 
 
 TabBar::~TabBar(){}
+
+
+void TabBar::dragEnterEvent(QDragEnterEvent *event)
+{
+    // Aceptamos el drag
+    event->acceptProposedAction();
+}
+
+void TabBar::dragMoveEvent(QDragMoveEvent *event)
+{
+    // Posición del cursor dentro del TabBar
+    QPoint pos = event->position().toPoint();
+
+    // Averiguar sobre qué pestaña está el cursor
+    int index = tabAt(pos);
+
+    if (index >= 0) {
+        // Cambiar automáticamente a esa pestaña
+        setCurrentIndex(index);
+
+        // Hacer que la pestaña activa sea visible
+
+    }
+
+    event->acceptProposedAction();
+}
+
+
+
+
+
+
+
