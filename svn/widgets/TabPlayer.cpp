@@ -62,6 +62,7 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
         Container *container = new Container;
 
         int index = this->addTab(container, "noname");
+        this->setTabToolTip(index, "noname"); //  el ToolTip
         this->setCurrentIndex(index);      // seleccionarla automáticamente
     });
 
@@ -114,8 +115,13 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
     // **Crear 3 pestañas de ejemplo**
         for (int i = 1; i <= 3; ++i) {
             Container *container = new Container;
-            int index = this->addTab(container, QString("List %1").arg(i));
+            QString tabName = QString("List %1").arg(i);
+
+            int index = this->addTab(container, tabName);
+            this->setTabToolTip(index, tabName); //  el ToolTip
             if (i == 1) this->setCurrentIndex(index); // Seleccionar la primera por defecto
+
+
         }
 
 

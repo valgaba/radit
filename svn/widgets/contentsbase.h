@@ -52,6 +52,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
+    void setTabName(const QString &filename); //cambia el nombre de los tab al cargar las listas
 
 
 

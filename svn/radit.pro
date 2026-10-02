@@ -36,6 +36,7 @@ SOURCES += \
     widgets/button.cpp \
     widgets/container.cpp \
     widgets/contentsbase.cpp \
+    widgets/fileexplore.cpp \
     widgets/frame.cpp \
     widgets/frameoptionsplayer.cpp \
     widgets/label.cpp \
@@ -70,6 +71,7 @@ HEADERS += \
     widgets/button.h \
     widgets/container.h \
     widgets/contentsbase.h \
+    widgets/fileexplore.h \
     widgets/frame.h \
     widgets/frameoptionsplayer.h \
     widgets/label.h \

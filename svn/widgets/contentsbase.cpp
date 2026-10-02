@@ -120,7 +120,7 @@ void ContentsBase::dropEvent(QDropEvent *event){
                           this->clearItems();
                           Io io;
                           io.loadContentsPlayer(this, filePath);
-
+                          this->setTabName(filePath);
                           continue;
                       }
 
@@ -281,9 +281,7 @@ AudioItemMaxi* ContentsBase::findNextPlayItem(AudioItemMaxi* current)
 //***************** boorrar antes de cargar la lista nueva
 void ContentsBase::clearItems()
 {
-    qDebug() << "CLEAR ITEMS - antes:" << layout->count();
-
-        while (layout->count() > 0) {
+           while (layout->count() > 0) {
 
             QLayoutItem *layoutItem = layout->takeAt(0);
 
@@ -293,8 +291,6 @@ void ContentsBase::clearItems()
             QWidget *widget = layoutItem->widget();
 
             if (widget) {
-                qDebug() << "Eliminando:" << widget;
-
                 widget->setParent(nullptr);
                 delete widget;
             }
@@ -302,5 +298,51 @@ void ContentsBase::clearItems()
             delete layoutItem;
         }
 
-        qDebug() << "CLEAR ITEMS - después:" << layout->count();
+
 }
+
+
+void ContentsBase::setTabName(const QString &filename)
+{
+    // 1. Extraemos el nombre limpio del archivo y manejamos si viene vacío
+    QFileInfo fileInfo(filename);
+    QString tabName = fileInfo.baseName();
+
+    if (tabName.isEmpty()) {
+        tabName = "noname";
+    }
+
+    // 2. Subimos por la jerarquía de widgets buscando el TabPlayer
+    QWidget *parentWidget = this->parentWidget();
+    TabPlayer *tabPlayer = nullptr;
+
+    while (parentWidget != nullptr) {
+        tabPlayer = qobject_cast<TabPlayer*>(parentWidget);
+        if (tabPlayer) {
+            break; // ¡Encontrado!
+        }
+        parentWidget = parentWidget->parentWidget();
+    }
+
+    // 3. Si lo encontramos, localizamos la pestaña que contiene a este ContentsPlayer
+    if (tabPlayer) {
+        int tabIndex = -1;
+
+        for (int i = 0; i < tabPlayer->count(); ++i) {
+            // Comprobamos cuál de las pestañas es el "antepasado" de este widget
+            if (tabPlayer->widget(i)->isAncestorOf(this)) {
+                tabIndex = i;
+                break;
+            }
+        }
+
+        // 4. Cambiamos el texto y el ToolTip de la pestaña asignada
+        if (tabIndex != -1) {
+            tabPlayer->setTabText(tabIndex, tabName);
+            tabPlayer->setTabToolTip(tabIndex, tabName); // Muestra la ruta completa como ToolTip
+        }
+    }
+}
+
+
+

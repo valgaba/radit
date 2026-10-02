@@ -28,6 +28,11 @@ MediaManager::MediaManager(QObject *parent)
 {
     qRegisterMetaType<AudioFrame>("AudioFrame");
 
+    m_deviceRecoveryTimer = new QTimer(this);
+    m_deviceRecoveryTimer->setInterval(500);
+    connect(m_deviceRecoveryTimer, &QTimer::timeout,
+            this, &MediaManager::recoverDevice);
+
        m_timer = new QTimer(this);
 
        connect(m_timer, &QTimer::timeout, this, [this]() {
@@ -145,6 +150,9 @@ bool MediaManager::initialize()
 
 void MediaManager::shutdown(){
 
+    m_timer->stop();
+    m_deviceRecoveryTimer->stop();
+
     if (m_stream)
     {
         BASS_StreamFree(m_stream);
@@ -157,6 +165,12 @@ void MediaManager::shutdown(){
 
 
 bool MediaManager::loadFile(const QString &filePath){
+
+    // La selección de BASS es por hilo y puede haberla cambiado otro player.
+    if (m_currentDevice >= 0 && !startDevice(m_currentDevice))
+        return false;
+
+    m_deviceRecoveryTimer->stop();
 
     if (m_stream) {
           BASS_StreamFree(m_stream);
@@ -258,7 +272,15 @@ void MediaManager::play()
 {
     if (!m_stream) return;
 
-        BASS_ChannelPlay(m_stream, FALSE);
+    const DWORD device = BASS_ChannelGetDevice(m_stream);
+    if (device == static_cast<DWORD>(-1))
+        return;
+
+    if (!startDevice(static_cast<int>(device)))
+        m_deviceRecoveryTimer->start();
+
+    // BASS conserva el canal mientras la salida está desconectada.
+    if (BASS_ChannelPlay(m_stream, FALSE))
         m_timer->start(50);
 }
 
@@ -363,29 +385,70 @@ void MediaManager::seekRelative(double deltaSeconds)
 //**************************
 bool MediaManager::setDevice(int deviceId){
 
+    if (deviceId == -1) {
+        BASS_DEVICEINFO info = {};
+        for (int i = 1; BASS_GetDeviceInfo(i, &info); ++i) {
+            if ((info.flags & BASS_DEVICE_ENABLED) &&
+                (info.flags & BASS_DEVICE_DEFAULT)) {
+                deviceId = i;
+                break;
+            }
+        }
+    }
 
-    BASS_DEVICEINFO info;
-    BASS_GetDeviceInfo(deviceId, &info);
+    if (deviceId < 0 || !startDevice(deviceId))
+        return false;
 
-
-     // Solo inicializar si NO está inicializado
-         if (!(info.flags & BASS_DEVICE_INIT)){
-
-             if (!BASS_Init(deviceId, 44100, 0, nullptr, nullptr)){
-                 qDebug() << "Error initializing device:" << BASS_ErrorGetCode();
-                 return false;
-             }
-         }
-
-         // SIEMPRE cambiar al dispositivo
-             if (!BASS_SetDevice(deviceId)){
-                qDebug() << "Error setting device:" << BASS_ErrorGetCode();
-                 return false;
-             }
-
-
-
+    m_currentDevice = deviceId;
     return true;
+}
+
+int MediaManager::currentDevice() const
+{
+    return m_currentDevice;
+}
+
+bool MediaManager::startDevice(int deviceId)
+{
+    BASS_DEVICEINFO info = {};
+    if (!BASS_GetDeviceInfo(deviceId, &info) ||
+        (deviceId != 0 && !(info.flags & BASS_DEVICE_ENABLED)))
+        return false;
+
+    if (!(info.flags & BASS_DEVICE_INIT) &&
+        !BASS_Init(deviceId, 44100, 0, nullptr, nullptr))
+        return false;
+
+    if (!BASS_SetDevice(deviceId))
+        return false;
+
+    // Un dispositivo puede seguir inicializado aunque su salida esté detenida.
+    return BASS_Start();
+}
+
+void MediaManager::recoverDevice()
+{
+    if (!m_stream) {
+        m_deviceRecoveryTimer->stop();
+        return;
+    }
+
+    const DWORD device = BASS_ChannelGetDevice(m_stream);
+    if (device == static_cast<DWORD>(-1)) {
+        m_deviceRecoveryTimer->stop();
+        return;
+    }
+
+    // No cambiar la selección de salida de otros reproductores en este hilo.
+    const DWORD previousDevice = BASS_GetDevice();
+    const bool recovered = startDevice(static_cast<int>(device));
+    if (previousDevice != static_cast<DWORD>(-1))
+        BASS_SetDevice(previousDevice);
+
+    if (recovered) {
+        m_deviceRecoveryTimer->stop();
+        qDebug() << "Dispositivo de audio recuperado:" << device;
+    }
 }
 
 
@@ -443,14 +506,21 @@ void CALLBACK MediaManager::EndSyncCallback(
 
 
 void CALLBACK MediaManager::DeviceFailedSyncProc(
-        HSYNC handle,
+        HSYNC,
         DWORD channel,
-        DWORD data,
+        DWORD,
         void *user){
 
+    MediaManager* self = static_cast<MediaManager*>(user);
+    if (!self) return;
 
-           qDebug() << "Dispositivo USB desconectado";
-
+    QMetaObject::invokeMethod(self, [self, channel]() {
+        if (channel != self->m_stream)
+            return;
+        qDebug() << "Dispositivo de audio desconectado; esperando reconexión";
+        self->m_deviceRecoveryTimer->start();
+        self->recoverDevice();
+    }, Qt::QueuedConnection);
 
 }
 

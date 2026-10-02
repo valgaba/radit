@@ -61,8 +61,12 @@ private:
 
 
     QTimer* m_timer = nullptr;
+    QTimer* m_deviceRecoveryTimer = nullptr;
     HSTREAM m_stream = 0;
     int m_currentDevice = -1;
+
+    bool startDevice(int deviceId);
+    void recoverDevice();
 
 
     static void CALLBACK EndSyncCallback(

@@ -411,8 +411,14 @@ void Player::playItem(AudioItemMaxi *item)
           this->stopMain();
    }
 
-       mediamanager->setDevice(this->devicePlay());
-       mediamanager->loadFile(item->filePath());
+       if (!mediamanager->setDevice(this->devicePlay())) {
+           qWarning() << "Dispositivo de audio no disponible:" << this->devicePlay();
+           return;
+       }
+       if (!mediamanager->loadFile(item->filePath())) {
+           qWarning() << "No se pudo cargar el audio:" << item->filePath();
+           return;
+       }
        mediamanager->seek(item->secondStart());
        mediamanager->play();
        item->setPlaying(true);

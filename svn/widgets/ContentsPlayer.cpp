@@ -604,36 +604,29 @@ void ContentsPlayer::applyColor(const QColor &color)
 
 void ContentsPlayer::loadItems(){
 
-
-
-
-
     QString filename = QFileDialog::getOpenFileName(
-           this,
-           "Cargar lista",
-           QString(),
-           "Radit List (*.list);;Todos los archivos (*)"
-       );
+               this,
+               "Load list",
+               QString(),
+               "Radit List (*.list);;All Files (*)"
+           );
 
-       if (filename.isEmpty())
-           return;
+           if (filename.isEmpty())
+               return;
 
-
-    this->clearItems();
-    Io io;
-    io.loadContentsPlayer(this, filename);
-
-
-
+        this->clearItems();
+        Io io;
+        io.loadContentsPlayer(this, filename);
+        this->setTabName(filename);
 
 }
 void ContentsPlayer::saveItems(){
 
     QString filename = QFileDialog::getSaveFileName(
             this,
-            "Guardar lista",
+            "Save list",
             QString(),
-            "Radit List (*.list);;Todos los archivos (*)"
+            "Radit List (*.list);;All files (*)"
         );
 
         if (filename.isEmpty())
@@ -643,16 +636,8 @@ void ContentsPlayer::saveItems(){
 
     Io io;
     io.saveContentsPlayer(layout, filename);
+    this->setTabName(filename);
+
 
 }
-
-
-
-
-
-/*void ContentsPlayer::setPlayer(Player *player)
-{
-    m_player = player;
-}*/
-
 
