@@ -179,7 +179,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
                 &Player::configurationChanged,
                 this,
                 [this]() {
-                    Config::saveConfig("config.ini",players);
+                    Config::saveConfig("config.json",players);
                 });
     }
 
@@ -198,11 +198,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splitterdown->addWidget(player4);
 
 
-   /* connect(player, &Player::configurationChanged,
-            this, [this]() {
-                Config::saveConfig(players);
-            });*/
-
     // Ajustar tamaños equitativos
     QList<int> sizesTop;
     sizesTop << 1 << 1;  // Asigna el mismo peso a ambos widgets
@@ -210,7 +205,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
 // cargar configuracion de los player*******************
-    Config::loadConfig("config.ini",players);
+    Config::loadConfig("config.json",players);
 
 
 }

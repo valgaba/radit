@@ -23,6 +23,8 @@ class Slider: public QSlider
 
 
     protected:
+     void mousePressEvent(QMouseEvent *event) override;
+
 
     private slots:
 

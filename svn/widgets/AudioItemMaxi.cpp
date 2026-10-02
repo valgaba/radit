@@ -303,6 +303,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
          slider = new Slider;
 
 
+
          labeltiempocue = new Label;
          labeltiempocue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
          labeltiempocue->setFixedWidth(125);   // Fija solo el ancho
@@ -535,3 +536,12 @@ int AudioItemMaxi::devicePlay() const {
 }
 
 
+void AudioItemMaxi::setColor(const QColor& color)
+{
+    framecolor->setColor(color);
+}
+
+QColor AudioItemMaxi::color() const
+{
+    return framecolor->color();
+}

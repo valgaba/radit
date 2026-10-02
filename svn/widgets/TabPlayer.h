@@ -31,6 +31,7 @@ public:
  void closeTab(int index);
 
 
+
 protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
 

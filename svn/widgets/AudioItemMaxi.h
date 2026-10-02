@@ -207,6 +207,10 @@ public:
     void setPlaying(bool playing);
     bool isPlaying() const;
 
+    void setColor(const QColor& color);
+    QColor color() const;
+
+
     protected:
 
 

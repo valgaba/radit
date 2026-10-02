@@ -81,6 +81,16 @@ private:
     );
 
 
+   static void CALLBACK DeviceFailedSyncProc(
+           HSYNC handle,
+           DWORD channel,
+           DWORD data,
+           void *user
+
+
+           );
+
+
     float m_silenceThresholdDb = -25.0f; //45
     int   m_silenceDurationMs  = 300; //400
 

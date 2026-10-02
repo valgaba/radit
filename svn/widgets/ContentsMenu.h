@@ -27,6 +27,7 @@ public:
 
     void setColorVisible(bool visible);
     void setSelectAllVisible(bool visible);
+    void setUnselectAllVisible(bool visible);
     void setCopyVisible(bool visible);
     void setCutVisible(bool visible);
     void setDeleteVisible(bool visible);
@@ -43,6 +44,8 @@ public:
     void setselectVisible(bool visible);
 
 
+
+
 private:
     ContentsPlayer *player;
 
@@ -55,6 +58,9 @@ private:
     QAction *selectItemAction;
 
     QAction *selectallAction;
+    QAction *unselectallAction;
+
+
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;

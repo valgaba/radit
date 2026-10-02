@@ -195,6 +195,19 @@ bool MediaManager::loadFile(const QString &filePath){
              this
          );
 
+
+         // Fallo/desconexión del dispositivo de salida
+         BASS_ChannelSetSync(
+             m_stream,
+             BASS_SYNC_DEV_FAIL,
+             0,
+             &MediaManager::DeviceFailedSyncProc,
+             this
+         );
+
+
+
+
          return true;
 }
 
@@ -350,6 +363,7 @@ void MediaManager::seekRelative(double deltaSeconds)
 //**************************
 bool MediaManager::setDevice(int deviceId){
 
+
     BASS_DEVICEINFO info;
     BASS_GetDeviceInfo(deviceId, &info);
 
@@ -425,6 +439,19 @@ void CALLBACK MediaManager::EndSyncCallback(
         },
         Qt::QueuedConnection
     );
+}
+
+
+void CALLBACK MediaManager::DeviceFailedSyncProc(
+        HSYNC handle,
+        DWORD channel,
+        DWORD data,
+        void *user){
+
+
+           qDebug() << "Dispositivo USB desconectado";
+
+
 }
 
 

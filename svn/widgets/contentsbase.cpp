@@ -38,6 +38,7 @@
 #include "widgets/contentsbase.h"
 //#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFilemaxi.h"
+#include "core/io.h"
 //#include "bass.h"
 
 ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
@@ -112,6 +113,22 @@ void ContentsBase::dropEvent(QDropEvent *event){
             foreach(QUrl url, urls) {
 
                QString filePath = url.toLocalFile();
+
+               // Si es una lista .list, cargarla
+                      if (QFileInfo(filePath).suffix().compare("list", Qt::CaseInsensitive) == 0) {
+
+                          this->clearItems();
+                          Io io;
+                          io.loadContentsPlayer(this, filePath);
+
+                          continue;
+                      }
+
+                      // Si no es .list, tratarlo como archivo de audio
+
+
+
+
                double duration = mediamanager->getDurationSecond(filePath);
 
 
@@ -259,4 +276,31 @@ AudioItemMaxi* ContentsBase::findNextPlayItem(AudioItemMaxi* current)
         }
 
         return nullptr;
+}
+
+//***************** boorrar antes de cargar la lista nueva
+void ContentsBase::clearItems()
+{
+    qDebug() << "CLEAR ITEMS - antes:" << layout->count();
+
+        while (layout->count() > 0) {
+
+            QLayoutItem *layoutItem = layout->takeAt(0);
+
+            if (!layoutItem)
+                continue;
+
+            QWidget *widget = layoutItem->widget();
+
+            if (widget) {
+                qDebug() << "Eliminando:" << widget;
+
+                widget->setParent(nullptr);
+                delete widget;
+            }
+
+            delete layoutItem;
+        }
+
+        qDebug() << "CLEAR ITEMS - después:" << layout->count();
 }

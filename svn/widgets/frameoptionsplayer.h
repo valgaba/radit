@@ -33,7 +33,6 @@ class FrameOptionsPlayer: public Frame
     QComboBox *comboplay;
     QComboBox *combocue;
 
-    void ApplySelectedDevices();
 
 
 

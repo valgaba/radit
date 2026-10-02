@@ -133,11 +133,6 @@ bool Config::saveConfig(const QString& filename,
     file.write(document.toJson(QJsonDocument::Indented));
 
     file.close();
-
-
-    qDebug() << "Configuración guardada en:"
-             << configPath;
-
     return true;
 }
 
@@ -322,10 +317,6 @@ bool Config::loadConfig(const QString& filename,
             playerEncontrado->setDeviceCue(cueDevice);
 
 
-        qDebug() << "Configuración cargada:"
-                 << playerId
-                 << "Play:" << playDevice
-                 << "Cue:" << cueDevice;
     }
 
 

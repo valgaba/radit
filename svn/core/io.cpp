@@ -15,16 +15,16 @@
    along with radit.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFile>
-#include <QWidget>
-
+#include <QDebug>
 
 #include "core/io.h"
-#include "widgets/AudioItemFileMini.h"
+#include "widgets/AudioItemMaxi.h"
+#include "widgets/contentsbase.h"
+#include "widgets/AudioItemFilemaxi.h"
 
 Io::Io(QObject *parent): QObject(parent){
 
@@ -33,199 +33,176 @@ Io::Io(QObject *parent): QObject(parent){
 
 Io::~Io(){}
 
-
-
-void Io::saveWidgetsToJson(QLayout* layout, const QString& filename){
-    QJsonObject rootObj;  // Objeto raíz del JSON
-
-       //  Metadatos
-       QJsonObject metadataObj;
-       metadataObj["description"] = "Radit list";
-       metadataObj["totalitem"] = layout->count();
-       rootObj["metadata"] = metadataObj;  // Se guarda en un campo "metadata"
-
-
-       //  Lista de widgets
-       QJsonArray widgetsArray;
-       for (int i = 0; i < layout->count(); ++i) {
-           QLayoutItem* item = layout->itemAt(i);
-
-           if (item->widget()) {
-               QWidget* widget = item->widget();
-               QJsonObject widgetObj;
-               widgetObj["type"] = widget->metaObject()->className();
-               widgetObj["name"] = widget->objectName();
-
-
-
-                  if (AudioItemFileMini* audioitem = qobject_cast<AudioItemFileMini*>(widget)){
-
-                       // widgetObj["nombre"] = audioitem->nombre->text();
-                          widgetObj["nombre"] = "sasasasasa";
-
-
-                  }
-
-               widgetsArray.append(widgetObj);
-           }
-
-
-       }
-       rootObj["audioitems"] = widgetsArray;  // Se guarda en un campo "audioitem"
-
-       // Guardar el JSON
-       QJsonDocument doc(rootObj);  // Usamos rootObj en lugar de widgetsArray
-       QFile file(filename);
-       if (file.open(QIODevice::WriteOnly)) {
-           file.write(doc.toJson());
-           file.close();
-       }
-}
-
-
-
-//***************************************************
-
-
-void Io::loadWidgetsFromJson(QLayout* layout, const QString& filename) {
-    // Limpiar el layout actual (opcional, depende de tu caso de uso)
-    QLayoutItem* item;
-    while ((item = layout->takeAt(0)) != nullptr) {
-        if (item->widget()) {
-            delete item->widget();
-        }
-        delete item;
-    }
-
-    // Leer el archivo JSON
-    QFile file(filename);
-    if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "No se pudo abrir el archivo:" << filename;
-        return;
-    }
-
-    QByteArray jsonData = file.readAll();
-    file.close();
-
-    // Parsear el JSON
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData);
-    if (doc.isNull()) {
-        qWarning() << "JSON inválido:" << filename;
-        return;
-    }
-
-    QJsonObject rootObj = doc.object();
-
-    // Verificar si existe la sección de audioitems
-    if (!rootObj.contains("audioitems") || !rootObj["audioitems"].isArray()) {
-        qWarning() << "Formato JSON incorrecto: falta 'audioitems'";
-        return;
-    }
-
-    QJsonArray widgetsArray = rootObj["audioitems"].toArray();
-
-    // Crear los widgets y añadirlos al layout
-    for (const QJsonValue& value : widgetsArray) {
-            QJsonObject widgetObj = value.toObject();
-
-            QString type = widgetObj["type"].toString();
-            QString name = widgetObj["name"].toString();
-
-        if (type == "AudioItemFileMini") {
-            // Crear el widget personalizado AudioItemFile
-            AudioItemFileMini* audioItem = new AudioItemFileMini;
-            audioItem->setObjectName(name);
-
-            // Establecer propiedades específicas
-            if (widgetObj.contains("nombre")) {
-                //audioItem->nombre->setText(widgetObj["nombre"].toString());
-            }
-            if (widgetObj.contains("filepath")) {
-               // audioItem->setfilePath(widgetObj["filepath"].toString());
-            }
-
-            // Añadir al layout
-            layout->addWidget(audioItem);
-        }
-    }
-}
-
-
-//***********===============guardado para estudio =============
-
-//=================================================================
-
-
-/*void Io::saveWidgetsToJson(QLayout* layout, const QString& filename) {
+void Io::saveContentsPlayer(QLayout* layout, const QString& filename)
+{
     QJsonObject rootObj;
 
-    // Metadatos
-    QJsonObject metadataObj;
-    metadataObj["description"] = "Rdit list";
-    metadataObj["totalitem"] = layout->count();
-    rootObj["metadata"] = metadataObj;
+    rootObj["version"] = 1;
 
-    // Lista de widgets
-    QJsonArray widgetsArray;
+    QJsonArray itemsArray;
+
     for (int i = 0; i < layout->count(); ++i) {
-        QLayoutItem* item = layout->itemAt(i);
-        if (item->widget()) {
-            QWidget* widget = item->widget();
-            QJsonObject widgetObj;
-            widgetObj["type"] = widget->metaObject()->className();
-            widgetObj["name"] = widget->objectName();
 
-            if (AudioItemFile* audioitemfile = qobject_cast<AudioItemFile*>(widget)) {
-                // Guardar AudioItemFile
-                widgetObj["nombre"] = audioitemfile->nombre->text();
-                widgetObj["filepath"] = audioitemfile->getfilePath();
-            }
-            else if (AudioItemGroup* audioitemgroup = qobject_cast<AudioItemGroup*>(widget)) {
-                // Guardar AudioItemGroup (recursivamente)
-                QJsonArray groupItemsArray;
-                QLayout* groupLayout = audioitemgroup->getLayout(); // Asume que existe este método
+        QLayoutItem* layoutItem = layout->itemAt(i);
 
-                for (int j = 0; j < groupLayout->count(); ++j) {
-                    QLayoutItem* groupItem = groupLayout->itemAt(j);
-                    if (groupItem->widget()) {
-                        QWidget* groupWidget = groupItem->widget();
-                        QJsonObject groupWidgetObj;
-                        groupWidgetObj["type"] = groupWidget->metaObject()->className();
-                        groupWidgetObj["name"] = groupWidget->objectName();
+        if (!layoutItem)
+            continue;
 
-                        if (AudioItemFile* groupAudioItem = qobject_cast<AudioItemFile*>(groupWidget)) {
-                            groupWidgetObj["nombre"] = groupAudioItem->nombre->text();
-                            groupWidgetObj["filepath"] = groupAudioItem->getfilePath();
-                        }
+        QWidget* widget = layoutItem->widget();
 
-                        groupItemsArray.append(groupWidgetObj);
-                    }
-                }
-                widgetObj["group_items"] = groupItemsArray;
-                widgetObj["group_name"] = audioitemgroup->getGroupName(); // Asume que existe
-            }
+        if (!widget)
+            continue;
 
-            widgetsArray.append(widgetObj);
-        }
+        AudioItemMaxi* item =
+            qobject_cast<AudioItemMaxi*>(widget);
+
+        if (!item)
+            continue;
+
+        QJsonObject itemObj;
+
+        itemObj["url"] = item->filePath();
+        itemObj["name"] = item->nameFile();
+        itemObj["second"] = item->second();
+
+        itemObj["select"] = item->isSelect();
+        itemObj["playNext"] = item->isPlayNext();
+        itemObj["purge"] = item->isPurge();
+        itemObj["loop"] = item->isLoop();
+
+        // Color
+        itemObj["color"] = item->color().name(QColor::HexArgb);
+
+        itemsArray.append(itemObj);
     }
 
-    rootObj["audioitems"] = widgetsArray;
+    rootObj["count"] = itemsArray.count();
+    rootObj["items"] = itemsArray;
 
-    // Guardar JSON
-    QJsonDocument doc(rootObj);
+    QJsonDocument document(rootObj);
+
     QFile file(filename);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(doc.toJson());
-        file.close();
+
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "No se pudo abrir el fichero para escribir:"
+                   << filename;
+        return;
     }
-}*/
+
+    file.write(document.toJson(QJsonDocument::Indented));
+    file.close();
+
+    qDebug() << "Lista guardada en:" << filename;
+}
 
 
 
 
+void Io::loadContentsPlayer(ContentsBase* contents, const QString& filename)
+{
+    if (!contents)
+        return;
+
+    QFile file(filename);
+
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "No se pudo abrir el fichero para leer:"
+                   << filename;
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonParseError error;
+    QJsonDocument document = QJsonDocument::fromJson(data, &error);
+
+    if (error.error != QJsonParseError::NoError) {
+        qWarning() << "Error leyendo JSON:"
+                   << error.errorString();
+        return;
+    }
+
+    if (!document.isObject()) {
+        qWarning() << "El fichero no contiene un objeto JSON";
+        return;
+    }
+
+    QJsonObject rootObj = document.object();
+
+    int version = rootObj["version"].toInt(1);
+
+    if (version != 1) {
+        qWarning() << "Versión de lista no soportada:"
+                   << version;
+        return;
+    }
+
+    QJsonArray itemsArray = rootObj["items"].toArray();
+
+    int count = rootObj["count"].toInt(itemsArray.count());
 
 
+    for (const QJsonValue &value : itemsArray) {
 
+        if (!value.isObject())
+            continue;
+
+        QJsonObject itemObj = value.toObject();
+
+        QString filePath = itemObj["url"].toString();
+
+        if (filePath.isEmpty()) {
+            qWarning() << "Item sin URL, se omite";
+            continue;
+        }
+
+        // Crear el item
+        AudioItemFileMaxi* item = new AudioItemFileMaxi(contents);
+
+        // Datos principales
+        item->setFilePath(filePath);
+        item->setNameFile(itemObj["name"].toString());
+
+        double second = itemObj["second"].toDouble();
+
+        item->setSecond(second);
+        item->setTiempoFile(second);
+
+        // Estados
+        item->setIsSelect(
+            itemObj["select"].toBool(false)
+        );
+
+        item->setIsPlayNext(
+            itemObj["playNext"].toBool(false)
+        );
+
+        item->setIsPurge(
+            itemObj["purge"].toBool(false)
+        );
+
+        item->setIsLoop(
+            itemObj["loop"].toBool(false)
+        );
+
+        // Color
+        if (itemObj.contains("color")) {
+
+            QColor color(itemObj["color"].toString());
+
+            if (color.isValid()) {
+                item->setColor(color);
+            }
+        }
+
+        // Añadir y conectar exactamente igual
+        // que cualquier item creado normalmente.
+        contents->createItem(item);
+    }
+
+    qDebug() << "Lista cargada correctamente:" << filename;
+}
 
 
 

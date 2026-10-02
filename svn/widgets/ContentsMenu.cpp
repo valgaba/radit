@@ -42,6 +42,7 @@ void ContentsMenu::showAt(const QPoint &pos) {
 
 void ContentsMenu::setColorVisible(bool visible) { if (colorAction) colorAction->setVisible(visible); }
 void ContentsMenu::setSelectAllVisible(bool visible) { if (selectallAction) selectallAction->setVisible(visible); }
+void ContentsMenu::setUnselectAllVisible(bool visible) { if (unselectallAction) unselectallAction->setVisible(visible); }
 void ContentsMenu::setCopyVisible(bool visible) { if (copyAction) copyAction->setVisible(visible); }
 void ContentsMenu::setCutVisible(bool visible) { if (cutAction) cutAction->setVisible(visible); }
 void ContentsMenu::setDeleteVisible(bool visible) { if (deleteAction) deleteAction->setVisible(visible); }
@@ -75,6 +76,8 @@ void ContentsMenu::setupActions() {
     selectItemAction = new QAction("Select Item", this);
 
     selectallAction = new QAction("SelectAll", this);
+    unselectallAction = new QAction("UnselectAll", this);
+
     cutAction = new QAction("Cut", this);
     copyAction = new QAction("Copy", this);
     pasteAction = new QAction("Paste", this);
@@ -87,6 +90,8 @@ void ContentsMenu::setupActions() {
    // selectItemAction->setIcon(QIcon(":/icons/Loop.svg"));
 
     selectallAction->setIcon(QIcon(":/icons/Selectall.svg"));
+    unselectallAction->setIcon(QIcon(":/icons/unselect.svg"));
+
     cutAction->setIcon(QIcon(":/icons/ActionCut.svg"));
     copyAction->setIcon(QIcon(":/icons/ActionCopy.svg"));
     pasteAction->setIcon(QIcon(":/icons/ActionPaste.svg"));
@@ -104,6 +109,7 @@ void ContentsMenu::setupActions() {
 
      addSeparator();
      Menu::addAction(selectallAction);
+     Menu::addAction(unselectallAction);
 
     addSeparator();
     Menu::addAction(nextItemAction);
@@ -139,10 +145,19 @@ void ContentsMenu::connectActions() {
 
 
     connect(selectallAction, &QAction::triggered, player, &ContentsPlayer::selectAllItems);
+    connect(unselectallAction, &QAction::triggered, player, &ContentsPlayer::unSelectAllItems);
+
     connect(deleteAction, &QAction::triggered, player, &ContentsPlayer::deleteSelected);
     connect(copyAction, &QAction::triggered, player, &ContentsPlayer::copySelected);
     connect(cutAction, &QAction::triggered, player, &ContentsPlayer::cutSelected);
     connect(pasteAction, &QAction::triggered, player, &ContentsPlayer::pasteClipboard);
+
+    connect(loadAction, &QAction::triggered, player, &ContentsPlayer::loadItems);
+    connect(saveAction, &QAction::triggered, player, &ContentsPlayer::saveItems);
+    connect(saveasAction, &QAction::triggered, player, &ContentsPlayer::saveAsItems);
+
+
+
 }
 
 
@@ -170,6 +185,9 @@ QAction* ContentsMenu::createAddAction() {
     submenu->addAction(addGroup);
 
     action->setMenu(submenu);
+
+
+    // conectar acciones del submenu************************
 
     connect(addAudiofile, &QAction::triggered, player, [this]{
         player->createItem(new AudioItemFileMaxi(player));

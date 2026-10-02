@@ -185,9 +185,8 @@ void TabPlayer::closeTab(int index){
 
 void TabPlayer::contextMenuEvent(QContextMenuEvent *event)
 {
-
-
     menu->exec(mapToGlobal(event->pos()));
 
 }
+
 

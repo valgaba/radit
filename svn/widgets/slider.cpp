@@ -17,6 +17,8 @@
 
 #include <QDebug>
 
+#include <QMouseEvent>
+#include <QStyleOptionSlider>
 
 
 
@@ -60,7 +62,29 @@ Slider::~Slider(){}
 
 
 
+void Slider::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton) {
+        QSlider::mousePressEvent(event);
+        return;
+    }
 
+    QStyleOptionSlider opt;
+    initStyleOption(&opt);
+
+    QRect handleRect = style()->subControlRect(
+        QStyle::CC_Slider,
+        &opt,
+        QStyle::SC_SliderHandle,
+        this
+    );
+
+    // Solo dejamos que Qt procese el clic
+    // si se ha pulsado directamente sobre el handle.
+    if (handleRect.contains(event->pos())) {
+        QSlider::mousePressEvent(event);
+    }
+}
 
 
 

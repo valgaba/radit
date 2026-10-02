@@ -59,5 +59,6 @@
         <file>icons/Purgeon.svg</file>
         <file>icons/playpause2on.svg</file>
         <file>icons/eject.svg</file>
+        <file>icons/unselect.svg</file>
     </qresource>
 </RCC>

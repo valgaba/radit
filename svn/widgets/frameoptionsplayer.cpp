@@ -135,8 +135,10 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
     layoutdown->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum)); //espaciador
 
-    layoutdown->addWidget(btncancel);
+
     layoutdown->addWidget(btnacept);
+    layoutdown->addWidget(btncancel);
+
 
 
     // Cancelar -> ocultar el panel
@@ -156,14 +158,10 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
           Player *player = qobject_cast<Player*>(this->parent());
 
            if (player) {
-              // this->ApplySelectedDevices();
+               // BASS_Free();
                player->setDevicePlay(selectedPlay);
                player->setDeviceCue(selectedCue);
                emit player->configurationChanged();
-
-
-
-
 
            }
 
@@ -194,6 +192,7 @@ void FrameOptionsPlayer::UpdateDevice(){
 
     BASS_DEVICEINFO info;
       for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
+
           if (info.flags & BASS_DEVICE_ENABLED) {
               QString deviceName = QString::fromUtf8(info.name);
 
@@ -201,14 +200,8 @@ void FrameOptionsPlayer::UpdateDevice(){
               comboplay->addItem(deviceName, i);
               combocue->addItem(deviceName, i);
 
-            /*  BASS_SetDevice(i);
-              BASS_Free();
 
-              if (!BASS_Init(i, 44100, 0, nullptr, nullptr))
-              {
-                  qDebug() << "BASS_Init error:" << BASS_ErrorGetCode();
 
-              }*/
 
 
           }
@@ -259,30 +252,7 @@ void FrameOptionsPlayer::UpdateDevice(){
 }
 
 
-// Para poner y quitar USB en caliente -- esto hay que revisar
-void FrameOptionsPlayer::ApplySelectedDevices() {
-    // Obtenemos los índices que el usuario tiene seleccionados en la interfaz gráfica
-    int playDevice = comboplay->currentData().toInt();
-    int cueDevice = combocue->currentData().toInt();
 
-    // Inicializamos el dispositivo de REPRODUCCIÓN (Play)
-    if (playDevice >= 0) {
-        BASS_SetDevice(playDevice);
-      //  BASS_Free(); //  libera el estado "fantasma" del USB anterior
-        if (!BASS_Init(playDevice, 44100, 0, nullptr, nullptr)) {
-            qDebug() << "BASS_Init Play error:" << BASS_ErrorGetCode();
-        }
-    }
-
-    // Inicializamos el dispositivo de PREESCUCHA (Cue) si es diferente al de Play
-    if (cueDevice >= 0 && cueDevice != playDevice) {
-        BASS_SetDevice(cueDevice);
-        //BASS_Free();
-        if (!BASS_Init(cueDevice, 44100, 0, nullptr, nullptr)) {
-            qDebug() << "BASS_Init Cue error:" << BASS_ErrorGetCode();
-        }
-    }
-}
 
 
 // cada vez que se abre se actualiza

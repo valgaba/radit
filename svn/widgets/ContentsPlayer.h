@@ -45,14 +45,16 @@ public:
     void selectItems();
 
     void selectAllItems();
+    void unSelectAllItems();
+
     void deleteSelected();
     void copySelected();
     void cutSelected();
     void pasteClipboard();
     void applyColor(const QColor &color);
 
-    void loadItems()   { /* TODO: implementar */ }
-    void saveItems()   { /* TODO: implementar */ }
+    void loadItems();
+    void saveItems();
     void saveAsItems() { /* TODO: implementar */ }
 
     void setPlayer(Player *player);

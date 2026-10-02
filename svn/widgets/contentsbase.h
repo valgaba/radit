@@ -45,6 +45,8 @@ public:
 
     AudioItemMaxi* findNextPlayItem(AudioItemMaxi* current);
 
+     void clearItems();  // borrar los items al cargar una lista en los player
+
 protected:
 
     void dragEnterEvent(QDragEnterEvent *event) override;

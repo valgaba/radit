@@ -8,6 +8,8 @@
 #include <QDebug>
 #include <QLayout>
 
+class ContentsBase;
+
 
 class Io: public QObject {
     Q_OBJECT
@@ -18,10 +20,8 @@ public:
     ~Io();
 
 
-  void saveWidgetsToJson(QLayout* layout, const QString& filename);
-  void loadWidgetsFromJson(QLayout* layout, const QString& filename);
-
-
+    void saveContentsPlayer(QLayout* layout, const QString& filename);
+    void loadContentsPlayer(ContentsBase* contents, const QString& filename);
 
 private:
 

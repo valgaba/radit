@@ -31,10 +31,12 @@
 #include <QMimeType>
 #include <QMessageBox>
 #include <QWidgetAction>
+#include <QFileDialog>
 
 
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItem.h"
+#include "core/io.h"
 
 
 ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
@@ -206,6 +208,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         if (!widget) {
             contentsMenu->setColorVisible(false);
             contentsMenu->setSelectAllVisible(false);
+            contentsMenu->setUnselectAllVisible(false);
             contentsMenu->setCopyVisible(false);
             contentsMenu->setCutVisible(false);
             contentsMenu->setDeleteVisible(false);
@@ -229,6 +232,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         // Mostrar acciones por defecto
         contentsMenu->setColorVisible(true);
         contentsMenu->setSelectAllVisible(true);
+        contentsMenu->setUnselectAllVisible(true);
         contentsMenu->setCopyVisible(true);
         contentsMenu->setCutVisible(true);
         contentsMenu->setDeleteVisible(true);
@@ -387,7 +391,16 @@ void ContentsPlayer::selectAllItems()
     }
 }
 
+void ContentsPlayer::unSelectAllItems(){
 
+    QList<AudioItemMaxi*> items = this->findChildren<AudioItemMaxi*>();
+
+        for (AudioItemMaxi* item : std::as_const(items)) {
+            item->setIsSelect(false);
+        }
+
+
+}
 
 void ContentsPlayer::deleteSelected(){
 
@@ -578,6 +591,7 @@ void ContentsPlayer::applyColor(const QColor &color)
 
         if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
             item->framecolor->setColor(color);
+
         }
     }
 
@@ -586,6 +600,54 @@ void ContentsPlayer::applyColor(const QColor &color)
         item->setIsSelect(false);
     }
 }
+
+
+void ContentsPlayer::loadItems(){
+
+
+
+
+
+    QString filename = QFileDialog::getOpenFileName(
+           this,
+           "Cargar lista",
+           QString(),
+           "Radit List (*.list);;Todos los archivos (*)"
+       );
+
+       if (filename.isEmpty())
+           return;
+
+
+    this->clearItems();
+    Io io;
+    io.loadContentsPlayer(this, filename);
+
+
+
+
+}
+void ContentsPlayer::saveItems(){
+
+    QString filename = QFileDialog::getSaveFileName(
+            this,
+            "Guardar lista",
+            QString(),
+            "Radit List (*.list);;Todos los archivos (*)"
+        );
+
+        if (filename.isEmpty())
+            return;
+
+
+
+    Io io;
+    io.saveContentsPlayer(layout, filename);
+
+}
+
+
+
 
 
 /*void ContentsPlayer::setPlayer(Player *player)
