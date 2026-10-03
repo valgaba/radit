@@ -44,3 +44,13 @@ release/
 # Archivos de backends de Qt Creator
 *.qmlc
 *.js
+
+# Copias de seguridad y archivos locales de Radit
+backups/
+.qtc_clangd/
+.cache/
+*.ini
+*.list
+qrc_*.cpp
+ui_*.h
+*.res

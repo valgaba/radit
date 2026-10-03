@@ -27,6 +27,7 @@ SOURCES += \
     widgets/AudioItemNet.cpp \
     widgets/ContentsMenu.cpp \
     widgets/ContentsPlayer.cpp \
+    widgets/FileExploreMenu.cpp \
     widgets/FormAbout.cpp \
     widgets/FormProperties.cpp \
     widgets/FormPropertiesAudioItem.cpp \
@@ -40,9 +41,11 @@ SOURCES += \
     widgets/frame.cpp \
     widgets/frameoptionsplayer.cpp \
     widgets/label.cpp \
+    widgets/levelmeter.cpp \
     widgets/menu.cpp \
     widgets/scrollbar.cpp \
     widgets/slider.cpp \
+    widgets/vumeter.cpp \
     widgets/tab.cpp \
     widgets/tabbar.cpp
 
@@ -60,6 +63,7 @@ HEADERS += \
     widgets/AudioItemNet.h \
     widgets/ContentsMenu.h \
     widgets/ContentsPlayer.h \
+    widgets/FileExploreMenu.h \
     widgets/DraggableWidget.h \
     widgets/FormAbout.h \
     widgets/FormProperties.h \
@@ -75,9 +79,11 @@ HEADERS += \
     widgets/frame.h \
     widgets/frameoptionsplayer.h \
     widgets/label.h \
+    widgets/levelmeter.h \
     widgets/menu.h \
     widgets/scrollbar.h \
     widgets/slider.h \
+    widgets/vumeter.h \
     widgets/tab.h \
     widgets/tabbar.h
 

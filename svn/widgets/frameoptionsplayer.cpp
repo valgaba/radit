@@ -17,6 +17,9 @@
 
 #include <QDebug>
 #include <QLabel>
+#include <QSlider>
+#include <QSignalBlocker>
+#include <cmath>
 
 #include "widgets/frameoptionsplayer.h"
 #include "widgets/label.h"
@@ -109,6 +112,44 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
     layoutcenter->addRow(labelplay, comboplay);
     layoutcenter->addRow(labelcue, combocue);
 
+    auto *volumeRow = new QWidget(framecenter);
+    auto *volumeLayout = new QHBoxLayout(volumeRow);
+    volumeLayout->setContentsMargins(0, 0, 0, 0);
+    volumeLayout->setSpacing(6);
+    volumeSlider = new QSlider(Qt::Horizontal, volumeRow);
+    volumeSlider->setObjectName("PlayerVolumeSlider");
+    volumeSlider->setRange(0, 100);
+    volumeSlider->setSingleStep(1);
+    volumeSlider->setPageStep(10);
+    volumeSlider->setValue(100);
+    volumeSlider->setFixedHeight(24);
+    volumeSlider->setToolTip(tr("Playback volume"));
+    volumeSlider->setAccessibleName(tr("Playback volume"));
+    volumeValue = new QLabel("100 %", volumeRow);
+    volumeValue->setObjectName("PlayerVolumeValue");
+    volumeValue->setFixedWidth(45);
+    volumeValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    volumeLayout->addWidget(volumeSlider, 1);
+    volumeLayout->addWidget(volumeValue);
+    auto *volumeLabel = new Label(framecenter);
+    volumeLabel->setText(tr("Volume"));
+    volumeLabel->setFont(font);
+    volumeLabel->setBuddy(volumeSlider);
+    layoutcenter->addRow(volumeLabel, volumeRow);
+    connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
+        auto *player = qobject_cast<Player *>(parentWidget());
+        if (!player)
+            return;
+        if (player->setVolume(value / 100.0f)) {
+            volumeValue->setText(QString::number(value) + " %");
+        } else {
+            const QSignalBlocker blocker(volumeSlider);
+            const int current = qRound(player->volume() * 100);
+            volumeSlider->setValue(current);
+            volumeValue->setText(QString::number(current) + " %");
+        }
+    });
+
 
 
 
@@ -161,6 +202,7 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
                // BASS_Free();
                player->setDevicePlay(selectedPlay);
                player->setDeviceCue(selectedCue);
+               m_volumeCommitted = true;
                emit player->configurationChanged();
 
            }
@@ -259,4 +301,21 @@ void FrameOptionsPlayer::UpdateDevice(){
 void FrameOptionsPlayer::showEvent(QShowEvent *event) {
     Frame::showEvent(event); // Llama al evento base
     this->UpdateDevice();    // Refresca la lista de dispositivos automáticamente al abrir
+    m_volumeCommitted = false;
+    if (auto *player = qobject_cast<Player *>(parentWidget())) {
+        m_previousVolume = player->volume();
+        const QSignalBlocker blocker(volumeSlider);
+        const int value = qRound(m_previousVolume * 100);
+        volumeSlider->setValue(value);
+        volumeValue->setText(QString::number(value) + " %");
+    }
+}
+
+void FrameOptionsPlayer::hideEvent(QHideEvent *event)
+{
+    if (!m_volumeCommitted) {
+        if (auto *player = qobject_cast<Player *>(parentWidget()))
+            player->setVolume(m_previousVolume);
+    }
+    Frame::hideEvent(event);
 }

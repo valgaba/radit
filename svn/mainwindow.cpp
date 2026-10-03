@@ -35,6 +35,7 @@
 #include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
 #include "core/config.h"
+#include "widgets/fileexplore.h"
 //#include "widgets/Player.h"
 
 
@@ -190,7 +191,8 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     // Añadir Players a la interfaz
     // ----------------------------------------
 
-    splittertop->addWidget(player1);
+   // splittertop->addWidget(player1);
+    splittertop->addWidget(new FileExplore);
     splittertop->addWidget(new TabAuto);
 
     splitterdown->addWidget(player2);
@@ -198,9 +200,11 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splitterdown->addWidget(player4);
 
 
-    // Ajustar tamaños equitativos
+    // Repartir el ancho: 40 % para FileExplore y 60 % para TabAuto.
+    splittertop->setStretchFactor(0, 2);
+    splittertop->setStretchFactor(1, 3);
     QList<int> sizesTop;
-    sizesTop << 1 << 1;  // Asigna el mismo peso a ambos widgets
+    sizesTop << 400 << 600;
     splittertop->setSizes(sizesTop);
 
 

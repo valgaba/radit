@@ -15,6 +15,8 @@
 #include "core/MediaManager.h"
 #include "widgets/frameoptionsplayer.h"
 
+class VuMeter;
+
 
 
 class Player: public Frame{
@@ -48,6 +50,7 @@ private:
 
     TabPlayer *tabplayer;
     MediaManager *mediamanager;
+    VuMeter *vumeter = nullptr;
     AudioItemMaxi* currentItem = nullptr;
 
 
@@ -83,6 +86,8 @@ public:
     void playItem(AudioItemMaxi *item);
     void pauseMain();
     void stopMain();
+    bool setVolume(float volume);
+    float volume() const;
 
     int devicePlay() const;
     void setDevicePlay(int device);

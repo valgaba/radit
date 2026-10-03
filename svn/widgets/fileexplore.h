@@ -2,41 +2,57 @@
 #define FILEEXPLORE_H
 
 #include "widgets/frame.h"
+#include <QStringList>
 
+class Button;
+class FileExploreFilter;
+class FileExploreMenu;
+class QComboBox;
+class QFileSystemModel;
+class QLineEdit;
+class QMenu;
+class QTreeView;
 
-class FileExplore: public Frame
-
+class FileExplore : public Frame
 {
     Q_OBJECT
 
-    private:
+public:
+    explicit FileExplore(QWidget *parent = nullptr);
+    ~FileExplore();
+    QString currentPath() const;
+    QStringList selectedFilePaths() const;
+    bool canPasteFiles() const;
 
+public slots:
+    bool setPath(const QString &path);
+    void copySelectedFiles();
+    void cutSelectedFiles();
+    void pasteFiles();
+    void renameSelectedFile();
+    void deleteSelectedFiles();
+    void selectAllFiles();
 
+signals:
+    void directoryChanged(const QString &path);
+    void fileActivated(const QString &path);
 
-    public:
+private:
+    void updateFavoritesMenu();
+    void savePreferences();
+    QString pasteDestination() const;
 
-
-
-      explicit FileExplore( QWidget *parent = 0);
-      ~FileExplore();
-
-
-
-
-
-    protected:
-
-
-
-
-    private slots:
-
-
+    QFileSystemModel *m_model = nullptr;
+    FileExploreFilter *m_filter = nullptr;
+    QTreeView *m_tree = nullptr;
+    FileExploreMenu *m_fileMenu = nullptr;
+    QComboBox *m_path = nullptr;
+    QLineEdit *m_search = nullptr;
+    Button *m_up = nullptr;
+    QMenu *m_favoritesMenu = nullptr;
+    QStringList m_favorites;
+    QStringList m_history;
+    QString m_currentPath;
 };
-
-
-
-
-
 
 #endif // FILEEXPLORE_H

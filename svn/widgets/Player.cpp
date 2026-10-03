@@ -18,6 +18,7 @@
 #include <QDebug>
 #include <QMessageBox>
 #include "widgets/Player.h"
+#include "widgets/vumeter.h"
 #include "widgets/contentsbase.h"
 
 //#include "widgets/container.h"
@@ -36,6 +37,13 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
      connect(mediamanager, &MediaManager::audioFrameUpdated,
                this, [this](const AudioFrame &frame) {
+
+         if (vumeter) {
+             if (mediamanager->isPlaying())
+                 vumeter->setLevels(frame.left, frame.right);
+             else
+                 vumeter->reset();
+         }
 
          this->labeltiempo->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
 
@@ -206,7 +214,10 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
      // Parte alta********************************
 
-      layouttop->addItem(new QSpacerItem(363, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum)); //espaciador
+      vumeter = new VuMeter(frametop);
+      vumeter->setFixedWidth(180);
+      layouttop->addWidget(vumeter);
+      layouttop->addStretch(1);
       btnoption= new Button(this);
       btnoption->SetIcon("Tools.svg");
       btnoption->setIconSize(QSize(20, 20));
@@ -444,6 +455,7 @@ void Player::pauseMain()
 
         if (mediamanager->isPlaying()) {
             mediamanager->pause();
+            vumeter->reset();
             btnpause->SetIcon("Playmini.svg");   // opcional: cambia icono a play
 
         } else {
@@ -461,6 +473,7 @@ void Player::stopMain()
 
         mediamanager->stop();
         mediamanager->seek(0.0);
+        vumeter->reset();
 
 
         if (currentItem) {  // <-- protección extra
@@ -475,6 +488,16 @@ void Player::stopMain()
 
 }
 
+
+bool Player::setVolume(float volume)
+{
+    return mediamanager->setVolume(volume);
+}
+
+float Player::volume() const
+{
+    return mediamanager->volume();
+}
 
 int Player::devicePlay() const {return m_deviceplay;}
 

@@ -8,6 +8,9 @@
 #include <QComboBox>
 #include "widgets/button.h"
 
+class QSlider;
+class QLabel;
+
 
 
 
@@ -32,6 +35,10 @@ class FrameOptionsPlayer: public Frame
     Button * btnacept;
     QComboBox *comboplay;
     QComboBox *combocue;
+    QSlider *volumeSlider;
+    QLabel *volumeValue;
+    float m_previousVolume = 1.0f;
+    bool m_volumeCommitted = false;
 
 
 
@@ -50,6 +57,7 @@ class FrameOptionsPlayer: public Frame
     protected:
 
    void showEvent(QShowEvent *event) override;
+   void hideEvent(QHideEvent *event) override;
 
 
     private slots:

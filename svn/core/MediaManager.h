@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <bass.h>
 
 
@@ -28,6 +29,8 @@ public:
     bool initialize();
     void shutdown();
 
+    static QStringList supportedAudioNameFilters();
+
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
     void play();
@@ -48,6 +51,8 @@ public:
     bool setDevice(int deviceId);
     int  currentDevice() const;
     void fadeOut(int durationMs);
+    bool setVolume(float volume);
+    float volume() const;
 
 
 
@@ -64,6 +69,7 @@ private:
     QTimer* m_deviceRecoveryTimer = nullptr;
     HSTREAM m_stream = 0;
     int m_currentDevice = -1;
+    float m_volume = 1.0f;
 
     bool startDevice(int deviceId);
     void recoverDevice();

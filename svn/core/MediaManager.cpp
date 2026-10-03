@@ -19,7 +19,52 @@
 
 #include <QDebug>
 #include <QCoreApplication>
+#include <algorithm>
+#include <cmath>
 #include "core/MediaManager.h"
+
+namespace {
+QList<HPLUGIN> &loadedAudioPlugins()
+{
+    // Los plugins de BASS son globales, compartidos por todos los players.
+    static QList<HPLUGIN> plugins;
+    return plugins;
+}
+
+void registerAudioPlugin(HPLUGIN handle)
+{
+    if (handle && !loadedAudioPlugins().contains(handle))
+        loadedAudioPlugins().append(handle);
+}
+}
+
+QStringList MediaManager::supportedAudioNameFilters()
+{
+    // Formatos nativos de BASS_StreamCreateFile. No incluir módulos musicales:
+    // necesitan BASS_MusicLoad, que el reproductor de Radit no utiliza.
+    QStringList filters = {
+        "*.mp3", "*.mp2", "*.mp1", "*.ogg", "*.wav", "*.aif", "*.aiff"
+    };
+
+    for (HPLUGIN handle : loadedAudioPlugins()) {
+        const BASS_PLUGININFO *info = BASS_PluginGetInfo(handle);
+        if (!info)
+            continue;
+
+        for (DWORD i = 0; i < info->formatc; ++i) {
+            if (!info->formats[i].exts)
+                continue;
+            const QString extensions = QString::fromUtf8(info->formats[i].exts);
+            for (const QString &extension : extensions.split(';', Qt::SkipEmptyParts)) {
+                const QString filter = extension.trimmed().toLower();
+                if (filter.startsWith("*.") && filter.size() > 2)
+                    filters.append(filter);
+            }
+        }
+    }
+    filters.removeDuplicates();
+    return filters;
+}
 
 
 
@@ -51,9 +96,16 @@ MediaManager::MediaManager(QObject *parent)
                );
 
                DWORD level = BASS_ChannelGetLevel(m_stream);
+               // Una lectura fallida no es un pico de audio.
+               if (level == static_cast<DWORD>(-1))
+                   level = 0;
 
-               float leftLinear  = LOWORD(level) / 32768.0f;
-               float rightLinear = HIWORD(level) / 32768.0f;
+               // El nivel de BASS se mide antes del volumen: aplicarlo al vúmetro.
+               float volume = 1.0f;
+               if (!BASS_ChannelGetAttribute(m_stream, BASS_ATTRIB_VOL, &volume))
+                   volume = 1.0f;
+               float leftLinear  = (LOWORD(level) / 32768.0f) * volume;
+               float rightLinear = (HIWORD(level) / 32768.0f) * volume;
 
                leftLinear  = std::max(leftLinear,  0.000001f);
                rightLinear = std::max(rightLinear, 0.000001f);
@@ -126,6 +178,8 @@ bool MediaManager::initialize()
             fullPath.toUtf8().constData(), 0
         );
 
+        registerAudioPlugin(handle);
+
         if (!handle){
 
             qDebug() << "Error cargando plugin:"
@@ -140,8 +194,8 @@ bool MediaManager::initialize()
 
 #ifdef Q_OS_UNIX
     QString basePath = QCoreApplication::applicationDirPath() + "/Plugin";
-    BASS_PluginLoad((basePath + "/libbass_aac.so").toUtf8(), 0);
-    BASS_PluginLoad((basePath + "/libbassflac.so").toUtf8(), 0);
+    registerAudioPlugin(BASS_PluginLoad((basePath + "/libbass_aac.so").toUtf8(), 0));
+    registerAudioPlugin(BASS_PluginLoad((basePath + "/libbassflac.so").toUtf8(), 0));
 #endif
 
     return true;
@@ -198,6 +252,13 @@ bool MediaManager::loadFile(const QString &filePath){
 
       if (!m_stream) {
            return false;
+         }
+
+         // Volumen normal de reproducción, sin amplificación.
+         if (!BASS_ChannelSetAttribute(m_stream, BASS_ATTRIB_VOL, m_volume)) {
+             BASS_StreamFree(m_stream);
+             m_stream = 0;
+             return false;
          }
 
 
@@ -280,8 +341,37 @@ void MediaManager::play()
         m_deviceRecoveryTimer->start();
 
     // BASS conserva el canal mientras la salida está desconectada.
-    if (BASS_ChannelPlay(m_stream, FALSE))
+    if (BASS_ChannelPlay(m_stream, FALSE)) {
         m_timer->start(50);
+        float volume = 0.0f;
+        if (BASS_ChannelGetAttribute(m_stream, BASS_ATTRIB_VOL, &volume)) {
+            qDebug() << "BASS: canal" << m_stream
+                     << "dispositivo" << device
+                     << "volumen real" << volume
+                     << "esperado" << m_volume;
+        } else {
+            qWarning() << "BASS: no se pudo leer el volumen del canal" << m_stream
+                       << "error" << BASS_ErrorGetCode();
+        }
+    }
+}
+
+bool MediaManager::setVolume(float volume)
+{
+    if (!std::isfinite(volume))
+        return false;
+    const float value = std::clamp(volume, 0.0f, 1.0f);
+    if (m_stream && !BASS_ChannelSetAttribute(m_stream, BASS_ATTRIB_VOL, value)) {
+        qWarning() << "BASS: no se pudo ajustar el volumen, error" << BASS_ErrorGetCode();
+        return false;
+    }
+    m_volume = value;
+    return true;
+}
+
+float MediaManager::volume() const
+{
+    return m_volume;
 }
 
 void MediaManager::pause()
@@ -349,13 +439,20 @@ void MediaManager::seek(double seconds)
 
        //  Actualizar UI inmediatamente
        DWORD level = BASS_ChannelGetLevel(m_stream);
+       // Mantener la actualización de posición aunque falle la lectura de nivel.
+       if (level == static_cast<DWORD>(-1))
+           level = 0;
 
        AudioFrame frame;
 
        frame.position = seconds;
 
-       float leftLinear  = LOWORD(level) / 32768.0f;
-       float rightLinear = HIWORD(level) / 32768.0f;
+       // Mantener la misma lectura al cambiar la posición de reproducción.
+       float volume = 1.0f;
+       if (!BASS_ChannelGetAttribute(m_stream, BASS_ATTRIB_VOL, &volume))
+           volume = 1.0f;
+       float leftLinear  = (LOWORD(level) / 32768.0f) * volume;
+       float rightLinear = (HIWORD(level) / 32768.0f) * volume;
 
        leftLinear  = std::max(leftLinear,  0.000001f);
        rightLinear = std::max(rightLinear, 0.000001f);
@@ -540,7 +637,7 @@ void CALLBACK MediaManager::FadeOutSyncCallback(
                 [self, channel]()
                 {
                     // Restaurar volumen
-                    BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, 1.0f);
+                    BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, self->m_volume);
 
                     // Stop
                     BASS_ChannelStop(channel);
