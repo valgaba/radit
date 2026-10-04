@@ -31,7 +31,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
    this->setObjectName("AudioItemMaxi"); //para qss
    this->setAttribute(Qt::WA_StyledBackground, true);
-   this->setFixedHeight(100); //alto del item fijo
+   this->setFixedHeight(75); //alto del item sin botonera inferior
    //this->setStyleSheet("background-color: #262c3b;");
 
 
@@ -39,48 +39,13 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
      connect(mediamanager, &MediaManager::audioFrameUpdated,
              this, [this](const AudioFrame &frame) {
-
-
-         this->labeltiempocue->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
-         this->setSecondStart(frame.position); //guardamos los segundos de pause para luego el play
-
-         if (!m_userIsSeeking && m_duration > 0.0)
-         {
-             int value = static_cast<int>((frame.position / m_duration) * 1000.0);
-             slider->setValue(value);
-         }
-
+         setSecondStart(frame.position);
      });
 
-
-
-     connect(mediamanager, &MediaManager::playbackFinished,
-             this, [this]()
-     {
-         mediamanager->seek(0.0);   // volver al inicio
+     connect(mediamanager, &MediaManager::playbackFinished, this, [this]() {
+         mediamanager->seek(0.0);
          mediamanager->stop();
-         m_pauseBlinkTimer->stop();
-         labeltiempocue->setStyleSheet("color: #84868f;");
-
      });
-
-
-
-
-     m_pauseBlinkTimer = new QTimer(this);
-     m_pauseBlinkTimer->setInterval(500); // parpadeo cada 500ms
-
-     connect(m_pauseBlinkTimer, &QTimer::timeout, this, [this]() {
-         m_labelVisible = !m_labelVisible;
-            if (m_labelVisible) {
-                labeltiempocue->setStyleSheet("color: #84868f;");
-            } else {
-                labeltiempocue->setStyleSheet("color: transparent;"); // texto invisible pero el espacio se mantiene
-            }
-     });
-
-
-
 //***************************************************
 
 
@@ -89,17 +54,15 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
    layout->setSpacing(0); // espacios entre  item dentro del contenedor
    this->setLayout(layout);
 
-   // diviedimos en tres partes
+   // dividimos en dos partes
 
        frametop = new Frame;
        framecenter = new Frame;
-       framedown = new Frame;
 
 
 
        //layou de las zonas
        layouttop = new QHBoxLayout;
-       layoutdown =new QHBoxLayout;
        layoutcenter = new QHBoxLayout;
 
 
@@ -109,7 +72,6 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
        layouttop->setContentsMargins(0, 0, 0, 0);
-       layoutdown->setContentsMargins(0, 0, 0, 0);
        layoutcenter->setContentsMargins(0, 0, 0, 0);
        layoutcenter->setSpacing(0); // espacios entre  item dentro del contenedor
 
@@ -122,7 +84,6 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
        frametop->setLayout(layouttop);
        framecenter->setLayout(layoutcenter);
-       framedown->setLayout(layoutdown);
 
 
 
@@ -274,144 +235,78 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
 
-///***************** botonera parte baja ****************
-        btnplaycue = new Button;
-        btnplaycue->SetIcon("playpause.svg");
-        btnplaycue->setIconSize(QSize(25, 25));   // no termina de gustarme el tamaño del icono por defecto
-        btnplaycue->setFixedSize(23, 23);  //Tamaño fijo
-        btnplaycue->setToolTip("Properties");
-
-        btnstopcue = new Button;
-        btnstopcue->SetIcon("Stop.svg");
-        btnstopcue->setIconSize(QSize(25, 25));   // no termina de gustarme el tamaño del icono por defecto
-        btnstopcue->setFixedSize(23, 23);  //Tamaño fijo
-        btnstopcue->setToolTip("Stop cue");
-
-
-        btnrewind = new Button;
-        btnrewind->SetIcon("rewind.svg");
-        btnrewind->setIconSize(QSize(20, 20));
-        btnrewind->setFixedSize(23, 23);  //Tamaño fijo
-        btnrewind->setToolTip("Properties");
-
-        btnforward = new Button;
-        btnforward->SetIcon("forward.svg");
-        btnforward->setIconSize(QSize(20, 20));
-        btnforward->setFixedSize(23, 23);  //Tamaño fijo
-        btnforward->setToolTip("Properties");
-
-
-         slider = new Slider;
-
-
-
-         labeltiempocue = new Label;
-         labeltiempocue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-         labeltiempocue->setFixedWidth(125);   // Fija solo el ancho
-         font.setPointSize(14);
-         labeltiempocue->setFont(font);
-         labeltiempocue->setText("00:00:00.00");
-
-        layoutdown->addWidget(btnplaycue);
-        layoutdown->addWidget(btnstopcue);
-
-        layoutdown->addWidget(btnrewind);
-        layoutdown->addWidget(btnforward);
+// Botón para abrir los controles del cue en el waveform.
         auto *btnwaveform = new Button;
         btnwaveform->SetIcon("waveform.svg");
         btnwaveform->setIconSize(QSize(20, 20));
         btnwaveform->setFixedSize(23, 23);
         btnwaveform->setToolTip(tr("Show cue waveform"));
         btnwaveform->setAccessibleName(btnwaveform->toolTip());
-        layoutdown->addWidget(btnwaveform);
+        layouttop->insertWidget(layouttop->indexOf(btnproperties) + 1, btnwaveform);
         connect(btnwaveform, &QPushButton::clicked, this, [this]() {
             QWidget *player = parentWidget();
             while (player && !qobject_cast<Player *>(player))
                 player = player->parentWidget();
-            if (!m_cueWaveform)
+            if (!m_cueWaveform) {
                 m_cueWaveform = new CueWaveformFrame(mediamanager, this);
+                connect(m_cueWaveform, &CueWaveformFrame::playPauseRequested, this, &AudioItemMaxi::toggleCuePlayback);
+                connect(m_cueWaveform, &CueWaveformFrame::stopRequested, this, [this]() {
+                    mediamanager->stop();
+                    mediamanager->seek(m_cueStartPosition);
+                });
+                connect(m_cueWaveform, &CueWaveformFrame::seekRequested, this, [this](double seconds) {
+                    if (!prepareCue()) return;
+                    if (mediamanager->isPlaying()) mediamanager->pause();
+                    mediamanager->seek(seconds);
+                    m_cueStartPosition = mediamanager->getPosition();
+                });
+            }
+            m_cueWaveform->setWindowTitle(labelnombre->text());
             m_cueWaveform->showWaveform(filePath(), player ? player : this);
         });
-        layoutdown->addWidget(slider,1);
-        layoutdown->addWidget(labeltiempocue);
-
-        connect(btnplaycue, &QPushButton::clicked, this, [=](){
-
-            if (!mediamanager->isPlaying() && !mediamanager->isPaused()){
-
-
-
-
-                   mediamanager->setDevice(devicePlay());
-                   mediamanager->loadFile(this->filePath());
-                   m_duration = this->second();
-                   mediamanager->play();
-
-                   // Detener parpadeo por si estaba activo
-                   m_pauseBlinkTimer->stop();
-                   labeltiempocue->setStyleSheet("color: #84868f;");
-                   return;
-               }
-
-               if (mediamanager->isPlaying()){
-                   mediamanager->pause();
-                   // Iniciar parpadeo
-                   m_pauseBlinkTimer->start();
-               } else {
-                   mediamanager->play();
-
-                   // Detener parpadeo
-                   m_pauseBlinkTimer->stop();
-                   labeltiempocue->setStyleSheet("color: #84868f;");
-               }
-
-        });
-
-
-        connect(btnstopcue, &QPushButton::clicked,
-                this, [=]() {
-                mediamanager->stop();
-                mediamanager->seek(0.0);
-
-              m_pauseBlinkTimer->stop();
-              labeltiempocue->setStyleSheet("color: #84868f;");
-                });
-
-
-
-        connect(btnrewind, &QPushButton::clicked,
-                mediamanager, &MediaManager::rewind);
-
-        connect(btnforward, &QPushButton::clicked,
-                mediamanager, &MediaManager::forward);
-
-
-
-
-        connect(slider, &QSlider::sliderPressed, this, [this]() {
-            m_userIsSeeking = true;
-
-        });
-
-        connect(slider, &QSlider::sliderReleased, this, [this]() {
-            m_userIsSeeking = false;
-
-            double percent = slider->value() / 1000.0;
-            mediamanager->seek(percent * m_duration);
-        });
-
-
-
         //añadimos al principal
 
         layout->addWidget(frametop,1);
         layout->addWidget(framecenter,1);
-        layout->addWidget(framedown,1);
 
 
 }
 
 
+
+void AudioItemMaxi::toggleCuePlayback()
+{
+    if (mediamanager->isPlaying()) {
+        mediamanager->pause();
+        return;
+    }
+    if (!prepareCue()) return;
+    if (!mediamanager->isPaused())
+        m_cueStartPosition = mediamanager->getPosition();
+    mediamanager->play();
+}
+
+bool AudioItemMaxi::prepareCue()
+{
+    const int device = devicePlay();
+    const bool sameFile = m_loadedCuePath == filePath() && !m_loadedCuePath.isEmpty();
+    if (sameFile && m_loadedCueDevice == device)
+        return true;
+    const double position = sameFile ? mediamanager->getPosition() : 0;
+    const bool playing = sameFile && mediamanager->isPlaying();
+    const bool paused = sameFile && mediamanager->isPaused();
+    if (!mediamanager->setDevice(device) || !mediamanager->loadFile(filePath()))
+        return false;
+    m_loadedCuePath = filePath();
+    m_loadedCueDevice = device;
+    if (!sameFile) m_cueStartPosition = 0;
+    if (sameFile) {
+        mediamanager->seek(position);
+        if (playing || paused) mediamanager->play();
+        if (paused) mediamanager->pause();
+    }
+    return true;
+}
 
 AudioItemMaxi::~AudioItemMaxi(){}
 
@@ -423,12 +318,12 @@ void AudioItemMaxi::setNameFile(const QString &nombre)
     m_NameFile=nombre;
 
     this->labelnombre->setText(nombre);
+    if (m_cueWaveform) m_cueWaveform->setWindowTitle(nombre);
 }
 
 
 void AudioItemMaxi::setTiempoFile(double segundos){
         this->labeltiempo->setText(SecondToTime(segundos));
-        this->labeltiempocue->setText(SecondToTime(segundos));
 }
 
 

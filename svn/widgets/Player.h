@@ -9,6 +9,7 @@
 
 #include "widgets/button.h"
 #include "widgets/label.h"
+#include "widgets/slider.h"
 #include "widgets/frame.h"
 #include "widgets/TabPlayer.h"
 #include "widgets/AudioItemMaxi.h"

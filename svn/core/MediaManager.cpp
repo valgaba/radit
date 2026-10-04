@@ -939,6 +939,16 @@ void MediaManager::seek(double seconds)
 
 
 
+double MediaManager::getDuration() const
+{
+    if (!m_backend->stream)
+        return 0;
+    const QWORD length = BASS_ChannelGetLength(m_backend->stream, BASS_POS_BYTE);
+    if (length == QWORD(-1))
+        return 0;
+    return std::max(0.0, BASS_ChannelBytes2Seconds(m_backend->stream, length));
+}
+
 double MediaManager::getPosition() const
 {
     if (!m_backend->stream)

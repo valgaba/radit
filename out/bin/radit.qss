@@ -1197,11 +1197,17 @@ QMenu::separator{
     border: 1px solid #333b4f;
 }
 
-#CueWaveformTitle {
-    background: transparent;
-    border: none;
-    color: #80A4AE;
-    font-size: 11px;
+#CueWaveformPosition::groove:horizontal {
+    height: 5px;
+    border: 1px solid #686b74;
+    background: #262c3b;
+}
+
+#CueWaveformPosition::handle:horizontal {
+    width: 12px;
+    margin: -4px 0;
+    border-radius: 3px;
+    background: #80A4AE;
 }
 
 #FormAbout {

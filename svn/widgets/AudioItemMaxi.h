@@ -11,7 +11,6 @@
 #include "widgets/button.h"
 #include "widgets/label.h"
 #include "widgets/FrameColorItemMax.h"
-#include "widgets/slider.h"
 #include "core/MediaManager.h"
 
 class CueWaveformFrame;
@@ -32,13 +31,11 @@ private:
 
     Frame *frametop;
     Frame *framecenter;
-    Frame *framedown;
 
     Frame *framecenterleft;
     Frame *framecenterright;
 
     QHBoxLayout *layouttop;
-    QHBoxLayout *layoutdown;
     QHBoxLayout *layoutcenter;
 
 
@@ -62,14 +59,7 @@ private:
 
 
 
-    Button * btnplaycue;
-    Button * btnstopcue;
-    Button * btnrewind;
-    Button * btnforward;
     CueWaveformFrame *m_cueWaveform = nullptr;
-    Label *labeltiempocue;
-
-    Slider * slider;
 
 
      bool m_isPlayNext=false;
@@ -80,15 +70,15 @@ private:
 
      MediaManager * mediamanager;
 
-     bool m_userIsSeeking = false;
-     double m_duration = 0.0;
+     double m_cueStartPosition = 0.0;
+     QString m_loadedCuePath;
+     int m_loadedCueDevice = -2;
+     bool prepareCue();
+     void toggleCuePlayback();
 
      QString SecondToTime(double segundos);
 
-     QTimer* m_pauseBlinkTimer = nullptr;
-     bool m_labelVisible = true;
-
-     double  m_secondstart;
+     double m_secondstart = 0;
 
      bool m_isPlaying = false;
 
