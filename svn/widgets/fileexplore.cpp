@@ -19,6 +19,7 @@
 #include "widgets/FileExploreMenu.h"
 #include "core/MediaManager.h"
 #include "widgets/button.h"
+#include "widgets/label.h"
 #include "widgets/scrollbar.h"
 
 #include <QAction>
@@ -227,6 +228,19 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+
+    auto *framebarra = new Frame(this);
+    framebarra->setObjectName("framebarra");
+    framebarra->setFixedHeight(25);
+    auto *layoutbarra = new QHBoxLayout(framebarra);
+    layoutbarra->setContentsMargins(0, 0, 0, 0);
+    layoutbarra->setSpacing(0);
+    auto *labeltitle = new Label(framebarra);
+    labeltitle->setObjectName("PanelTitle");
+    labeltitle->setText(tr("File Browser"));
+    layoutbarra->addWidget(labeltitle);
+    layoutbarra->addStretch(1);
+    layout->addWidget(framebarra);
 
     auto *toolbar = new Frame(this);
     toolbar->setObjectName("FileExploreToolbar");

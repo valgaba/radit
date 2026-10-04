@@ -17,6 +17,7 @@
 
 #include "widgets/Capture.h"
 #include "widgets/button.h"
+#include "widgets/label.h"
 #include "widgets/vumeter.h"
 #include "bass.h"
 
@@ -30,12 +31,30 @@
 Capture::Capture(QWidget *parent) : Frame(parent)
 {
     setObjectName("Capture"); // Para radit.qss.
-    setMinimumHeight(110);
+    setMinimumHeight(135);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
-    auto *layout = new QVBoxLayout(this);
+    auto *rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
+    auto *framebarra = new Frame(this);
+    framebarra->setObjectName("framebarra");
+    framebarra->setFixedHeight(25);
+    auto *layoutbarra = new QHBoxLayout(framebarra);
+    layoutbarra->setContentsMargins(0, 0, 0, 0);
+    layoutbarra->setSpacing(0);
+    auto *labeltitle = new Label(framebarra);
+    labeltitle->setObjectName("PanelTitle");
+    labeltitle->setText(tr("Capture"));
+    layoutbarra->addWidget(labeltitle);
+    layoutbarra->addStretch(1);
+    rootLayout->addWidget(framebarra);
+
+    auto *content = new QWidget(this);
+    auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(10, 8, 10, 8);
     layout->setSpacing(0);
+    rootLayout->addWidget(content, 1);
     auto *topRow = new QHBoxLayout;
     topRow->setSpacing(12);
 

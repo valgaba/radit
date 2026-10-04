@@ -1192,6 +1192,21 @@ QMenu::separator{
 }
 
 /* Explorador de archivos */
+#FileExplore Frame#framebarra,
+#Capture Frame#framebarra {
+    background-color: #4e4d7a;
+    border: none;
+}
+
+#FileExplore QLabel#PanelTitle,
+#Capture QLabel#PanelTitle {
+    font-size: 14px;
+    color: #8a8d96;
+    background: transparent;
+    border: none;
+    padding: 2px;
+}
+
 #Capture {
     background-color: #262c3b;
     border: 1px solid #333b4f;
