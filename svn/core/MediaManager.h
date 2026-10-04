@@ -8,6 +8,22 @@
 #include <QStringList>
 #include <QList>
 #include <memory>
+#include <atomic>
+#include <QVector>
+
+struct WaveformPeak
+{
+    float minimum = 0;
+    float maximum = 0;
+};
+
+struct AudioWaveform
+{
+    QVector<WaveformPeak> peaks;
+    double secondsPerPeak = 0;
+    double duration = 0;
+    QString error;
+};
 
 struct AudioDevice
 {
@@ -41,6 +57,8 @@ public:
     static QStringList supportedAudioNameFilters();
     static QList<AudioDevice> inputDevices();
     static QList<AudioDevice> outputDevices();
+    static AudioWaveform readWaveform(const QString &filePath,
+                                      const std::shared_ptr<std::atomic_bool> &cancel);
 
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);

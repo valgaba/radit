@@ -154,6 +154,92 @@ QList<AudioDevice> MediaManager::outputDevices()
     return devices;
 }
 
+AudioWaveform MediaManager::readWaveform(const QString &filePath,
+                                         const std::shared_ptr<std::atomic_bool> &cancel)
+{
+    AudioWaveform waveform;
+    if (cancel->load())
+        return waveform;
+    // Contexto de decodificación independiente, sin abrir una salida audible.
+    static QMutex decoderInitMutex;
+    {
+        const QMutexLocker lock(&decoderInitMutex);
+        if (!BASS_SetDevice(0) && !BASS_Init(0, 44100, 0, nullptr, nullptr)) {
+            waveform.error = tr("Unable to initialize waveform decoding (error %1).")
+                .arg(BASS_ErrorGetCode());
+            return waveform;
+        }
+    }
+#ifdef Q_OS_WIN
+    const HSTREAM stream = BASS_StreamCreateFile(FALSE, filePath.utf16(), 0, 0,
+        BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT | BASS_STREAM_PRESCAN | BASS_UNICODE);
+#else
+    const QByteArray path = filePath.toUtf8();
+    const HSTREAM stream = BASS_StreamCreateFile(FALSE, path.constData(), 0, 0,
+        BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT | BASS_STREAM_PRESCAN);
+#endif
+    if (!stream) {
+        waveform.error = tr("Unable to read the waveform (error %1).")
+            .arg(BASS_ErrorGetCode());
+        return waveform;
+    }
+    struct StreamGuard {
+        HSTREAM stream;
+        ~StreamGuard() { BASS_StreamFree(stream); }
+    } guard{stream};
+    BASS_CHANNELINFO info = {};
+    if (!BASS_ChannelGetInfo(stream, &info) || !info.freq || !info.chans || info.chans > 32) {
+        waveform.error = tr("Unsupported waveform audio format.");
+        return waveform;
+    }
+    const QWORD length = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
+    const double duration = length == QWORD(-1) ? 0 : BASS_ChannelBytes2Seconds(stream, length);
+    // 100 puntos por segundo; limitar la memoria para grabaciones largas.
+    const qint64 framesPerPeak = std::max(std::max(qint64(1), qint64(info.freq / 100)),
+        qint64(std::ceil(duration * info.freq / 1000000.0)));
+    waveform.secondsPerPeak = double(framesPerPeak) / info.freq;
+    QVector<float> samples(8192 * info.chans);
+    WaveformPeak peak;
+    qint64 frames = 0, binFrames = 0;
+    while (!cancel->load()) {
+        const DWORD bytes = BASS_ChannelGetData(stream, samples.data(), samples.size() * sizeof(float));
+        if (bytes == DWORD(-1)) {
+            if (BASS_ErrorGetCode() != BASS_ERROR_ENDED)
+                waveform.error = tr("Waveform decoding failed (error %1).")
+                    .arg(BASS_ErrorGetCode());
+            break;
+        }
+        if (!bytes)
+            break;
+        const DWORD count = bytes / (sizeof(float) * info.chans);
+        for (DWORD frame = 0; frame < count; ++frame) {
+            for (DWORD channel = 0; channel < info.chans; ++channel) {
+                const float value = samples[frame * info.chans + channel];
+                if (std::isfinite(value)) {
+                    peak.minimum = std::min(peak.minimum, std::clamp(value, -1.0f, 1.0f));
+                    peak.maximum = std::max(peak.maximum, std::clamp(value, -1.0f, 1.0f));
+                }
+            }
+            ++frames;
+            if (++binFrames == framesPerPeak) {
+                waveform.peaks.append(peak);
+                peak = {};
+                binFrames = 0;
+            }
+        }
+        if (waveform.peaks.size() > 1000000) {
+            waveform.error = tr("The audio file is too long to display its waveform.");
+            break;
+        }
+    }
+    if (cancel->load())
+        return {};
+    if (binFrames)
+        waveform.peaks.append(peak);
+    waveform.duration = double(frames) / info.freq;
+    return waveform;
+}
+
 QStringList MediaManager::supportedAudioNameFilters()
 {
     // Formatos nativos de BASS_StreamCreateFile. No incluir módulos musicales:
@@ -852,6 +938,16 @@ void MediaManager::seek(double seconds)
 
 
 
+
+double MediaManager::getPosition() const
+{
+    if (!m_backend->stream)
+        return 0;
+    const QWORD position = BASS_ChannelGetPosition(m_backend->stream, BASS_POS_BYTE);
+    if (position == QWORD(-1))
+        return 0;
+    return std::max(0.0, BASS_ChannelBytes2Seconds(m_backend->stream, position));
+}
 
 void MediaManager::seekRelative(double deltaSeconds)
 {

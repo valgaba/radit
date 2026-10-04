@@ -1192,6 +1192,18 @@ QMenu::separator{
 }
 
 /* Explorador de archivos */
+#CueWaveformFrame {
+    background-color: #262c3b;
+    border: 1px solid #333b4f;
+}
+
+#CueWaveformTitle {
+    background: transparent;
+    border: none;
+    color: #80A4AE;
+    font-size: 11px;
+}
+
 #FormAbout {
     background-color: #262c3b;
     border: 1px solid #333b4f;

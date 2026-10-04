@@ -14,6 +14,8 @@
 #include "widgets/slider.h"
 #include "core/MediaManager.h"
 
+class CueWaveformFrame;
+
 
 
 class AudioItemMaxi: public AudioItem{
@@ -64,6 +66,7 @@ private:
     Button * btnstopcue;
     Button * btnrewind;
     Button * btnforward;
+    CueWaveformFrame *m_cueWaveform = nullptr;
     Label *labeltiempocue;
 
     Slider * slider;

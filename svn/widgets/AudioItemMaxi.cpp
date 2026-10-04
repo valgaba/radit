@@ -23,6 +23,7 @@
 
 #include "widgets/AudioItemMaxi.h"
 #include "widgets/Player.h"
+#include "widgets/CueWaveformFrame.h"
 
 
 AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
@@ -316,6 +317,21 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         layoutdown->addWidget(btnrewind);
         layoutdown->addWidget(btnforward);
+        auto *btnwaveform = new Button;
+        btnwaveform->SetIcon("waveform.svg");
+        btnwaveform->setIconSize(QSize(20, 20));
+        btnwaveform->setFixedSize(23, 23);
+        btnwaveform->setToolTip(tr("Show cue waveform"));
+        btnwaveform->setAccessibleName(btnwaveform->toolTip());
+        layoutdown->addWidget(btnwaveform);
+        connect(btnwaveform, &QPushButton::clicked, this, [this]() {
+            QWidget *player = parentWidget();
+            while (player && !qobject_cast<Player *>(player))
+                player = player->parentWidget();
+            if (!m_cueWaveform)
+                m_cueWaveform = new CueWaveformFrame(mediamanager, this);
+            m_cueWaveform->showWaveform(filePath(), player ? player : this);
+        });
         layoutdown->addWidget(slider,1);
         layoutdown->addWidget(labeltiempocue);
 
