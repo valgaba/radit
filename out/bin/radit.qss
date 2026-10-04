@@ -1221,8 +1221,8 @@ QMenu::separator{
 
 #Capture QLabel#CaptureRecordingTime {
     color: #80A4AE;
-    font-family: "Consolas", monospace;
-    font-size: 18px;
+    font-size: 16pt;
+    font-weight: bold;
 }
 
 #Capture VuMeter QLabel {

@@ -4,6 +4,7 @@
 #include "widgets/frame.h"
 
 class Button;
+class Label;
 class QComboBox;
 class QLabel;
 class QSlider;
@@ -20,7 +21,7 @@ private:
     QLabel *m_volumeValue = nullptr;
     Button *m_recButton = nullptr;
     Button *m_stopButton = nullptr;
-    QLabel *m_recordingTime = nullptr;
+    Label *m_recordingTime = nullptr;
 
 public:
     explicit Capture(QWidget *parent = nullptr);

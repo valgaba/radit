@@ -207,7 +207,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
           );
 
           if (reply == QMessageBox::Yes) {
-              this->deleteLater();
+              this->hide();
           }
       });
 

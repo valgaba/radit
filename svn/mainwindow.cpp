@@ -26,6 +26,8 @@
 #include <QDebug>
 #include <QLabel>
 #include <QMenuBar>
+#include <QMenu>
+#include <QAction>
 #include <QDesktopServices>
 #include <QUrl>
 
@@ -55,20 +57,20 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
        // Añadir los menús principales (sin submenús por ahora)
-       menubar->addMenu("&Archivo");
-       menubar->addMenu("&Editar");
-       menubar->addMenu("&Herramientas");
-      // menubar->addMenu("A&yuda");
+       menubar->addMenu(tr("&File"));
+       menubar->addMenu(tr("&Edit"));
+       QMenu *vistasMenu = menubar->addMenu(tr("&View"));
+       menubar->addMenu(tr("&Tools"));
 
 
        // Crear submenús
-       QMenu *ayudaMenu = menubar->addMenu("A&yuda");
+       QMenu *ayudaMenu = menubar->addMenu(tr("&Help"));
 
        // Añadir acciones al submenú de ayuda
-       QAction *accionAyuda = new QAction("Ayuda", this);
-       QAction *accionWeb = new QAction("Visita el sitio web", this);
+       QAction *accionAyuda = new QAction(tr("Help"), this);
+       QAction *accionWeb = new QAction(tr("Visit website"), this);
 
-       QAction *accionAcercaDe = new QAction("Acerca de", this);
+       QAction *accionAcercaDe = new QAction(tr("About"), this);
 
        ayudaMenu->addAction(accionAyuda);
        ayudaMenu->addAction(accionWeb);
@@ -193,8 +195,10 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     // ----------------------------------------
 
    // splittertop->addWidget(player1);
-    splittertop->addWidget(new FileExplore);
-    splittertop->addWidget(new Capture);
+    m_fileExplore = new FileExplore;
+    m_capture = new Capture;
+    splittertop->addWidget(m_fileExplore);
+    splittertop->addWidget(m_capture);
     splittertop->addWidget(new TabAuto);
 
     splitterdown->addWidget(player2);
@@ -210,11 +214,51 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     sizesTop << 400 << 400 << 600;
     splittertop->setSizes(sizesTop);
 
+    QAction *resetInterface = vistasMenu->addAction(tr("Reset User Interface"));
+    connect(resetInterface, &QAction::triggered, this, &MainWindow::restoreInterface);
+    vistasMenu->addSeparator();
+
+    const auto addPanelAction = [this, vistasMenu](const QString &text, QWidget *panel) {
+        QAction *action = vistasMenu->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(!panel->isHidden());
+        connect(action, &QAction::triggered, this, [panel](bool visible) {
+            panel->setVisible(visible);
+        });
+        // Sincronizar también después de ocultar el panel con su botón X.
+        connect(vistasMenu, &QMenu::aboutToShow, this, [action, panel]() {
+            action->setChecked(!panel->isHidden());
+        });
+    };
+
+    // Los tres Player del menú corresponden a la fila inferior.
+    addPanelAction(tr("Show Player1"), player2);
+    addPanelAction(tr("Show Player2"), player3);
+    addPanelAction(tr("Show Player3"), player4);
+    addPanelAction(tr("Show File Browser"), m_fileExplore);
+    addPanelAction(tr("Show Capture"), m_capture);
+
 
 // cargar configuracion de los player*******************
     Config::loadConfig("config.json",players);
 
 
+}
+
+void MainWindow::restoreInterface()
+{
+    // Recuperar los mismos paneles y su estado, sin crear nuevas instancias.
+    for (int i = 0; i < splittertop->count(); ++i)
+        splittertop->widget(i)->show();
+    for (int i = 0; i < splitterdown->count(); ++i)
+        splitterdown->widget(i)->show();
+    splittertop->show();
+    splitterdown->show();
+
+    splittertop->setSizes({400, 400, 600});
+    splitterdown->setSizes({400, 400, 400});
+    const int height = qMax(3, splitterprincipal->height() - splitterprincipal->handleWidth());
+    splitterprincipal->setSizes({height / 3, height - height / 3});
 }
 
 MainWindow::~MainWindow(){

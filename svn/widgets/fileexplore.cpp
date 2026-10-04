@@ -240,6 +240,21 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     labeltitle->setText(tr("File Browser"));
     layoutbarra->addWidget(labeltitle);
     layoutbarra->addStretch(1);
+    auto *btnclose = new Button(framebarra);
+    btnclose->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
+    btnclose->setFixedSize(15, 15);
+    btnclose->SetIcon("Close-hover.svg");
+    btnclose->setIconSize(QSize(15, 15));
+    btnclose->setToolTip(tr("Close file browser"));
+    btnclose->setAccessibleName(btnclose->toolTip());
+    layoutbarra->addWidget(btnclose);
+    connect(btnclose, &Button::clicked, this, [this]() {
+        if (QMessageBox::question(this, tr("Cerrar File Browser"),
+                                 tr("¿Seguro que quieres cerrar el explorador de archivos?"),
+                                 QMessageBox::Yes | QMessageBox::No,
+                                 QMessageBox::No) == QMessageBox::Yes)
+            hide();
+    });
     layout->addWidget(framebarra);
 
     auto *toolbar = new Frame(this);

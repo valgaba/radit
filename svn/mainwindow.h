@@ -9,6 +9,8 @@
 #include "core/MediaManager.h"
 
 class Player;
+class FileExplore;
+class Capture;
 
 class MainWindow : public QMainWindow
 {
@@ -27,6 +29,7 @@ public:
 
 
 private:
+    void restoreInterface();
 
     QWidget *centralwidget;
     QSplitter *splitterprincipal;
@@ -35,6 +38,8 @@ private:
     MediaManager * mediamanager;
 
     QList<Player*> players;
+    FileExplore *m_fileExplore = nullptr;
+    Capture *m_capture = nullptr;
 
 
 };

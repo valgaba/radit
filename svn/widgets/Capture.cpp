@@ -22,8 +22,10 @@
 #include "bass.h"
 
 #include <QComboBox>
+#include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QVBoxLayout>
@@ -48,6 +50,21 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     labeltitle->setText(tr("Capture"));
     layoutbarra->addWidget(labeltitle);
     layoutbarra->addStretch(1);
+    auto *btnclose = new Button(framebarra);
+    btnclose->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
+    btnclose->setFixedSize(15, 15);
+    btnclose->SetIcon("Close-hover.svg");
+    btnclose->setIconSize(QSize(15, 15));
+    btnclose->setToolTip(tr("Close capture"));
+    btnclose->setAccessibleName(btnclose->toolTip());
+    layoutbarra->addWidget(btnclose);
+    connect(btnclose, &Button::clicked, this, [this]() {
+        if (QMessageBox::question(this, tr("Cerrar Capture"),
+                                 tr("¿Seguro que quieres cerrar Capture?"),
+                                 QMessageBox::Yes | QMessageBox::No,
+                                 QMessageBox::No) == QMessageBox::Yes)
+            hide();
+    });
     rootLayout->addWidget(framebarra);
 
     auto *content = new QWidget(this);
@@ -121,9 +138,16 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     bottomRow->addWidget(m_recButton);
     bottomRow->addWidget(m_stopButton);
     bottomRow->addStretch(1);
-    m_recordingTime = new QLabel("00:00:00", this);
+    m_recordingTime = new Label(this);
+    m_recordingTime->setText("00:00:00.00");
+    m_recordingTime->setWordWrap(false);
     m_recordingTime->setObjectName("CaptureRecordingTime");
-    m_recordingTime->setMinimumWidth(100);
+    QFont font = m_recordingTime->font();
+    font.setPointSize(16);
+    font.setBold(true);
+    m_recordingTime->setFont(font);
+    m_recordingTime->setFixedHeight(25);
+    m_recordingTime->setMinimumWidth(QFontMetrics(font).horizontalAdvance(m_recordingTime->text()) + 4);
     m_recordingTime->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_recordingTime->setToolTip(tr("Recording time"));
     m_recordingTime->setAccessibleName(tr("Recording time"));

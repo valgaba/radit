@@ -151,6 +151,16 @@ bool MediaManager::initialize()
 {
     int device = -1; // default Windows
 
+#ifdef Q_OS_WIN
+    // Configurar los nombres antes de inicializar o enumerar dispositivos.
+    // Capture y FrameOptionsPlayer los convierten con QString::fromUtf8.
+    if (!BASS_GetConfig(BASS_CONFIG_UNICODE) &&
+        !BASS_SetConfig(BASS_CONFIG_UNICODE, TRUE)) {
+        qWarning() << "BASS: no se pudo activar UTF-8 para los dispositivos, error"
+                   << BASS_ErrorGetCode();
+    }
+#endif
+
     BASS_SetConfig(BASS_CONFIG_BUFFER, 5000);
     BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST, 1);
 
