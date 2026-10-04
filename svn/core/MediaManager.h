@@ -6,7 +6,16 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
-#include <bass.h>
+#include <QList>
+#include <memory>
+
+struct AudioDevice
+{
+    int id = -1;
+    QString name;
+    bool isDefault = false;
+    bool isMicrophone = false;
+};
 
 
 struct AudioFrame
@@ -30,6 +39,8 @@ public:
     void shutdown();
 
     static QStringList supportedAudioNameFilters();
+    static QList<AudioDevice> inputDevices();
+    static QList<AudioDevice> outputDevices();
 
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
@@ -54,9 +65,16 @@ public:
     bool setVolume(float volume);
     float volume() const;
 
+    bool startInput(int deviceId);
+    void stopInput();
+    void setInputVolume(float volume);
+    float inputVolume() const;
+
 
 
 signals:
+    void inputLevelsChanged(float leftDb, float rightDb);
+    void inputError(const QString &message);
     void positionChanged(double seconds);
     void playbackFinished();
     void vuMeterChanged(float left, float right);
@@ -66,39 +84,16 @@ private:
 
 
     QTimer* m_timer = nullptr;
+    QTimer* m_inputTimer = nullptr;
+    float m_inputVolume = 1.0f;
     QTimer* m_deviceRecoveryTimer = nullptr;
-    HSTREAM m_stream = 0;
+    struct Backend;
+    std::unique_ptr<Backend> m_backend;
     int m_currentDevice = -1;
     float m_volume = 1.0f;
 
     bool startDevice(int deviceId);
     void recoverDevice();
-
-
-    static void CALLBACK EndSyncCallback(
-           HSYNC handle,
-           DWORD channel,
-           DWORD data,
-           void *user
-       );
-
-
-    static void CALLBACK FadeOutSyncCallback(
-        HSYNC handle,
-        DWORD channel,
-        DWORD data,
-        void *user
-    );
-
-
-   static void CALLBACK DeviceFailedSyncProc(
-           HSYNC handle,
-           DWORD channel,
-           DWORD data,
-           void *user
-
-
-           );
 
 
     float m_silenceThresholdDb = -25.0f; //45

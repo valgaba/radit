@@ -9,12 +9,14 @@ class QComboBox;
 class QLabel;
 class QSlider;
 class VuMeter;
+class MediaManager;
 
 class Capture : public Frame
 {
     Q_OBJECT
 
 private:
+    MediaManager *m_mediaManager = nullptr;
     QComboBox *m_inputDevice = nullptr;
     VuMeter *m_inputMeter = nullptr;
     QSlider *m_volumeSlider = nullptr;
@@ -29,8 +31,10 @@ public:
 
 protected:
     void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private slots:
+    void monitorInput();
 
 public slots:
     void updateInputDevices();

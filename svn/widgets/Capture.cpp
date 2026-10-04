@@ -19,7 +19,7 @@
 #include "widgets/button.h"
 #include "widgets/label.h"
 #include "widgets/vumeter.h"
-#include "bass.h"
+#include "core/MediaManager.h"
 
 #include <QComboBox>
 #include <QFontMetrics>
@@ -155,13 +155,36 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     layout->addLayout(bottomRow);
     layout->addStretch(1); // Todo el espacio vertical sobrante queda debajo.
 
+    m_mediaManager = new MediaManager(this);
+    connect(m_mediaManager, &MediaManager::inputLevelsChanged,
+            m_inputMeter, &VuMeter::setLevels);
+    connect(m_mediaManager, &MediaManager::inputError, this, [this](const QString &message) {
+        m_inputMeter->reset();
+        m_inputDevice->setToolTip(message);
+        QMessageBox::warning(this, tr("Audio input"), message);
+    });
+    connect(m_inputDevice, &QComboBox::activated, this, &Capture::monitorInput);
     connect(m_volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         m_volumeValue->setText(QString::number(value) + " %");
+        m_mediaManager->setInputVolume(value / 100.0f);
     });
     updateInputDevices();
 }
 
-Capture::~Capture() {}
+Capture::~Capture()
+{
+    m_mediaManager->stopInput();
+}
+
+void Capture::monitorInput()
+{
+    const bool microphone = m_inputDevice->currentData(Qt::UserRole + 1).toBool();
+    m_inputMeter->setDecibelScale(microphone);
+    m_inputMeter->setToolTip(microphone ? tr("Input level (-60 to 0 dBFS)")
+                                       : tr("Input level"));
+    m_inputDevice->setToolTip(tr("Select an audio input device"));
+    m_mediaManager->startInput(m_inputDevice->currentData().toInt());
+}
 
 void Capture::updateInputDevices()
 {
@@ -170,12 +193,11 @@ void Capture::updateInputDevices()
     const QSignalBlocker blocker(m_inputDevice);
     m_inputDevice->clear();
     int defaultIndex = -1;
-    BASS_DEVICEINFO info = {};
-    for (DWORD device = 0; BASS_RecordGetDeviceInfo(device, &info); ++device) {
-        if (!(info.flags & BASS_DEVICE_ENABLED))
-            continue;
-        m_inputDevice->addItem(QString::fromUtf8(info.name), static_cast<int>(device));
-        if (info.flags & BASS_DEVICE_DEFAULT)
+    for (const AudioDevice &device : MediaManager::inputDevices()) {
+        m_inputDevice->addItem(device.name, device.id);
+        m_inputDevice->setItemData(m_inputDevice->count() - 1,
+                                   device.isMicrophone, Qt::UserRole + 1);
+        if (device.isDefault)
             defaultIndex = m_inputDevice->count() - 1;
     }
     const bool available = m_inputDevice->count() > 0;
@@ -187,10 +209,19 @@ void Capture::updateInputDevices()
         m_inputDevice->addItem(tr("No input devices available"), -1);
     }
     m_inputDevice->setEnabled(available);
+    if (isVisible())
+        monitorInput();
 }
 
 void Capture::showEvent(QShowEvent *event)
 {
     Frame::showEvent(event);
     updateInputDevices();
+}
+
+void Capture::hideEvent(QHideEvent *event)
+{
+    m_mediaManager->stopInput();
+    m_inputMeter->reset();
+    Frame::hideEvent(event);
 }

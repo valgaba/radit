@@ -24,7 +24,7 @@
 #include "widgets/frameoptionsplayer.h"
 #include "widgets/label.h"
 #include "widgets/Player.h"
-#include "bass.h"
+#include "core/MediaManager.h"
 
 
 
@@ -199,7 +199,6 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
           Player *player = qobject_cast<Player*>(this->parent());
 
            if (player) {
-               // BASS_Free();
                player->setDevicePlay(selectedPlay);
                player->setDeviceCue(selectedCue);
                m_volumeCommitted = true;
@@ -232,23 +231,11 @@ void FrameOptionsPlayer::UpdateDevice(){
        combocue->clear();
 
 
-    BASS_DEVICEINFO info;
-      for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
-
-          if (info.flags & BASS_DEVICE_ENABLED) {
-              QString deviceName = QString::fromUtf8(info.name);
-
-              // Añadimos el dispositivo a ambos combos
-              comboplay->addItem(deviceName, i);
-              combocue->addItem(deviceName, i);
-
-
-
-
-
-          }
-      }
-
+    for (const AudioDevice &device : MediaManager::outputDevices()) {
+        // Añadimos el dispositivo a ambos combos.
+        comboplay->addItem(device.name, device.id);
+        combocue->addItem(device.name, device.id);
+    }
 
       // ----------------------------------------
           // Obtener Player propietario del panel

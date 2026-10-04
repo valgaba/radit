@@ -51,10 +51,20 @@ QSize VuMeter::sizeHint() const
     return QSize(180, 28);
 }
 
-qreal VuMeter::levelValue(float decibels)
+void VuMeter::setDecibelScale(bool enabled)
+{
+    m_decibelScale = enabled;
+    reset();
+}
+
+qreal VuMeter::levelValue(float decibels) const
 {
     if (!std::isfinite(decibels) || decibels <= -120.0f)
         return 0;
+    // La captura necesita mostrar niveles de micrófono inferiores a los de un
+    // archivo normalizado. Cambiar la escala visual no modifica las muestras.
+    if (m_decibelScale)
+        return std::clamp((decibels + 60.0) / 60.0, 0.0, 1.0);
     // Amplitud lineal: -6.02 dBFS ocupa media barra y 0 dBFS la llena.
     // Los niveles ya incluyen el volumen del canal en MediaManager.
     if (decibels >= 0.0f)

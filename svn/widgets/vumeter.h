@@ -13,6 +13,7 @@ class VuMeter : public QWidget
 public:
     explicit VuMeter(QWidget *parent = nullptr);
     QSize sizeHint() const override;
+    void setDecibelScale(bool enabled);
 
 public slots:
     // Niveles en dBFS, como los que entrega AudioFrame.
@@ -20,7 +21,8 @@ public slots:
     void reset();
 
 private:
-    static qreal levelValue(float decibels);
+    qreal levelValue(float decibels) const;
+    bool m_decibelScale = false;
     LevelMeter *m_left = nullptr;
     LevelMeter *m_right = nullptr;
     QTimer *m_idleTimer = nullptr;

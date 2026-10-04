@@ -19,11 +19,57 @@
 
 #include <QDebug>
 #include <QCoreApplication>
+#include <QHash>
 #include <algorithm>
 #include <cmath>
 #include "core/MediaManager.h"
+#include <bass.h>
+
+// Los tipos y callbacks del motor quedan fuera de la interfaz pública.
+struct MediaManager::Backend
+{
+    HSTREAM stream = 0;
+    HRECORD inputStream = 0;
+    int inputDevice = -1;
+    static BOOL CALLBACK InputCallback(HRECORD, const void *, DWORD, void *)
+    {
+        // Consumir el audio sin reproducirlo ni guardarlo durante la monitorización.
+        return TRUE;
+    }
+    static void CALLBACK EndSyncCallback(HSYNC handle, DWORD channel, DWORD data, void *user);
+    static void CALLBACK FadeOutSyncCallback(HSYNC handle, DWORD channel, DWORD data, void *user);
+    static void CALLBACK DeviceFailedSyncProc(HSYNC handle, DWORD channel, DWORD data, void *user);
+};
 
 namespace {
+struct InputDeviceUse
+{
+    int users = 0;
+    bool owned = false;
+};
+
+QHash<int, InputDeviceUse> &inputDeviceUses()
+{
+    // Acceso desde el hilo de Qt; los callbacks no modifican esta tabla.
+    static QHash<int, InputDeviceUse> devices;
+    return devices;
+}
+
+void releaseInputDevice(int device)
+{
+    auto &devices = inputDeviceUses();
+    auto it = devices.find(device);
+    if (it == devices.end() || --it->users > 0)
+        return;
+    const bool owned = it->owned;
+    devices.erase(it);
+    const DWORD previous = BASS_RecordGetDevice();
+    if (owned && BASS_RecordSetDevice(device))
+        BASS_RecordFree();
+    if (previous != static_cast<DWORD>(-1) && previous != static_cast<DWORD>(device))
+        BASS_RecordSetDevice(previous);
+}
+
 QList<HPLUGIN> &loadedAudioPlugins()
 {
     // Los plugins de BASS son globales, compartidos por todos los players.
@@ -36,6 +82,44 @@ void registerAudioPlugin(HPLUGIN handle)
     if (handle && !loadedAudioPlugins().contains(handle))
         loadedAudioPlugins().append(handle);
 }
+
+QString audioDeviceName(const char *name)
+{
+#ifdef Q_OS_WIN
+    if (!BASS_GetConfig(BASS_CONFIG_UNICODE))
+        return QString::fromLocal8Bit(name);
+#endif
+    return QString::fromUtf8(name);
+}
+}
+
+QList<AudioDevice> MediaManager::inputDevices()
+{
+    QList<AudioDevice> devices;
+    BASS_DEVICEINFO info = {};
+    for (DWORD id = 0; BASS_RecordGetDeviceInfo(id, &info); ++id) {
+        if (info.flags & BASS_DEVICE_ENABLED) {
+            const DWORD type = info.flags & BASS_DEVICE_TYPE_MASK;
+            const bool microphone = !(info.flags & BASS_DEVICE_LOOPBACK) &&
+                (type == BASS_DEVICE_TYPE_MICROPHONE ||
+                 type == BASS_DEVICE_TYPE_HEADSET || type == BASS_DEVICE_TYPE_HANDSET);
+            devices.append({static_cast<int>(id), audioDeviceName(info.name),
+                            (info.flags & BASS_DEVICE_DEFAULT) != 0, microphone});
+        }
+    }
+    return devices;
+}
+
+QList<AudioDevice> MediaManager::outputDevices()
+{
+    QList<AudioDevice> devices;
+    BASS_DEVICEINFO info = {};
+    for (DWORD id = 0; BASS_GetDeviceInfo(id, &info); ++id) {
+        if (info.flags & BASS_DEVICE_ENABLED)
+            devices.append({static_cast<int>(id), audioDeviceName(info.name),
+                            (info.flags & BASS_DEVICE_DEFAULT) != 0});
+    }
+    return devices;
 }
 
 QStringList MediaManager::supportedAudioNameFilters()
@@ -69,9 +153,29 @@ QStringList MediaManager::supportedAudioNameFilters()
 
 
 MediaManager::MediaManager(QObject *parent)
-    : QObject(parent)
+    : QObject(parent), m_backend(std::make_unique<Backend>())
 {
     qRegisterMetaType<AudioFrame>("AudioFrame");
+
+    m_inputTimer = new QTimer(this);
+    m_inputTimer->setTimerType(Qt::PreciseTimer);
+    m_inputTimer->setInterval(25);
+    connect(m_inputTimer, &QTimer::timeout, this, [this]() {
+        if (!m_backend->inputStream)
+            return;
+        const DWORD level = BASS_ChannelGetLevel(m_backend->inputStream);
+        if (level == static_cast<DWORD>(-1) ||
+            BASS_ChannelIsActive(m_backend->inputStream) != BASS_ACTIVE_PLAYING) {
+            stopInput();
+            emit inputError(tr("Audio input disconnected or unavailable. Select the input device again."));
+            return;
+        }
+        const auto toDb = [this](float amplitude) {
+            return 20.0f * std::log10(std::max(amplitude * m_inputVolume, 0.000001f));
+        };
+        emit inputLevelsChanged(toDb(LOWORD(level) / 32768.0f),
+                                toDb(HIWORD(level) / 32768.0f));
+    });
 
     m_deviceRecoveryTimer = new QTimer(this);
     m_deviceRecoveryTimer->setInterval(500);
@@ -82,27 +186,27 @@ MediaManager::MediaManager(QObject *parent)
 
        connect(m_timer, &QTimer::timeout, this, [this]() {
 
-           if (!m_stream) return;
+           if (!m_backend->stream) return;
 
-           DWORD state = BASS_ChannelIsActive(m_stream);
+           DWORD state = BASS_ChannelIsActive(m_backend->stream);
 
            if (state == BASS_ACTIVE_PLAYING)
            {
                AudioFrame frame;
 
                frame.position = BASS_ChannelBytes2Seconds(
-                   m_stream,
-                   BASS_ChannelGetPosition(m_stream, BASS_POS_BYTE)
+                   m_backend->stream,
+                   BASS_ChannelGetPosition(m_backend->stream, BASS_POS_BYTE)
                );
 
-               DWORD level = BASS_ChannelGetLevel(m_stream);
+               DWORD level = BASS_ChannelGetLevel(m_backend->stream);
                // Una lectura fallida no es un pico de audio.
                if (level == static_cast<DWORD>(-1))
                    level = 0;
 
                // El nivel de BASS se mide antes del volumen: aplicarlo al vúmetro.
                float volume = 1.0f;
-               if (!BASS_ChannelGetAttribute(m_stream, BASS_ATTRIB_VOL, &volume))
+               if (!BASS_ChannelGetAttribute(m_backend->stream, BASS_ATTRIB_VOL, &volume))
                    volume = 1.0f;
                float leftLinear  = (LOWORD(level) / 32768.0f) * volume;
                float rightLinear = (HIWORD(level) / 32768.0f) * volume;
@@ -116,7 +220,7 @@ MediaManager::MediaManager(QObject *parent)
                //  detección de finales
                     /*  if (shouldStopBySilence(frame)) //cuidado corta estrevistas etc.
                       {
-                          BASS_ChannelStop(m_stream);
+                          BASS_ChannelStop(m_backend->stream);
                           m_timer->stop();
 
                           emit playbackFinished();
@@ -136,12 +240,87 @@ MediaManager::MediaManager(QObject *parent)
 
 MediaManager::~MediaManager(){
 
-    if (m_stream){
-        BASS_StreamFree(m_stream);
-        m_stream = 0;
+    stopInput();
+
+    if (m_backend->stream){
+        BASS_StreamFree(m_backend->stream);
+        m_backend->stream = 0;
        }
 
 
+}
+
+bool MediaManager::startInput(int deviceId)
+{
+    if (deviceId >= 0 && m_backend->inputDevice == deviceId &&
+        m_backend->inputStream &&
+        BASS_ChannelIsActive(m_backend->inputStream) == BASS_ACTIVE_PLAYING)
+        return true;
+
+    stopInput();
+    if (deviceId < 0)
+        return false;
+
+    const DWORD previous = BASS_RecordGetDevice();
+    auto &devices = inputDeviceUses();
+    bool ready = false;
+    if (devices.contains(deviceId)) {
+        ready = BASS_RecordSetDevice(deviceId);
+        if (ready)
+            ++devices[deviceId].users;
+    } else {
+        const bool owned = BASS_RecordInit(deviceId);
+        ready = owned || (BASS_ErrorGetCode() == BASS_ERROR_ALREADY &&
+                          BASS_RecordSetDevice(deviceId));
+        if (ready)
+            devices.insert(deviceId, {1, owned});
+    }
+    int error = ready ? 0 : BASS_ErrorGetCode();
+    if (ready) {
+        // Formato nativo: también admite micrófonos mono. Callback cada 20 ms.
+        m_backend->inputStream = BASS_RecordStart(0, 0, MAKELONG(BASS_SAMPLE_FLOAT, 20),
+                                                Backend::InputCallback, nullptr);
+        if (!m_backend->inputStream) {
+            error = BASS_ErrorGetCode();
+            releaseInputDevice(deviceId);
+        }
+    }
+    if (previous != static_cast<DWORD>(-1))
+        BASS_RecordSetDevice(previous);
+    if (!m_backend->inputStream) {
+        emit inputError(tr("Unable to open the audio input (error %1).").arg(error));
+        return false;
+    }
+    m_backend->inputDevice = deviceId;
+    m_inputTimer->start();
+    return true;
+}
+
+void MediaManager::stopInput()
+{
+    m_inputTimer->stop();
+    if (m_backend->inputStream) {
+        BASS_ChannelStop(m_backend->inputStream);
+        m_backend->inputStream = 0;
+    }
+    if (m_backend->inputDevice >= 0) {
+        releaseInputDevice(m_backend->inputDevice);
+        m_backend->inputDevice = -1;
+    }
+    emit inputLevelsChanged(-120.0f, -120.0f);
+}
+
+void MediaManager::setInputVolume(float volume)
+{
+    if (std::isfinite(volume))
+        m_inputVolume = std::clamp(volume, 0.0f, 1.0f);
+    if (m_inputVolume == 0.0f)
+        emit inputLevelsChanged(-120.0f, -120.0f);
+}
+
+float MediaManager::inputVolume() const
+{
+    return m_inputVolume;
 }
 
 
@@ -214,13 +393,14 @@ bool MediaManager::initialize()
 
 void MediaManager::shutdown(){
 
+    stopInput();
     m_timer->stop();
     m_deviceRecoveryTimer->stop();
 
-    if (m_stream)
+    if (m_backend->stream)
     {
-        BASS_StreamFree(m_stream);
-        m_stream = 0;
+        BASS_StreamFree(m_backend->stream);
+        m_backend->stream = 0;
     }
 
     BASS_Free();
@@ -236,13 +416,13 @@ bool MediaManager::loadFile(const QString &filePath){
 
     m_deviceRecoveryTimer->stop();
 
-    if (m_stream) {
-          BASS_StreamFree(m_stream);
-          m_stream = 0;
+    if (m_backend->stream) {
+          BASS_StreamFree(m_backend->stream);
+          m_backend->stream = 0;
       }
 
   #ifdef Q_OS_WIN
-      m_stream = BASS_StreamCreateFile(
+      m_backend->stream = BASS_StreamCreateFile(
           FALSE,
           filePath.utf16(),
           0,
@@ -251,7 +431,7 @@ bool MediaManager::loadFile(const QString &filePath){
       );
   #else
       QByteArray path = filePath.toUtf8();
-      m_stream = BASS_StreamCreateFile(
+      m_backend->stream = BASS_StreamCreateFile(
           FALSE,
           path.constData(),
           0,
@@ -260,33 +440,33 @@ bool MediaManager::loadFile(const QString &filePath){
       );
   #endif
 
-      if (!m_stream) {
+      if (!m_backend->stream) {
            return false;
          }
 
          // Volumen normal de reproducción, sin amplificación.
-         if (!BASS_ChannelSetAttribute(m_stream, BASS_ATTRIB_VOL, m_volume)) {
-             BASS_StreamFree(m_stream);
-             m_stream = 0;
+         if (!BASS_ChannelSetAttribute(m_backend->stream, BASS_ATTRIB_VOL, m_volume)) {
+             BASS_StreamFree(m_backend->stream);
+             m_backend->stream = 0;
              return false;
          }
 
 
          BASS_ChannelSetSync(
-             m_stream,
+             m_backend->stream,
              BASS_SYNC_END,
              0,
-             &MediaManager::EndSyncCallback,
+             &MediaManager::Backend::EndSyncCallback,
              this
          );
 
 
          // Fallo/desconexión del dispositivo de salida
          BASS_ChannelSetSync(
-             m_stream,
+             m_backend->stream,
              BASS_SYNC_DEV_FAIL,
              0,
-             &MediaManager::DeviceFailedSyncProc,
+             &MediaManager::Backend::DeviceFailedSyncProc,
              this
          );
 
@@ -341,9 +521,9 @@ double MediaManager::getDurationSecond(const QString &filePath){
 
 void MediaManager::play()
 {
-    if (!m_stream) return;
+    if (!m_backend->stream) return;
 
-    const DWORD device = BASS_ChannelGetDevice(m_stream);
+    const DWORD device = BASS_ChannelGetDevice(m_backend->stream);
     if (device == static_cast<DWORD>(-1))
         return;
 
@@ -351,16 +531,16 @@ void MediaManager::play()
         m_deviceRecoveryTimer->start();
 
     // BASS conserva el canal mientras la salida está desconectada.
-    if (BASS_ChannelPlay(m_stream, FALSE)) {
+    if (BASS_ChannelPlay(m_backend->stream, FALSE)) {
         m_timer->start(50);
         float volume = 0.0f;
-        if (BASS_ChannelGetAttribute(m_stream, BASS_ATTRIB_VOL, &volume)) {
-            qDebug() << "BASS: canal" << m_stream
+        if (BASS_ChannelGetAttribute(m_backend->stream, BASS_ATTRIB_VOL, &volume)) {
+            qDebug() << "BASS: canal" << m_backend->stream
                      << "dispositivo" << device
                      << "volumen real" << volume
                      << "esperado" << m_volume;
         } else {
-            qWarning() << "BASS: no se pudo leer el volumen del canal" << m_stream
+            qWarning() << "BASS: no se pudo leer el volumen del canal" << m_backend->stream
                        << "error" << BASS_ErrorGetCode();
         }
     }
@@ -371,7 +551,7 @@ bool MediaManager::setVolume(float volume)
     if (!std::isfinite(volume))
         return false;
     const float value = std::clamp(volume, 0.0f, 1.0f);
-    if (m_stream && !BASS_ChannelSetAttribute(m_stream, BASS_ATTRIB_VOL, value)) {
+    if (m_backend->stream && !BASS_ChannelSetAttribute(m_backend->stream, BASS_ATTRIB_VOL, value)) {
         qWarning() << "BASS: no se pudo ajustar el volumen, error" << BASS_ErrorGetCode();
         return false;
     }
@@ -386,19 +566,19 @@ float MediaManager::volume() const
 
 void MediaManager::pause()
 {
-    if (!m_stream) return;
+    if (!m_backend->stream) return;
 
-        BASS_ChannelPause(m_stream);
+        BASS_ChannelPause(m_backend->stream);
         m_timer->stop();
 }
 
 void MediaManager::stop()
 {
-    if (!m_stream)
+    if (!m_backend->stream)
          return;
 
 
-        BASS_ChannelStop(m_stream);
+        BASS_ChannelStop(m_backend->stream);
         m_timer->stop();
 
         emit positionChanged(0.0);
@@ -407,14 +587,14 @@ void MediaManager::stop()
 
 bool MediaManager::isPlaying() const
 {
-    if (!m_stream) return false;
-    return BASS_ChannelIsActive(m_stream) == BASS_ACTIVE_PLAYING;
+    if (!m_backend->stream) return false;
+    return BASS_ChannelIsActive(m_backend->stream) == BASS_ACTIVE_PLAYING;
 }
 
 bool MediaManager::isPaused() const
 {
-    if (!m_stream) return false;
-    return BASS_ChannelIsActive(m_stream) == BASS_ACTIVE_PAUSED;
+    if (!m_backend->stream) return false;
+    return BASS_ChannelIsActive(m_backend->stream) == BASS_ACTIVE_PAUSED;
 }
 
 void MediaManager::rewind()
@@ -429,12 +609,12 @@ void MediaManager::forward()
 
 void MediaManager::seek(double seconds)
 {
-    if (!m_stream) return;
+    if (!m_backend->stream) return;
 
        // Duración total
        double duration = BASS_ChannelBytes2Seconds(
-           m_stream,
-           BASS_ChannelGetLength(m_stream, BASS_POS_BYTE)
+           m_backend->stream,
+           BASS_ChannelGetLength(m_backend->stream, BASS_POS_BYTE)
        );
 
        if (seconds < 0.0)
@@ -444,11 +624,11 @@ void MediaManager::seek(double seconds)
            seconds = duration;
 
        // Convertir y aplicar
-       QWORD bytePos = BASS_ChannelSeconds2Bytes(m_stream, seconds);
-       BASS_ChannelSetPosition(m_stream, bytePos, BASS_POS_BYTE);
+       QWORD bytePos = BASS_ChannelSeconds2Bytes(m_backend->stream, seconds);
+       BASS_ChannelSetPosition(m_backend->stream, bytePos, BASS_POS_BYTE);
 
        //  Actualizar UI inmediatamente
-       DWORD level = BASS_ChannelGetLevel(m_stream);
+       DWORD level = BASS_ChannelGetLevel(m_backend->stream);
        // Mantener la actualización de posición aunque falle la lectura de nivel.
        if (level == static_cast<DWORD>(-1))
            level = 0;
@@ -459,7 +639,7 @@ void MediaManager::seek(double seconds)
 
        // Mantener la misma lectura al cambiar la posición de reproducción.
        float volume = 1.0f;
-       if (!BASS_ChannelGetAttribute(m_stream, BASS_ATTRIB_VOL, &volume))
+       if (!BASS_ChannelGetAttribute(m_backend->stream, BASS_ATTRIB_VOL, &volume))
            volume = 1.0f;
        float leftLinear  = (LOWORD(level) / 32768.0f) * volume;
        float rightLinear = (HIWORD(level) / 32768.0f) * volume;
@@ -478,11 +658,11 @@ void MediaManager::seek(double seconds)
 
 void MediaManager::seekRelative(double deltaSeconds)
 {
-    if (!m_stream) return;
+    if (!m_backend->stream) return;
 
       double current = BASS_ChannelBytes2Seconds(
-          m_stream,
-          BASS_ChannelGetPosition(m_stream, BASS_POS_BYTE)
+          m_backend->stream,
+          BASS_ChannelGetPosition(m_backend->stream, BASS_POS_BYTE)
       );
 
       seek(current + deltaSeconds);
@@ -535,12 +715,12 @@ bool MediaManager::startDevice(int deviceId)
 
 void MediaManager::recoverDevice()
 {
-    if (!m_stream) {
+    if (!m_backend->stream) {
         m_deviceRecoveryTimer->stop();
         return;
     }
 
-    const DWORD device = BASS_ChannelGetDevice(m_stream);
+    const DWORD device = BASS_ChannelGetDevice(m_backend->stream);
     if (device == static_cast<DWORD>(-1)) {
         m_deviceRecoveryTimer->stop();
         return;
@@ -562,12 +742,12 @@ void MediaManager::recoverDevice()
 //******************************
 void MediaManager::fadeOut(int durationMs)
 {
-    if (!m_stream)
+    if (!m_backend->stream)
         return;
 
     // Deslizar volumen hasta 0
     BASS_ChannelSlideAttribute(
-        m_stream,
+        m_backend->stream,
         BASS_ATTRIB_VOL,
         0.0f,
         durationMs
@@ -575,10 +755,10 @@ void MediaManager::fadeOut(int durationMs)
 
     // Sync cuando termina el slide
     BASS_ChannelSetSync(
-        m_stream,
+        m_backend->stream,
         BASS_SYNC_SLIDE,
         0,
-        &MediaManager::FadeOutSyncCallback,
+        &MediaManager::Backend::FadeOutSyncCallback,
         this
     );
 }
@@ -588,7 +768,7 @@ void MediaManager::fadeOut(int durationMs)
 
 //****************************************************
 
-void CALLBACK MediaManager::EndSyncCallback(
+void CALLBACK MediaManager::Backend::EndSyncCallback(
         HSYNC,
         DWORD,
         DWORD,
@@ -612,7 +792,7 @@ void CALLBACK MediaManager::EndSyncCallback(
 }
 
 
-void CALLBACK MediaManager::DeviceFailedSyncProc(
+void CALLBACK MediaManager::Backend::DeviceFailedSyncProc(
         HSYNC,
         DWORD channel,
         DWORD,
@@ -622,7 +802,7 @@ void CALLBACK MediaManager::DeviceFailedSyncProc(
     if (!self) return;
 
     QMetaObject::invokeMethod(self, [self, channel]() {
-        if (channel != self->m_stream)
+        if (channel != self->m_backend->stream)
             return;
         qDebug() << "Dispositivo de audio desconectado; esperando reconexión";
         self->m_deviceRecoveryTimer->start();
@@ -633,7 +813,7 @@ void CALLBACK MediaManager::DeviceFailedSyncProc(
 
 
 //*****************************************
-void CALLBACK MediaManager::FadeOutSyncCallback(
+void CALLBACK MediaManager::Backend::FadeOutSyncCallback(
         HSYNC,
         DWORD channel,
         DWORD,
@@ -656,7 +836,7 @@ void CALLBACK MediaManager::FadeOutSyncCallback(
                     BASS_ChannelSetPosition(channel, 0, BASS_POS_BYTE);
 
                     // Si es el canal actual, mantener coherencia
-                    if (channel == self->m_stream)
+                    if (channel == self->m_backend->stream)
                     {
                         if (self->m_timer)
                             self->m_timer->stop();
@@ -680,8 +860,8 @@ bool MediaManager::shouldStopBySilence(const AudioFrame& frame)
 
     // 2. Duración total
     double duration = BASS_ChannelBytes2Seconds(
-        m_stream,
-        BASS_ChannelGetLength(m_stream, BASS_POS_BYTE)
+        m_backend->stream,
+        BASS_ChannelGetLength(m_backend->stream, BASS_POS_BYTE)
     );
 
     double current = frame.position;
