@@ -6,6 +6,7 @@
 #include <QPointer>
 
 class QLabel;
+class Button;
 
 class CueWaveformFrame : public Frame
 {
@@ -22,10 +23,15 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    void setWindowSeconds(double seconds);
+
     QPointer<MediaManager> m_cue;
     QPointer<QWidget> m_player;
     QLabel *m_title = nullptr;
     QTimer *m_refresh = nullptr;
+    Button *m_zoomIn = nullptr;
+    Button *m_zoomOut = nullptr;
+    double m_windowSeconds = 12;
     QString m_filePath;
     QString m_status;
     AudioWaveform m_waveform;
