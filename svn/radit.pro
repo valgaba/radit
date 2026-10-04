@@ -25,6 +25,7 @@ SOURCES += \
     widgets/AudioItemMaxi.cpp \
     widgets/AudioItemMini.cpp \
     widgets/AudioItemNet.cpp \
+    widgets/Capture.cpp \
     widgets/ContentsMenu.cpp \
     widgets/ContentsPlayer.cpp \
     widgets/FileExploreMenu.cpp \
@@ -61,6 +62,7 @@ HEADERS += \
     widgets/AudioItemMaxi.h \
     widgets/AudioItemMini.h \
     widgets/AudioItemNet.h \
+    widgets/Capture.h \
     widgets/ContentsMenu.h \
     widgets/ContentsPlayer.h \
     widgets/FileExploreMenu.h \

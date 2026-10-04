@@ -616,19 +616,22 @@ VuMeter LevelMeter {
     border: none;
 }
 
-#PlayerVolumeSlider::groove:horizontal {
+#PlayerVolumeSlider::groove:horizontal,
+#CaptureVolumeSlider::groove:horizontal {
     border: 1px solid #686b74;
     height: 6px;
     background: #181e2c;
     border-radius: 3px;
 }
 
-#PlayerVolumeSlider::sub-page:horizontal {
+#PlayerVolumeSlider::sub-page:horizontal,
+#CaptureVolumeSlider::sub-page:horizontal {
     background: #80A4AE;
     border-radius: 3px;
 }
 
-#PlayerVolumeSlider::handle:horizontal {
+#PlayerVolumeSlider::handle:horizontal,
+#CaptureVolumeSlider::handle:horizontal {
     background: #80A4AE;
     border: 1px solid #80A4AE;
     width: 12px;
@@ -636,7 +639,8 @@ VuMeter LevelMeter {
     border-radius: 3px;
 }
 
-#PlayerVolumeValue {
+#PlayerVolumeValue,
+#CaptureVolumeValue {
     color: #8a8d96;
     background: transparent;
     border: none;
@@ -1188,6 +1192,38 @@ QMenu::separator{
 }
 
 /* Explorador de archivos */
+#Capture {
+    background-color: #262c3b;
+    border: 1px solid #333b4f;
+}
+
+#Capture QLabel {
+    color: #8a8d96;
+    background: transparent;
+    border: none;
+    font-size: 12px;
+}
+
+#Capture QLabel#CaptureRecordingTime {
+    color: #80A4AE;
+    font-family: "Consolas", monospace;
+    font-size: 18px;
+}
+
+#Capture VuMeter QLabel {
+    font-size: 10px;
+}
+
+#Capture Button {
+    font-size: 12px;
+    padding: 2px 6px;
+}
+
+#Capture Button:disabled {
+    color: #686b74;
+    border-color: #333b4f;
+}
+
 #FileExplore {
     background-color: #262c3b;
     border: 1px solid #333b4f;

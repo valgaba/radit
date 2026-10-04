@@ -36,6 +36,7 @@
 #include "widgets/FormAbout.h"
 #include "core/config.h"
 #include "widgets/fileexplore.h"
+#include "widgets/Capture.h"
 //#include "widgets/Player.h"
 
 
@@ -193,6 +194,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
    // splittertop->addWidget(player1);
     splittertop->addWidget(new FileExplore);
+    splittertop->addWidget(new Capture);
     splittertop->addWidget(new TabAuto);
 
     splitterdown->addWidget(player2);
@@ -200,11 +202,12 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splitterdown->addWidget(player4);
 
 
-    // Repartir el ancho: 40 % para FileExplore y 60 % para TabAuto.
+    // FileExplore y Capture con el mismo ancho inicial; TabAuto algo más ancho.
     splittertop->setStretchFactor(0, 2);
-    splittertop->setStretchFactor(1, 3);
+    splittertop->setStretchFactor(1, 2);
+    splittertop->setStretchFactor(2, 3);
     QList<int> sizesTop;
-    sizesTop << 400 << 600;
+    sizesTop << 400 << 400 << 600;
     splittertop->setSizes(sizesTop);
 
 
