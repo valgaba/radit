@@ -20,6 +20,13 @@
 #include <QDebug>
 #include <QCoreApplication>
 #include <QHash>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QProcess>
 #include <algorithm>
 #include <cmath>
 #include "core/MediaManager.h"
@@ -31,9 +38,34 @@ struct MediaManager::Backend
     HSTREAM stream = 0;
     HRECORD inputStream = 0;
     int inputDevice = -1;
-    static BOOL CALLBACK InputCallback(HRECORD, const void *, DWORD, void *)
+    DWORD inputRate = 0;
+    DWORD inputChannels = 0;
+    QMutex inputMutex;
+    bool collectRecording = false;
+    bool recording = false;
+    bool overflow = false;
+    float inputGain = 1.0f;
+    QByteArray recordingData;
+    qint64 recordingBytes = 0;
+    QProcess *encoder = nullptr;
+    QString recordingPath;
+    static BOOL CALLBACK InputCallback(HRECORD, const void *buffer, DWORD length, void *user)
     {
-        // Consumir el audio sin reproducirlo ni guardarlo durante la monitorización.
+        auto *backend = static_cast<Backend *>(user);
+        const QMutexLocker lock(&backend->inputMutex);
+        if (!backend->collectRecording)
+            return TRUE;
+        // El callback de BASS no accede a QProcess ni a los widgets de Qt.
+        if (backend->recordingData.size() + length > 4 * 1024 * 1024) {
+            backend->overflow = true;
+            return TRUE;
+        }
+        const qsizetype offset = backend->recordingData.size();
+        backend->recordingData.append(static_cast<const char *>(buffer), length);
+        auto *samples = reinterpret_cast<float *>(backend->recordingData.data() + offset);
+        for (DWORD i = 0; i < length / sizeof(float); ++i)
+            samples[i] *= backend->inputGain;
+        backend->recordingBytes += length;
         return TRUE;
     }
     static void CALLBACK EndSyncCallback(HSYNC handle, DWORD channel, DWORD data, void *user);
@@ -157,6 +189,23 @@ MediaManager::MediaManager(QObject *parent)
 {
     qRegisterMetaType<AudioFrame>("AudioFrame");
 
+    m_backend->encoder = new QProcess(this);
+#ifdef Q_OS_WIN
+    m_backend->encoder->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+        args->flags |= CREATE_NO_WINDOW;
+    });
+#endif
+    connect(m_backend->encoder, &QProcess::readyReadStandardError, this, [this]() {
+        // Evitar que los mensajes del codificador crezcan sin límite.
+        const QByteArray error = m_backend->encoder->readAllStandardError();
+        if (!error.isEmpty())
+            qWarning().noquote() << "Capture:" << QString::fromUtf8(error).trimmed();
+    });
+    connect(m_backend->encoder, &QProcess::finished, this, [this]() {
+        if (isRecording())
+            stopRecording();
+    });
+
     m_inputTimer = new QTimer(this);
     m_inputTimer->setTimerType(Qt::PreciseTimer);
     m_inputTimer->setInterval(25);
@@ -175,6 +224,7 @@ MediaManager::MediaManager(QObject *parent)
         };
         emit inputLevelsChanged(toDb(LOWORD(level) / 32768.0f),
                                 toDb(HIWORD(level) / 32768.0f));
+        flushRecordingData();
     });
 
     m_deviceRecoveryTimer = new QTimer(this);
@@ -279,7 +329,7 @@ bool MediaManager::startInput(int deviceId)
     if (ready) {
         // Formato nativo: también admite micrófonos mono. Callback cada 20 ms.
         m_backend->inputStream = BASS_RecordStart(0, 0, MAKELONG(BASS_SAMPLE_FLOAT, 20),
-                                                Backend::InputCallback, nullptr);
+                                                Backend::InputCallback, m_backend.get());
         if (!m_backend->inputStream) {
             error = BASS_ErrorGetCode();
             releaseInputDevice(deviceId);
@@ -292,12 +342,17 @@ bool MediaManager::startInput(int deviceId)
         return false;
     }
     m_backend->inputDevice = deviceId;
+    BASS_CHANNELINFO info = {};
+    BASS_ChannelGetInfo(m_backend->inputStream, &info);
+    m_backend->inputRate = info.freq;
+    m_backend->inputChannels = info.chans;
     m_inputTimer->start();
     return true;
 }
 
 void MediaManager::stopInput()
 {
+    stopRecording();
     m_inputTimer->stop();
     if (m_backend->inputStream) {
         BASS_ChannelStop(m_backend->inputStream);
@@ -314,6 +369,10 @@ void MediaManager::setInputVolume(float volume)
 {
     if (std::isfinite(volume))
         m_inputVolume = std::clamp(volume, 0.0f, 1.0f);
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        m_backend->inputGain = m_inputVolume;
+    }
     if (m_inputVolume == 0.0f)
         emit inputLevelsChanged(-120.0f, -120.0f);
 }
@@ -321,6 +380,144 @@ void MediaManager::setInputVolume(float volume)
 float MediaManager::inputVolume() const
 {
     return m_inputVolume;
+}
+
+bool MediaManager::isRecording() const
+{
+    return m_backend->recording;
+}
+
+bool MediaManager::startRecording()
+{
+    if (isRecording())
+        return true;
+    if (!m_backend->inputStream || !m_backend->inputRate || !m_backend->inputChannels ||
+        BASS_ChannelIsActive(m_backend->inputStream) != BASS_ACTIVE_PLAYING) {
+        emit recordingError(tr("Select an available audio input before recording."));
+        return false;
+    }
+
+    const QDir applicationDir(QCoreApplication::applicationDirPath());
+    const QString program = applicationDir.filePath("ffmpeg/ffmpeg.exe");
+    if (!QFileInfo::exists(program)) {
+        emit recordingError(tr("The MP3 encoder is missing: %1").arg(program));
+        return false;
+    }
+    if (!applicationDir.mkpath("captures")) {
+        emit recordingError(tr("Unable to create the captures folder."));
+        return false;
+    }
+    const QString baseName = "capture_" +
+        QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss");
+    QFile output;
+    for (int suffix = 1; ; ++suffix) {
+        const QString name = baseName + (suffix == 1 ? QString() : "_" + QString::number(suffix));
+        output.setFileName(applicationDir.filePath("captures/" + name + ".mp3"));
+        // Reservar el archivo de forma exclusiva, incluso con dos instancias de Radit.
+        if (output.open(QIODevice::WriteOnly | QIODevice::NewOnly))
+            break;
+        if (!QFileInfo::exists(output.fileName())) {
+            emit recordingError(tr("Unable to write to the captures folder: %1").arg(output.errorString()));
+            return false;
+        }
+    }
+    const QString path = output.fileName();
+    output.close();
+    m_backend->encoder->start(program, {
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        "-f", "f32le", "-ar", QString::number(m_backend->inputRate),
+        "-ac", QString::number(m_backend->inputChannels), "-i", "pipe:0",
+        "-ac", QString::number(std::min(m_backend->inputChannels, DWORD(2))),
+        "-c:a", "libmp3lame", "-b:a", "192k", "-f", "mp3", path
+    });
+    if (!m_backend->encoder->waitForStarted(3000)) {
+        const QString error = m_backend->encoder->errorString();
+        m_backend->encoder->kill();
+        m_backend->encoder->waitForFinished(1000);
+        output.remove();
+        emit recordingError(tr("Unable to start the MP3 encoder: %1")
+                            .arg(error));
+        return false;
+    }
+    m_backend->recordingPath = path;
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        m_backend->recordingData.clear();
+        m_backend->recordingBytes = 0;
+        m_backend->overflow = false;
+        m_backend->collectRecording = true;
+    }
+    m_backend->recording = true;
+    emit recordingTimeChanged(0);
+    emit recordingChanged(true);
+    return true;
+}
+
+void MediaManager::flushRecordingData()
+{
+    if (!isRecording())
+        return;
+    QByteArray data;
+    qint64 bytes = 0;
+    bool overflow = false;
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        data.swap(m_backend->recordingData);
+        bytes = m_backend->recordingBytes;
+        overflow = m_backend->overflow;
+    }
+    if (overflow || m_backend->encoder->bytesToWrite() > 4 * 1024 * 1024 ||
+        m_backend->encoder->state() != QProcess::Running ||
+        (!data.isEmpty() && m_backend->encoder->write(data) != data.size())) {
+        if (stopRecording())
+            emit recordingError(tr("Recording stopped because the MP3 encoder could not keep up or failed."));
+        return;
+    }
+    emit recordingTimeChanged(bytes * 1000 /
+                              (m_backend->inputRate * m_backend->inputChannels * sizeof(float)));
+}
+
+bool MediaManager::stopRecording()
+{
+    if (!isRecording())
+        return true;
+    QByteArray data;
+    qint64 bytes = 0;
+    bool overflow = false;
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        m_backend->collectRecording = false;
+        data.swap(m_backend->recordingData);
+        bytes = m_backend->recordingBytes;
+        overflow = m_backend->overflow;
+    }
+    // Marcar antes de esperar: finished no debe cerrar dos veces el codificador.
+    m_backend->recording = false;
+    bool success = !overflow;
+    if (m_backend->encoder->state() == QProcess::Running) {
+        if (!data.isEmpty())
+            success &= m_backend->encoder->write(data) == data.size();
+        m_backend->encoder->closeWriteChannel();
+        if (!m_backend->encoder->waitForFinished(10000)) {
+            m_backend->encoder->kill();
+            m_backend->encoder->waitForFinished(1000);
+            success = false;
+        }
+    } else if (!data.isEmpty()) {
+        success = false;
+    }
+    success &= m_backend->encoder->exitStatus() == QProcess::NormalExit &&
+               m_backend->encoder->exitCode() == 0 && bytes > 0 &&
+               QFileInfo(m_backend->recordingPath).size() > 0;
+    emit recordingTimeChanged(bytes * 1000 /
+                              (m_backend->inputRate * m_backend->inputChannels * sizeof(float)));
+    emit recordingChanged(false);
+    if (success)
+        emit recordingFinished(m_backend->recordingPath);
+    else
+        emit recordingError(tr("The recording could not be completed. Check the file: %1")
+                            .arg(m_backend->recordingPath));
+    return success;
 }
 
 

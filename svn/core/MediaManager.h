@@ -69,10 +69,17 @@ public:
     void stopInput();
     void setInputVolume(float volume);
     float inputVolume() const;
+    bool startRecording();
+    bool stopRecording();
+    bool isRecording() const;
 
 
 
 signals:
+    void recordingChanged(bool recording);
+    void recordingTimeChanged(qint64 milliseconds);
+    void recordingFinished(const QString &filePath);
+    void recordingError(const QString &message);
     void inputLevelsChanged(float leftDb, float rightDb);
     void inputError(const QString &message);
     void positionChanged(double seconds);
@@ -94,6 +101,7 @@ private:
 
     bool startDevice(int deviceId);
     void recoverDevice();
+    void flushRecordingData();
 
 
     float m_silenceThresholdDb = -25.0f; //45

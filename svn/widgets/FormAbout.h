@@ -1,42 +1,18 @@
 #ifndef FORMABOUT_H
 #define FORMABOUT_H
 
+#include "widgets/frame.h"
 
-
-#include <QWidget>
-#include <QTextEdit>
-
-
-#include "widgets/FormProperties.h"
-#include "widgets/button.h"
-
-
-class FormAbout : public FormProperties {
-
-
-   private:
-
-     QTextEdit *texteditabout;
-     Button *btnaccept;
-
-    public:
-       explicit FormAbout(QWidget *parent = nullptr);
-
-      ~ FormAbout();
-
-
-
-
-   protected:
-
-
-   private slots:
-
-   public slots:
-
-
-
-
+class FormAbout : public Frame
+{
+    Q_OBJECT
+public:
+    explicit FormAbout(QWidget *parent = nullptr);
+    ~FormAbout() override = default;
+protected:
+    void showEvent(QShowEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
 };
 
 #endif // FORMABOUT_H

@@ -198,18 +198,9 @@ Player::Player(QWidget *parent) : Frame(parent) {
       layoutbarra->addWidget(btnclose);
 
       connect(btnclose, &QPushButton::clicked, this, [this]() {
-          QMessageBox::StandardButton reply;
-          reply = QMessageBox::question(
-              this,
-              "Cerrar Player",
-              "¿Seguro que quieres cerrar este player?",
-              QMessageBox::Yes | QMessageBox::No
-          );
+                        this->hide();
 
-          if (reply == QMessageBox::Yes) {
-              this->hide();
-          }
-      });
+       });
 
 
      // Parte alta********************************

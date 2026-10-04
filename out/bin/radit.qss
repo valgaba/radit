@@ -1192,6 +1192,47 @@ QMenu::separator{
 }
 
 /* Explorador de archivos */
+#FormAbout {
+    background-color: #262c3b;
+    border: 1px solid #333b4f;
+}
+
+#FormAbout QLabel {
+    background: transparent;
+    border: none;
+    color: #dfdbd2;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 12px;
+}
+
+#FormAbout QLabel#AboutDescription {
+    font-size: 13px;
+}
+
+#FormAbout QLabel#AboutMuted,
+#FormAbout QLabel#AboutVersion {
+    color: #8a8d96;
+    font-size: 11px;
+}
+
+#FormAbout QLabel#AboutAuthor {
+    color: #80A4AE;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#FormAbout QLabel#AboutName {
+    color: #f4f4f7;
+    font-size: 38px;
+    font-weight: bold;
+    letter-spacing: 3px;
+}
+
+#FormAbout QLabel#AboutCredits,
+#FormAbout QLabel#AboutCopyright {
+    font-size: 11px;
+}
+
 #FileExplore Frame#framebarra,
 #Capture Frame#framebarra {
     background-color: #4e4d7a;

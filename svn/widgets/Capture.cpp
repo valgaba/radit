@@ -28,6 +28,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QTimer>
 #include <QVBoxLayout>
 
 Capture::Capture(QWidget *parent) : Frame(parent)
@@ -121,18 +122,24 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     auto *bottomRow = new QHBoxLayout;
     bottomRow->setSpacing(8);
     m_recButton = new Button(this);
-    m_recButton->setText(tr("Rec"));
-    m_recButton->SetIcon("rec.svg");
-    m_recButton->setIconSize(QSize(18, 18));
-    m_recButton->setFixedSize(80, 30);
+    m_recordIcon = QIcon(":/icons/rec.svg");
+    m_recordingIcon = QIcon(":/icons/recon.svg");
+    // Mantener el color del indicador aunque Rec esté deshabilitado al grabar.
+    m_recordIcon.addFile(":/icons/rec.svg", QSize(), QIcon::Disabled);
+    m_recordingIcon.addFile(":/icons/recon.svg", QSize(), QIcon::Disabled);
+    m_recButton->setIcon(m_recordIcon);
+    m_recButton->setIconSize(QSize(40, 50));
+    m_recButton->setFixedSize(50, 30);
     m_recButton->setToolTip(tr("Record to MP3"));
+    m_recButton->setAccessibleName(tr("Record to MP3"));
     m_stopButton = new Button(this);
-    m_stopButton->setText(tr("Stop"));
-    m_stopButton->SetIcon("Stop.svg");
-    m_stopButton->setIconSize(QSize(18, 18));
-    m_stopButton->setFixedSize(80, 30);
+    QIcon stopIcon(":/icons/Stop.svg");
+    stopIcon.addFile(":/icons/Stop.svg", QSize(), QIcon::Disabled);
+    m_stopButton->setIcon(stopIcon);
+    m_stopButton->setIconSize(QSize(32, 32));
+    m_stopButton->setFixedSize(50, 30);
     m_stopButton->setToolTip(tr("Stop recording"));
-    // Solo diseño: no simular una grabación que todavía no está implementada.
+    m_stopButton->setAccessibleName(tr("Stop recording"));
     m_recButton->setEnabled(false);
     m_stopButton->setEnabled(false);
     bottomRow->addWidget(m_recButton);
@@ -156,12 +163,48 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     layout->addStretch(1); // Todo el espacio vertical sobrante queda debajo.
 
     m_mediaManager = new MediaManager(this);
+    m_recordBlinkTimer = new QTimer(this);
+    m_recordBlinkTimer->setInterval(500);
+    connect(m_recordBlinkTimer, &QTimer::timeout, this, [this]() {
+        m_recordBlinkOn = !m_recordBlinkOn;
+        m_recButton->setIcon(m_recordBlinkOn ? m_recordingIcon : m_recordIcon);
+    });
     connect(m_mediaManager, &MediaManager::inputLevelsChanged,
             m_inputMeter, &VuMeter::setLevels);
     connect(m_mediaManager, &MediaManager::inputError, this, [this](const QString &message) {
+        m_recButton->setEnabled(false);
         m_inputMeter->reset();
         m_inputDevice->setToolTip(message);
         QMessageBox::warning(this, tr("Audio input"), message);
+    });
+    connect(m_recButton, &Button::clicked, this, [this]() {
+        m_mediaManager->startRecording();
+    });
+    connect(m_stopButton, &Button::clicked, this, [this]() {
+        m_mediaManager->stopRecording();
+    });
+    connect(m_mediaManager, &MediaManager::recordingChanged, this, [this](bool recording) {
+        m_recordBlinkTimer->stop();
+        m_recordBlinkOn = recording;
+        m_recButton->setIcon(recording ? m_recordingIcon : m_recordIcon);
+        if (recording)
+            m_recordBlinkTimer->start();
+        m_inputDevice->setEnabled(!recording && m_inputDevice->currentData().toInt() >= 0);
+        m_recButton->setEnabled(!recording && m_inputDevice->currentData().toInt() >= 0);
+        m_stopButton->setEnabled(recording);
+    });
+    connect(m_mediaManager, &MediaManager::recordingTimeChanged, this, [this](qint64 ms) {
+        m_recordingTime->setText(QString("%1:%2:%3.%4")
+            .arg(ms / 3600000, 2, 10, QLatin1Char('0'))
+            .arg((ms / 60000) % 60, 2, 10, QLatin1Char('0'))
+            .arg((ms / 1000) % 60, 2, 10, QLatin1Char('0'))
+            .arg((ms / 10) % 100, 2, 10, QLatin1Char('0')));
+    });
+    connect(m_mediaManager, &MediaManager::recordingFinished, this, [this](const QString &path) {
+        m_recordingTime->setToolTip(tr("Recording saved: %1").arg(path));
+    });
+    connect(m_mediaManager, &MediaManager::recordingError, this, [this](const QString &message) {
+        QMessageBox::warning(this, tr("Recording"), message);
     });
     connect(m_inputDevice, &QComboBox::activated, this, &Capture::monitorInput);
     connect(m_volumeSlider, &QSlider::valueChanged, this, [this](int value) {
@@ -173,6 +216,7 @@ Capture::Capture(QWidget *parent) : Frame(parent)
 
 Capture::~Capture()
 {
+    m_recordBlinkTimer->stop();
     m_mediaManager->stopInput();
 }
 
@@ -183,11 +227,13 @@ void Capture::monitorInput()
     m_inputMeter->setToolTip(microphone ? tr("Input level (-60 to 0 dBFS)")
                                        : tr("Input level"));
     m_inputDevice->setToolTip(tr("Select an audio input device"));
-    m_mediaManager->startInput(m_inputDevice->currentData().toInt());
+    m_recButton->setEnabled(m_mediaManager->startInput(m_inputDevice->currentData().toInt()));
 }
 
 void Capture::updateInputDevices()
 {
+    if (m_mediaManager->isRecording())
+        return;
     const int previousDevice = m_inputDevice->currentIndex() >= 0
         ? m_inputDevice->currentData().toInt() : -1;
     const QSignalBlocker blocker(m_inputDevice);
@@ -221,6 +267,11 @@ void Capture::showEvent(QShowEvent *event)
 
 void Capture::hideEvent(QHideEvent *event)
 {
+    // Ocultar Capture durante una grabación mantiene Rec activo hasta Stop.
+    if (m_mediaManager->isRecording()) {
+        Frame::hideEvent(event);
+        return;
+    }
     m_mediaManager->stopInput();
     m_inputMeter->reset();
     Frame::hideEvent(event);

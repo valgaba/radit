@@ -39,7 +39,7 @@
 #include "core/config.h"
 #include "widgets/fileexplore.h"
 #include "widgets/Capture.h"
-//#include "widgets/Player.h"
+#include "widgets/Player.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -84,8 +84,8 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
            QDesktopServices::openUrl(QUrl("http://www.radit.org"));
        });
 
-       connect(accionAcercaDe, &QAction::triggered, this, []() {
-           FormAbout *frmabout = new FormAbout;
+       connect(accionAcercaDe, &QAction::triggered, this, [this]() {
+           FormAbout *frmabout = new FormAbout(this);
            frmabout->show();
        });
 

@@ -2,6 +2,7 @@
 #define CAPTURE_H
 
 #include "widgets/frame.h"
+#include <QIcon>
 
 class Button;
 class Label;
@@ -10,6 +11,7 @@ class QLabel;
 class QSlider;
 class VuMeter;
 class MediaManager;
+class QTimer;
 
 class Capture : public Frame
 {
@@ -23,6 +25,10 @@ private:
     QLabel *m_volumeValue = nullptr;
     Button *m_recButton = nullptr;
     Button *m_stopButton = nullptr;
+    QTimer *m_recordBlinkTimer = nullptr;
+    QIcon m_recordIcon;
+    QIcon m_recordingIcon;
+    bool m_recordBlinkOn = false;
     Label *m_recordingTime = nullptr;
 
 public:
