@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 
 #include <QApplication>
+#include <QIcon>
 #include <QSplashScreen>
 #include <QPixmap>
 #include <QDebug>
@@ -48,6 +49,7 @@
 
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
+    a.setWindowIcon(QIcon(":/icons/radit.ico"));
 
     //  Cargar y aplicar la hoja de estilos (QSS)
     QFile file("radit.qss");

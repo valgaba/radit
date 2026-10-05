@@ -755,6 +755,10 @@ TabBar::tab:hover {
 	border: 1px solid #7885a6;
 }
 
+TabBar[playerTabs="true"]::tab {
+    padding-top: 8px;
+}
+
 TabBar::tab:first {
     margin-left: 5px;
 }

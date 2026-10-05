@@ -7,8 +7,9 @@
 
 
 #include "widgets/tab.h"
-#include "widgets/menu.h"
+#include <QPointer>
 class AudioItemMaxi;
+class TapPlayerMenu;
 
 
 class TabPlayer: public Tab
@@ -18,7 +19,8 @@ class TabPlayer: public Tab
 
 
 private:
-        Menu *menu;
+        TapPlayerMenu *menu;
+        QPointer<QWidget> m_colorTarget;
 
 
 public:

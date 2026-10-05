@@ -23,6 +23,8 @@
 #include <QFont>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
+#include <QPainter>
+#include <QStyleOptionTab>
 
 
 #include "widgets/tabbar.h"
@@ -47,6 +49,43 @@ TabBar::TabBar(QWidget *parent):QTabBar(parent){
 
 
 TabBar::~TabBar(){}
+
+void TabBar::setTabColor(int index, const QColor &color)
+{
+    if (index < 0 || index >= count())
+        return;
+    setTabData(index, color.isValid() && color.alpha() > 0 ? QVariant(color) : QVariant());
+    update();
+}
+
+QColor TabBar::tabColor(int index) const
+{
+    return tabData(index).value<QColor>();
+}
+
+void TabBar::paintEvent(QPaintEvent *event)
+{
+    QTabBar::paintEvent(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    for (int index = 0; index < count(); ++index) {
+        const QColor color = tabColor(index);
+        if (!color.isValid() || color.alpha() == 0 || !isTabVisible(index))
+            continue;
+        QStyleOptionTab option;
+        initStyleOption(&option, index);
+        const QRect textRect = style()->subElementRect(QStyle::SE_TabBarTabText, &option, this);
+        painter.save();
+        painter.translate(textRect.left(), textRect.top() - 7);
+        painter.scale(qMin(80, textRect.width()) / 80.0, 0.6);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(color);
+        painter.drawPolygon(QPolygonF{QPointF(0, 0), QPointF(50, 0), QPointF(40, 10), QPointF(0, 10)});
+        painter.drawPolygon(QPolygonF{QPointF(55, 0), QPointF(65, 0), QPointF(55, 10), QPointF(45, 10)});
+        painter.drawPolygon(QPolygonF{QPointF(70, 0), QPointF(80, 0), QPointF(70, 10), QPointF(60, 10)});
+        painter.restore();
+    }
+}
 
 
 void TabBar::dragEnterEvent(QDragEnterEvent *event)

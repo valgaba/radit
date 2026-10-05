@@ -25,6 +25,7 @@
 #include <QMessageBox>
 
 #include "widgets/TabPlayer.h"
+#include "widgets/TapPlayerMenu.h"
 #include "widgets/tabbar.h"
 #include "widgets/container.h"
 
@@ -35,30 +36,22 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
     setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
 
     TabBar *tabbar=new TabBar(this);
+    tabbar->setProperty("playerTabs", true);
     this->setTabBar(tabbar);
 
 
 
-    menu = new Menu(this);
-    menu->setFixedWidth(200); // Establecer anchura del menú en píxeles
+    menu = new TapPlayerMenu(this);
 
-    QAction *addAction = new QAction("Add list", this);
-    QAction *removeAction = new QAction("Delete list", this);
-    QAction *renameAction = new QAction("Rename list", this);
-
-    addAction->setIcon(QIcon(":/icons/Add.svg"));
-    removeAction->setIcon(QIcon(":/icons/Remove.svg"));
-
-    addAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_C)); // Establecer atajo de teclado
-
-
-    menu->addAction(addAction);
-    menu->addAction(removeAction);
-    menu->addAction(renameAction);
+    connect(menu, &TapPlayerMenu::colorRequested, this, [this, tabbar](const QColor &color) {
+        const int index = m_colorTarget ? indexOf(m_colorTarget.data()) : currentIndex();
+        if (index >= 0)
+            tabbar->setTabColor(index, color);
+    });
 
 
 
-    connect(addAction, &QAction::triggered, this, [=]() {
+    connect(menu, &TapPlayerMenu::addListRequested, this, [=]() {
         Container *container = new Container;
 
         int index = this->addTab(container, "noname");
@@ -72,11 +65,11 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
         closeTab(index);
     });
 
-    connect(removeAction, &QAction::triggered, this, [=]() {
+    connect(menu, &TapPlayerMenu::deleteListRequested, this, [=]() {
         closeTab(this->currentIndex());
     });
 
-    connect(renameAction, &QAction::triggered, this, [=]() {
+    connect(menu, &TapPlayerMenu::renameListRequested, this, [=]() {
         int index = this->currentIndex();
             if (index == -1) return;
 
@@ -191,7 +184,11 @@ void TabPlayer::closeTab(int index){
 
 void TabPlayer::contextMenuEvent(QContextMenuEvent *event)
 {
-    menu->exec(mapToGlobal(event->pos()));
+    const int hoveredIndex = tabBar()->tabAt(tabBar()->mapFromGlobal(event->globalPos()));
+    m_colorTarget = widget(hoveredIndex >= 0 ? hoveredIndex : currentIndex());
+    menu->exec(event->globalPos());
+    m_colorTarget.clear();
+    event->accept();
 
 }
 

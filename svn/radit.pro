@@ -36,6 +36,7 @@ SOURCES += \
     widgets/Player.cpp \
     widgets/TabAuto.cpp \
     widgets/TabPlayer.cpp \
+    widgets/TapPlayerMenu.cpp \
     widgets/button.cpp \
     widgets/container.cpp \
     widgets/contentsbase.cpp \
@@ -76,6 +77,7 @@ HEADERS += \
     widgets/Player.h \
     widgets/TabAuto.h \
     widgets/TabPlayer.h \
+    widgets/TapPlayerMenu.h \
     widgets/button.h \
     widgets/container.h \
     widgets/contentsbase.h \
