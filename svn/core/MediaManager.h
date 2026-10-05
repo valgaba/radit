@@ -31,9 +31,18 @@ struct AudioDevice
     QString name;
     bool isDefault = false;
     bool isMicrophone = false;
+    QString key;
 };
 
 
+struct Mp3RecordingMode
+{
+    QString id;
+    QString label;
+    int sampleRate;
+    int channels;
+    int bitrateKbps;
+};
 struct AudioFrame
 {
     double position;
@@ -58,7 +67,8 @@ public:
     static QList<AudioDevice> inputDevices();
     static QList<AudioDevice> outputDevices();
     static AudioWaveform readWaveform(const QString &filePath,
-                                      const std::shared_ptr<std::atomic_bool> &cancel);
+                                      const std::shared_ptr<std::atomic_bool> &cancel,
+                                      const std::shared_ptr<std::atomic_int> &progress = nullptr);
 
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
@@ -87,6 +97,10 @@ public:
     void stopInput();
     void setInputVolume(float volume);
     float inputVolume() const;
+    static QList<Mp3RecordingMode> mp3RecordingModes();
+    bool setRecordingMode(const QString &id);
+    QString recordingMode() const;
+    QStringList mp3EncodingOptions() const;
     bool startRecording();
     bool stopRecording();
     bool isRecording() const;
@@ -111,6 +125,7 @@ private:
     QTimer* m_timer = nullptr;
     QTimer* m_inputTimer = nullptr;
     float m_inputVolume = 1.0f;
+    QString m_recordingMode = "mp3-44100-stereo-192";
     QTimer* m_deviceRecoveryTimer = nullptr;
     struct Backend;
     std::unique_ptr<Backend> m_backend;

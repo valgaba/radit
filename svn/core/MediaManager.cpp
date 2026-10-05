@@ -130,13 +130,13 @@ QList<AudioDevice> MediaManager::inputDevices()
     QList<AudioDevice> devices;
     BASS_DEVICEINFO info = {};
     for (DWORD id = 0; BASS_RecordGetDeviceInfo(id, &info); ++id) {
-        if (info.flags & BASS_DEVICE_ENABLED) {
+        if ((info.flags & BASS_DEVICE_ENABLED) && !(info.flags & BASS_DEVICE_LOOPBACK)) {
             const DWORD type = info.flags & BASS_DEVICE_TYPE_MASK;
             const bool microphone = !(info.flags & BASS_DEVICE_LOOPBACK) &&
                 (type == BASS_DEVICE_TYPE_MICROPHONE ||
                  type == BASS_DEVICE_TYPE_HEADSET || type == BASS_DEVICE_TYPE_HANDSET);
             devices.append({static_cast<int>(id), audioDeviceName(info.name),
-                            (info.flags & BASS_DEVICE_DEFAULT) != 0, microphone});
+                            (info.flags & BASS_DEVICE_DEFAULT) != 0, microphone, info.driver ? QString::fromUtf8(info.driver) : QString()});
         }
     }
     return devices;
@@ -149,14 +149,16 @@ QList<AudioDevice> MediaManager::outputDevices()
     for (DWORD id = 0; BASS_GetDeviceInfo(id, &info); ++id) {
         if (info.flags & BASS_DEVICE_ENABLED)
             devices.append({static_cast<int>(id), audioDeviceName(info.name),
-                            (info.flags & BASS_DEVICE_DEFAULT) != 0});
+                            (info.flags & BASS_DEVICE_DEFAULT) != 0, false, info.driver ? QString::fromUtf8(info.driver) : QString()});
     }
     return devices;
 }
 
 AudioWaveform MediaManager::readWaveform(const QString &filePath,
-                                         const std::shared_ptr<std::atomic_bool> &cancel)
+                                         const std::shared_ptr<std::atomic_bool> &cancel,
+                                         const std::shared_ptr<std::atomic_int> &progress)
 {
+    if (progress) progress->store(-1);
     AudioWaveform waveform;
     if (cancel->load())
         return waveform;
@@ -201,6 +203,10 @@ AudioWaveform MediaManager::readWaveform(const QString &filePath,
     QVector<float> samples(8192 * info.chans);
     WaveformPeak peak;
     qint64 frames = 0, binFrames = 0;
+    QWORD decodedBytes = 0;
+    const bool knownLength = length != QWORD(-1) && length > 0;
+    int lastProgress = -1;
+    if (progress && knownLength) progress->store(0);
     while (!cancel->load()) {
         const DWORD bytes = BASS_ChannelGetData(stream, samples.data(), samples.size() * sizeof(float));
         if (bytes == DWORD(-1)) {
@@ -227,6 +233,14 @@ AudioWaveform MediaManager::readWaveform(const QString &filePath,
                 binFrames = 0;
             }
         }
+        decodedBytes += bytes;
+        if (progress && knownLength) {
+            const int percent = int(std::min(99.0, double(decodedBytes) / double(length) * 100.0));
+            if (percent != lastProgress) {
+                progress->store(percent);
+                lastProgress = percent;
+            }
+        }
         if (waveform.peaks.size() > 1000000) {
             waveform.error = tr("The audio file is too long to display its waveform.");
             break;
@@ -237,6 +251,7 @@ AudioWaveform MediaManager::readWaveform(const QString &filePath,
     if (binFrames)
         waveform.peaks.append(peak);
     waveform.duration = double(frames) / info.freq;
+    if (progress && waveform.error.isEmpty()) progress->store(100);
     return waveform;
 }
 
@@ -473,6 +488,46 @@ bool MediaManager::isRecording() const
     return m_backend->recording;
 }
 
+QList<Mp3RecordingMode> MediaManager::mp3RecordingModes()
+{
+    return {
+        {"mp3-44100-stereo-128", tr("MP3 44.1 kHz / Stereo / 128 kbps"), 44100, 2, 128},
+        {"mp3-44100-stereo-192", tr("MP3 44.1 kHz / Stereo / 192 kbps"), 44100, 2, 192},
+        {"mp3-44100-stereo-320", tr("MP3 44.1 kHz / Stereo / 320 kbps"), 44100, 2, 320},
+        {"mp3-48000-stereo-192", tr("MP3 48 kHz / Stereo / 192 kbps"), 48000, 2, 192},
+        {"mp3-48000-stereo-320", tr("MP3 48 kHz / Stereo / 320 kbps"), 48000, 2, 320},
+        {"mp3-44100-mono-96", tr("MP3 44.1 kHz / Mono / 96 kbps"), 44100, 1, 96}
+    };
+}
+
+bool MediaManager::setRecordingMode(const QString &id)
+{
+    if (isRecording()) return false;
+    for (const auto &mode : mp3RecordingModes()) {
+        if (mode.id == id) {
+            m_recordingMode = id;
+            return true;
+        }
+    }
+    return false;
+}
+
+QString MediaManager::recordingMode() const
+{
+    return m_recordingMode;
+}
+
+QStringList MediaManager::mp3EncodingOptions() const
+{
+    for (const auto &mode : mp3RecordingModes()) {
+        if (mode.id == m_recordingMode) {
+            return {"-ar", QString::number(mode.sampleRate), "-ac", QString::number(mode.channels),
+                    "-c:a", "libmp3lame", "-b:a", QString::number(mode.bitrateKbps) + "k"};
+        }
+    }
+    return {};
+}
+
 bool MediaManager::startRecording()
 {
     if (isRecording())
@@ -489,8 +544,8 @@ bool MediaManager::startRecording()
         emit recordingError(tr("The MP3 encoder is missing: %1").arg(program));
         return false;
     }
-    if (!applicationDir.mkpath("captures")) {
-        emit recordingError(tr("Unable to create the captures folder."));
+    if (!applicationDir.mkpath("capture")) {
+        emit recordingError(tr("Unable to create the capture folder."));
         return false;
     }
     const QString baseName = "capture_" +
@@ -498,24 +553,24 @@ bool MediaManager::startRecording()
     QFile output;
     for (int suffix = 1; ; ++suffix) {
         const QString name = baseName + (suffix == 1 ? QString() : "_" + QString::number(suffix));
-        output.setFileName(applicationDir.filePath("captures/" + name + ".mp3"));
+        output.setFileName(applicationDir.filePath("capture/" + name + ".mp3"));
         // Reservar el archivo de forma exclusiva, incluso con dos instancias de Radit.
         if (output.open(QIODevice::WriteOnly | QIODevice::NewOnly))
             break;
         if (!QFileInfo::exists(output.fileName())) {
-            emit recordingError(tr("Unable to write to the captures folder: %1").arg(output.errorString()));
+            emit recordingError(tr("Unable to write to the capture folder: %1").arg(output.errorString()));
             return false;
         }
     }
     const QString path = output.fileName();
     output.close();
-    m_backend->encoder->start(program, {
+    QStringList arguments{
         "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-f", "f32le", "-ar", QString::number(m_backend->inputRate),
-        "-ac", QString::number(m_backend->inputChannels), "-i", "pipe:0",
-        "-ac", QString::number(std::min(m_backend->inputChannels, DWORD(2))),
-        "-c:a", "libmp3lame", "-b:a", "192k", "-f", "mp3", path
-    });
+        "-ac", QString::number(m_backend->inputChannels), "-i", "pipe:0"
+    };
+    arguments << mp3EncodingOptions() << "-f" << "mp3" << path;
+    m_backend->encoder->start(program, arguments);
     if (!m_backend->encoder->waitForStarted(3000)) {
         const QString error = m_backend->encoder->errorString();
         m_backend->encoder->kill();
