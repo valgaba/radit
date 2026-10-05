@@ -617,7 +617,8 @@ VuMeter LevelMeter {
 }
 
 #PlayerVolumeSlider::groove:horizontal,
-#CaptureVolumeSlider::groove:horizontal {
+#CaptureVolumeSlider::groove:horizontal,
+#CueWaveformVolumeSlider::groove:horizontal {
     border: 1px solid #686b74;
     height: 6px;
     background: #181e2c;
@@ -625,13 +626,15 @@ VuMeter LevelMeter {
 }
 
 #PlayerVolumeSlider::sub-page:horizontal,
-#CaptureVolumeSlider::sub-page:horizontal {
+#CaptureVolumeSlider::sub-page:horizontal,
+#CueWaveformVolumeSlider::sub-page:horizontal {
     background: #80A4AE;
     border-radius: 3px;
 }
 
 #PlayerVolumeSlider::handle:horizontal,
-#CaptureVolumeSlider::handle:horizontal {
+#CaptureVolumeSlider::handle:horizontal,
+#CueWaveformVolumeSlider::handle:horizontal {
     background: #80A4AE;
     border: 1px solid #80A4AE;
     width: 12px;
@@ -1508,4 +1511,36 @@ QPushButton#btnstop,
 #Capture Button#CaptureRecordButton:disabled,
 #Capture Button#CaptureStopButton:disabled {
     background-color: #262c3b;
+}
+#CueWaveformTitleBar {
+    background-color: #4e4d7a;
+    border: none;
+}
+#CueWaveformTitle {
+    background: transparent;
+    border: none;
+    color: #8a8d96;
+    font-size: 14px;
+    font-weight: bold;
+}
+#CueWaveformTitleClose {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+#CueWaveformTitleClose:hover { background-color: #77769d; }
+#Capture QLabel#CaptureRecordingTime { padding: 0; }
+
+/* Shared loading indicator. */
+QProgressBar#LoadingProgress {
+    background-color: #181e2c;
+    color: #d9dce4;
+    border: 1px solid #686b74;
+    border-radius: 3px;
+    text-align: center;
+    font-size: 12px;
+}
+QProgressBar#LoadingProgress::chunk {
+    background-color: #4e4d7a;
+    border-radius: 2px;
 }
