@@ -27,6 +27,7 @@
 #include <QClipboard>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
@@ -75,7 +76,36 @@ public:
         invalidateFilter();
     }
 
+    void setSortByCreationDate(bool enabled)
+    {
+        if (m_sortByCreationDate == enabled)
+            return;
+        m_sortByCreationDate = enabled;
+        invalidate();
+    }
+
 protected:
+    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override
+    {
+        const auto *model = static_cast<QFileSystemModel *>(sourceModel());
+        const QFileInfo leftInfo = model->fileInfo(left);
+        const QFileInfo rightInfo = model->fileInfo(right);
+        // Keep folders first and alphabetical in both modes.
+        if (leftInfo.isDir() != rightInfo.isDir())
+            return leftInfo.isDir();
+        if (m_sortByCreationDate && !leftInfo.isDir()) {
+            const QDateTime leftBirth = leftInfo.birthTime();
+            const QDateTime rightBirth = rightInfo.birthTime();
+            const QDateTime leftDate = leftBirth.isValid() ? leftBirth : leftInfo.lastModified();
+            const QDateTime rightDate = rightBirth.isValid() ? rightBirth : rightInfo.lastModified();
+            if (leftDate != rightDate)
+                return leftDate > rightDate;
+        }
+        const int comparison = QString::compare(leftInfo.fileName(), rightInfo.fileName(),
+                                                Qt::CaseInsensitive);
+        return comparison != 0 ? comparison < 0 : leftInfo.fileName() < rightInfo.fileName();
+    }
+
     bool filterAcceptsRow(int row, const QModelIndex &parent) const override
     {
         const auto *model = static_cast<QFileSystemModel *>(sourceModel());
@@ -92,6 +122,7 @@ protected:
 private:
     QString m_search;
     QIcon m_audioIcon;
+    bool m_sortByCreationDate = false;
 };
 
 namespace {
@@ -311,6 +342,14 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
         addLocation(tr("Documents"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
         addLocation(tr("Downloads"), QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
         locationsMenu->addSeparator();
+        locationsMenu->addAction(tr("Favorites"))->setEnabled(false);
+        for (const QString &path : m_favorites) {
+            const QString name = QDir(path).dirName();
+            addLocation(name.isEmpty() ? QDir::toNativeSeparators(path) : name, path);
+        }
+        if (m_favorites.isEmpty())
+            locationsMenu->addAction(tr("No favorite folders"))->setEnabled(false);
+        locationsMenu->addSeparator();
         locationsMenu->addAction(tr("Drives"))->setEnabled(false);
 
         QStringList roots;
@@ -329,13 +368,19 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     });
 
     auto *favorites = new Button(toolbar);
+    m_favoritesButton = favorites;
     favorites->setObjectName("FileExploreFavorites");
     favorites->setFixedSize(30, 30);
     favorites->setIcon(QIcon(":/icons/Favorites.svg"));
-    favorites->setToolTip(tr("Favorite folders"));
-    favorites->setAccessibleName(favorites->toolTip());
-    m_favoritesMenu = new QMenu(this);
-    favorites->setMenu(m_favoritesMenu);
+    favorites->setCheckable(true);
+    connect(favorites, &Button::clicked, this, [this]() {
+        if (m_favorites.contains(m_currentPath))
+            m_favorites.removeAll(m_currentPath);
+        else
+            m_favorites.append(m_currentPath);
+        savePreferences();
+        updateFavoriteButton();
+    });
     bar->addWidget(favorites);
 
     layout->addWidget(toolbar);
@@ -349,7 +394,16 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     m_search->setFixedHeight(26);
     m_search->setClearButtonEnabled(true);
     m_search->addAction(explorerIcon(true), QLineEdit::LeadingPosition);
-    searchLayout->addWidget(m_search);
+    searchLayout->addWidget(m_search, 1);
+    m_sort = new QComboBox(this);
+    m_sort->setObjectName("FileExploreSort");
+    m_sort->setFixedHeight(26);
+    m_sort->addItem(tr("Name"), "name");
+    m_sort->addItem(tr("Creation date"), "created");
+    m_sort->setAccessibleName(tr("Sort files"));
+    m_sort->setToolTip(tr("Sort by name or creation date (newest first). "
+                        "If creation date is unavailable, modification date is used."));
+    searchLayout->addWidget(m_sort);
     layout->addLayout(searchLayout);
 
     m_model = new QFileSystemModel(this);
@@ -428,6 +482,10 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
         m_filter->setSearch(text);
         m_tree->setRootIndex(m_filter->mapFromSource(m_model->index(m_currentPath)));
     });
+    connect(m_sort, &QComboBox::currentIndexChanged, this, [this]() {
+        m_filter->setSortByCreationDate(m_sort->currentData().toString() == "created");
+        savePreferences();
+    });
     connect(m_tree, &QTreeView::activated, this, [this](const QModelIndex &index) {
         const QModelIndex source = m_filter->mapToSource(index);
         const QString path = m_model->filePath(source);
@@ -436,12 +494,16 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
         else
             emit fileActivated(path);
     });
-    connect(m_favoritesMenu, &QMenu::aboutToShow,
-            this, &FileExplore::updateFavoritesMenu);
 
     QSettings settings(preferencesFile(), QSettings::IniFormat);
     m_favorites = settings.value("favorites").toStringList();
     m_favorites.removeDuplicates();
+    {
+        const QSignalBlocker blocker(m_sort);
+        const int sortIndex = m_sort->findData(settings.value("sortMode", "name").toString());
+        m_sort->setCurrentIndex(sortIndex >= 0 ? sortIndex : 0);
+    }
+    m_filter->setSortByCreationDate(m_sort->currentData().toString() == "created");
     QString initialPath = settings.value("path").toString();
     if (!setPath(initialPath)) {
         initialPath = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
@@ -486,6 +548,7 @@ bool FileExplore::setPath(const QString &path)
     m_path->setToolTip(tr("Folder path (press Enter to open): %1")
                        .arg(QDir::toNativeSeparators(m_currentPath)));
     m_up->setEnabled(!QDir(m_currentPath).isRoot());
+    updateFavoriteButton();
     if (m_fileMenu)
         m_fileMenu->updateActions();
     savePreferences();
@@ -494,27 +557,13 @@ bool FileExplore::setPath(const QString &path)
     return true;
 }
 
-void FileExplore::updateFavoritesMenu()
+void FileExplore::updateFavoriteButton()
 {
-    m_favoritesMenu->clear();
     const bool favorite = m_favorites.contains(m_currentPath);
-    QAction *toggle = m_favoritesMenu->addAction(favorite
-        ? tr("Quitar esta carpeta de favoritos") : tr("Añadir esta carpeta a favoritos"));
-    connect(toggle, &QAction::triggered, this, [this, favorite]() {
-        if (favorite)
-            m_favorites.removeAll(m_currentPath);
-        else
-            m_favorites.append(m_currentPath);
-        savePreferences();
-    });
-    m_favoritesMenu->addSeparator();
-    for (const QString &path : m_favorites) {
-        QAction *action = m_favoritesMenu->addAction(QDir::toNativeSeparators(path));
-        action->setEnabled(QFileInfo(path).isDir());
-        connect(action, &QAction::triggered, this, [this, path]() { setPath(path); });
-    }
-    if (m_favorites.isEmpty())
-        m_favoritesMenu->addAction(tr("Sin carpetas favoritas"))->setEnabled(false);
+    m_favoritesButton->setChecked(favorite);
+    m_favoritesButton->setToolTip(favorite ? tr("Remove current folder from favorites")
+                                         : tr("Add current folder to favorites"));
+    m_favoritesButton->setAccessibleName(m_favoritesButton->toolTip());
 }
 
 void FileExplore::savePreferences()
@@ -522,6 +571,7 @@ void FileExplore::savePreferences()
     QSettings settings(preferencesFile(), QSettings::IniFormat);
     settings.setValue("path", m_currentPath);
     settings.setValue("favorites", m_favorites);
+    settings.setValue("sortMode", m_sort->currentData());
 }
 
 QStringList FileExplore::selectedFilePaths() const

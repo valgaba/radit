@@ -38,7 +38,7 @@ signals:
     void fileActivated(const QString &path);
 
 private:
-    void updateFavoritesMenu();
+    void updateFavoriteButton();
     void savePreferences();
     QString pasteDestination() const;
 
@@ -48,8 +48,9 @@ private:
     FileExploreMenu *m_fileMenu = nullptr;
     QComboBox *m_path = nullptr;
     QLineEdit *m_search = nullptr;
+    QComboBox *m_sort = nullptr;
     Button *m_up = nullptr;
-    QMenu *m_favoritesMenu = nullptr;
+    Button *m_favoritesButton = nullptr;
     QStringList m_favorites;
     QStringList m_history;
     QString m_currentPath;

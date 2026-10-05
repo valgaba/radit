@@ -120,6 +120,7 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     auto *bottomRow = new QHBoxLayout;
     bottomRow->setSpacing(8);
     m_recButton = new Button(this);
+    m_recButton->setObjectName("CaptureRecordButton");
     m_recordIcon = QIcon(":/icons/rec.svg");
     m_recordingIcon = QIcon(":/icons/recon.svg");
     // Mantener el color del indicador aunque Rec esté deshabilitado al grabar.
@@ -131,6 +132,7 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     m_recButton->setToolTip(tr("Record to MP3"));
     m_recButton->setAccessibleName(tr("Record to MP3"));
     m_stopButton = new Button(this);
+    m_stopButton->setObjectName("CaptureStopButton");
     QIcon stopIcon(":/icons/Stop.svg");
     stopIcon.addFile(":/icons/Stop.svg", QSize(), QIcon::Disabled);
     m_stopButton->setIcon(stopIcon);
