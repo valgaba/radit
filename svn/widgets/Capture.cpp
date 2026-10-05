@@ -59,13 +59,11 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     btnclose->setToolTip(tr("Close capture"));
     btnclose->setAccessibleName(btnclose->toolTip());
     layoutbarra->addWidget(btnclose);
+
     connect(btnclose, &Button::clicked, this, [this]() {
-        if (QMessageBox::question(this, tr("Cerrar Capture"),
-                                 tr("¿Seguro que quieres cerrar Capture?"),
-                                 QMessageBox::Yes | QMessageBox::No,
-                                 QMessageBox::No) == QMessageBox::Yes)
-            hide();
+         hide();
     });
+
     rootLayout->addWidget(framebarra);
 
     auto *content = new QWidget(this);
@@ -222,10 +220,8 @@ Capture::~Capture()
 
 void Capture::monitorInput()
 {
-    const bool microphone = m_inputDevice->currentData(Qt::UserRole + 1).toBool();
-    m_inputMeter->setDecibelScale(microphone);
-    m_inputMeter->setToolTip(microphone ? tr("Input level (-60 to 0 dBFS)")
-                                       : tr("Input level"));
+    m_inputMeter->setDecibelScale(false);
+    m_inputMeter->setToolTip(tr("Input level"));
     m_inputDevice->setToolTip(tr("Select an audio input device"));
     m_recButton->setEnabled(m_mediaManager->startInput(m_inputDevice->currentData().toInt()));
 }

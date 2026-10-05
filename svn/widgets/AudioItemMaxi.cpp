@@ -200,6 +200,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
         labelnombre = new Label;
+        labelnombre->setObjectName("AudioItemName");
         labelnombre->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         labelnombre->setText("fichero.....dfdfdfdfdfdfdfdfdfdfdf.....");
 
@@ -213,7 +214,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         labeltiempo->setFont(font);
 
         QFont fontnombre = labelnombre->font();
-        fontnombre.setPointSize(13); //16
+        fontnombre.setPointSize(12);
         fontnombre.setBold(true);
         labelnombre->setFont(fontnombre);
 
@@ -223,7 +224,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         labeltiempo->setText("00:03:12.00");
 
         labeltiempo->setFixedHeight(35); //45
-        labelnombre->setFixedHeight(45);
+        labelnombre->setFixedHeight(43);
 
         layoutcenterleft->addWidget(btnplay);
         layoutcenterright->addWidget(labelnombre);

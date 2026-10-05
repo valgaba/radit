@@ -19,9 +19,9 @@ CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
     : Frame(parent), m_cue(cue)
 {
     setObjectName("CueWaveformFrame");
-    setWindowFlags(Qt::Tool | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    setWindowFlags(Qt::Tool | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
     setWindowTitle(tr("Cue waveform"));
-    setMinimumSize(480, 140);
+    setMinimumSize(545, 140);
     setMouseTracking(true);
     resize(640, 260);
     auto *header = new QVBoxLayout(this);
@@ -53,6 +53,14 @@ CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
     m_vumeter = new VuMeter(this);
     m_vumeter->setFixedWidth(160);
     zoomBar->addWidget(m_vumeter);
+    auto *btnclose = new Button(this);
+    btnclose->setObjectName("CueWaveformClose");
+    btnclose->setText(tr("Closed"));
+    btnclose->setFixedSize(60, 23);
+    btnclose->setToolTip(tr("Close cue waveform"));
+    btnclose->setAccessibleName(btnclose->toolTip());
+    zoomBar->addWidget(btnclose);
+    connect(btnclose, &QPushButton::clicked, this, [this]() { close(); });
     if (m_cue) {
         connect(m_cue, &MediaManager::audioFrameUpdated, this, [this](const AudioFrame &frame) {
             if (isVisible() && m_cue && m_cue->isPlaying())

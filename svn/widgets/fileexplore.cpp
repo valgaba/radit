@@ -248,13 +248,11 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     btnclose->setToolTip(tr("Close file browser"));
     btnclose->setAccessibleName(btnclose->toolTip());
     layoutbarra->addWidget(btnclose);
+
     connect(btnclose, &Button::clicked, this, [this]() {
-        if (QMessageBox::question(this, tr("Cerrar File Browser"),
-                                 tr("¿Seguro que quieres cerrar el explorador de archivos?"),
-                                 QMessageBox::Yes | QMessageBox::No,
-                                 QMessageBox::No) == QMessageBox::Yes)
             hide();
     });
+
     layout->addWidget(framebarra);
 
     auto *toolbar = new Frame(this);
