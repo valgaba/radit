@@ -1275,7 +1275,7 @@ QMenu::separator{
 }
 
 #Capture {
-    background-color: #262c3b;
+    background-color: #181e2c;
     border: 1px solid #333b4f;
 }
 
@@ -1287,7 +1287,7 @@ QMenu::separator{
 }
 
 #Capture QLabel#CaptureRecordingTime {
-    color: #80A4AE;
+    color: #8a8d96;
     font-size: 16pt;
     font-weight: bold;
 }
@@ -1307,7 +1307,7 @@ QMenu::separator{
 }
 
 #FileExplore {
-    background-color: #262c3b;
+    background-color: #181e2c;
     border: 1px solid #333b4f;
 }
 
@@ -1417,7 +1417,7 @@ QMenu::separator{
 }
 
 #FileExploreTree {
-    background-color: #262c3b;
+    background-color: #181e2c;
     alternate-background-color: #262c3b;
     color: #8a8d96;
     selection-color: #8a8d96;
@@ -1471,4 +1471,41 @@ QMenu::separator{
 #FileExploreTree::branch {
     background: transparent;
     border: none;
+}
+
+/* File browser sorting selector */
+#FileExploreSort {
+    background-color: #262c3b;
+    color: #9aa0a6;
+    border: 1px solid #686b74;
+    border-radius: 3px;
+    padding: 2px 6px;
+}
+#FileExploreSort:focus { border-color: #80a4ae; }
+#FileExploreSort QAbstractItemView {
+    background-color: #39385b;
+    color: #9aa0a6;
+    selection-background-color: #4e4d7a;
+    selection-color: #ffffff;
+    border: 1px solid #686b74;
+    outline: none;
+}
+/* Capture transport colors. */
+#Capture Button#CaptureRecordButton,
+#Capture Button#CaptureStopButton {
+    background-color: #262c3b;
+    color: #8a8d96;
+    border-color: #686b74;
+}
+#Capture Button#CaptureRecordButton:hover,
+#Capture Button#CaptureStopButton:hover {
+    border-color: #7885a6;
+}
+/* Shared background for Eject, REC and STOP. */
+QPushButton#btnstop,
+#Capture Button#CaptureRecordButton,
+#Capture Button#CaptureStopButton,
+#Capture Button#CaptureRecordButton:disabled,
+#Capture Button#CaptureStopButton:disabled {
+    background-color: #262c3b;
 }
