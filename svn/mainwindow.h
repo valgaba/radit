@@ -28,7 +28,12 @@ public:
 
 
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
+    bool saveBeforeQuit();
+    bool m_quitDialogOpen = false;
     void restoreInterface();
 
     QWidget *centralwidget;

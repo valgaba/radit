@@ -67,6 +67,8 @@ HEADERS += \
     widgets/Capture.h \
     widgets/CueWaveformFrame.h \
     widgets/LoadingProgress.h \
+    widgets/LoadingDialog.h \
+    widgets/QuitDialog.h \
     widgets/ContentsMenu.h \
     widgets/ContentsPlayer.h \
     widgets/FileExploreMenu.h \

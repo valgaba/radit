@@ -22,6 +22,12 @@
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QSignalBlocker>
+#include <QScopedValueRollback>
+#include <QFutureWatcher>
+#include <QEventLoop>
+#include <QPointer>
+#include <QtConcurrent/QtConcurrentRun>
+#include "widgets/LoadingDialog.h"
 #include <cmath>
 #include "core/io.h"
 #include "widgets/AudioItemMaxi.h"
@@ -32,6 +38,8 @@
 #include "widgets/container.h"
 
 namespace {
+bool importInProgress = false;
+
 bool fail(QString *error, const QString &message)
 {
     if (error) *error = message;
@@ -56,7 +64,8 @@ QJsonArray saveItems(QLayout *layout)
     return items;
 }
 
-void loadItems(ContentsBase *contents, const QJsonArray &items)
+void loadItems(ContentsBase *contents, const QJsonArray &items,
+               LoadingDialog &loading, int &completed, int total)
 {
     for (const auto &value : items) {
         if (!value.isObject()) continue;
@@ -78,6 +87,7 @@ void loadItems(ContentsBase *contents, const QJsonArray &items)
         const QColor color(object["color"].toString());
         if (color.isValid()) item->setColor(color);
         contents->createItem(item);
+        loading.setProgress(++completed, total);
     }
 }
 
@@ -92,27 +102,50 @@ bool writeJson(const QString &filename, const QJsonObject &root, QString *error)
     return true;
 }
 
+struct JsonReadResult {
+    QJsonObject root;
+    QString error;
+};
+
 bool readJson(const QString &filename, QJsonObject &root, QString *error)
 {
-    QFile file(filename);
-    if (!file.open(QIODevice::ReadOnly))
-        return fail(error, Io::tr("Cannot open %1: %2").arg(filename, file.errorString()));
-    const QByteArray bytes = file.readAll();
-    if (file.error() != QFileDevice::NoError)
-        return fail(error, file.errorString());
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(bytes, &parseError);
-    if (parseError.error != QJsonParseError::NoError)
-        return fail(error, Io::tr("Invalid JSON: %1").arg(parseError.errorString()));
-    if (!document.isObject())
-        return fail(error, Io::tr("The file must contain a JSON object."));
-    root = document.object();
+    // Only file reading and JSON parsing run on the worker; no widgets are touched.
+    QFutureWatcher<JsonReadResult> watcher;
+    QEventLoop loop;
+    QObject::connect(&watcher, &QFutureWatcher<JsonReadResult>::finished,
+                     &loop, &QEventLoop::quit);
+    watcher.setFuture(QtConcurrent::run([filename]() {
+        JsonReadResult result;
+        QFile file(filename);
+        if (!file.open(QIODevice::ReadOnly)) {
+            result.error = Io::tr("Cannot open %1: %2").arg(filename, file.errorString());
+            return result;
+        }
+        const QByteArray bytes = file.readAll();
+        if (file.error() != QFileDevice::NoError) {
+            result.error = file.errorString();
+            return result;
+        }
+        QJsonParseError parseError;
+        const auto document = QJsonDocument::fromJson(bytes, &parseError);
+        if (parseError.error != QJsonParseError::NoError)
+            result.error = Io::tr("Invalid JSON: %1").arg(parseError.errorString());
+        else if (!document.isObject())
+            result.error = Io::tr("The file must contain a JSON object.");
+        else result.root = document.object();
+        return result;
+    }));
+    if (!watcher.isFinished()) loop.exec(QEventLoop::ExcludeUserInputEvents);
+    const auto result = watcher.result();
+    if (!result.error.isEmpty()) return fail(error, result.error);
+    root = result.root;
     return true;
 }
 
-bool validItems(const QJsonArray &items)
+bool validItems(const QJsonArray &items, LoadingDialog &loading)
 {
     for (const auto &value : items) {
+        loading.refresh();
         if (!value.isObject()) return false;
         const auto item = value.toObject();
         if (!item["url"].isString() || item["url"].toString().isEmpty()
@@ -145,13 +178,22 @@ bool Io::LoadListPlayer(ContentsBase *contents, const QString &filename, QString
 {
     if (error) error->clear();
     if (!contents) return fail(error, tr("No list was selected."));
+    if (importInProgress) return fail(error, tr("Another import is already in progress."));
+    QScopedValueRollback<bool> importing(importInProgress, true);
+    QPointer<ContentsBase> target(contents);
+    LoadingDialog loading(contents->window(), tr("Loading list…"));
     QJsonObject root;
     if (!readJson(filename, root, error)) return false;
     if (root["version"].toDouble(1) != 1 || !root["items"].isArray())
         return fail(error, tr("Unsupported list format or version."));
-    if (!validItems(root["items"].toArray()))
+    if (!validItems(root["items"].toArray(), loading))
         return fail(error, tr("Invalid data in the list."));
-    loadItems(contents, root["items"].toArray());
+    if (!target) return fail(error, tr("The destination list was closed."));
+    const QJsonArray items = root["items"].toArray();
+    int completed = 0;
+    loading.setProgress(0, qMax(1, int(items.size())));
+    loadItems(contents, items, loading, completed, qMax(1, int(items.size())));
+    loading.setProgress(qMax(1, int(items.size())), qMax(1, int(items.size())));
     if (auto *list = qobject_cast<ContentsPlayer*>(contents))
         list->setListFileName(QFileInfo(filename).absoluteFilePath());
     return true;
@@ -186,6 +228,10 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
 {
     if (error) error->clear();
     if (!player) return fail(error, tr("No player was selected."));
+    if (importInProgress) return fail(error, tr("Another import is already in progress."));
+    QScopedValueRollback<bool> importing(importInProgress, true);
+    QPointer<TabPlayer> target(player);
+    LoadingDialog loading(player->window(), tr("Loading player…"));
     auto *bar = player->findChild<TabBar*>();
     if (!bar) return fail(error, tr("The player has no tab bar."));
     QJsonObject root;
@@ -200,15 +246,21 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         || currentIndex < 0 || currentIndex >= tabs.size())
         return fail(error, tr("Invalid selected tab."));
     for (const auto &value : tabs) {
+        loading.refresh();
         if (!value.isObject()) return fail(error, tr("Invalid tab data."));
         const auto tab = value.toObject();
         if (!tab["name"].isString() || !tab["items"].isArray()
             || (tab.contains("listFile") && !tab["listFile"].isString())
-            || !validItems(tab["items"].toArray())
+            || !validItems(tab["items"].toArray(), loading)
             || (tab.contains("color") && !QColor(tab["color"].toString()).isValid()))
             return fail(error, tr("Invalid data in a player tab."));
     }
 
+    if (!target) return fail(error, tr("The destination player was closed."));
+    int total = player->count() + int(tabs.size());
+    for (const auto &value : tabs) total += int(value.toObject()["items"].toArray().size());
+    int completed = 0;
+    loading.setProgress(0, total);
     // The full document is validated before replacing any existing tabs.
     QWidget *owner = player->parentWidget();
     while (owner && !qobject_cast<Player*>(owner)) owner = owner->parentWidget();
@@ -223,6 +275,7 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         }
         player->removeTab(0);
         delete page;
+        loading.setProgress(++completed, total);
     }
     for (const auto &value : tabs) {
         const auto tab = value.toObject();
@@ -232,8 +285,9 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         player->setTabToolTip(index, name);
         bar->setTabColor(index, QColor(tab["color"].toString()));
         auto *contents = qobject_cast<ContentsPlayer*>(container->widget());
-        loadItems(contents, tab["items"].toArray());
+        loadItems(contents, tab["items"].toArray(), loading, completed, total);
         contents->setListFileName(tab["listFile"].toString());
+        loading.setProgress(++completed, total);
     }
     player->setCurrentIndex(currentIndex);
     blocker.unblock();

@@ -256,6 +256,53 @@ QIcon explorerIcon(bool search)
     }
     return QIcon(pixmap);
 }
+
+void installRaditEditMenu(QLineEdit *edit)
+{
+    edit->setContextMenuPolicy(Qt::CustomContextMenu);
+    QObject::connect(edit, &QWidget::customContextMenuRequested, edit, [edit](const QPoint &position) {
+        Menu menu(edit);
+        const int selectionStart = edit->selectionStart();
+        const int selectionLength = edit->selectedText().size();
+        const int cursorPosition = edit->cursorPosition();
+        const auto addEditAction = [edit, &menu, selectionStart, selectionLength, cursorPosition](const QString &text, const QString &iconPath,
+                                          const QKeySequence &shortcut, bool enabled,
+                                          const std::function<void()> &callback) {
+            QIcon icon(iconPath);
+            icon.addFile(iconPath, QSize(), QIcon::Disabled);
+            QAction *action = menu.addAction(icon, text);
+            action->setShortcut(shortcut);
+            action->setEnabled(enabled);
+            QObject::connect(action, &QAction::triggered, &menu,
+                [edit, callback, selectionStart, selectionLength, cursorPosition]() {
+                    edit->setFocus();
+                    if (selectionStart >= 0)
+                        edit->setSelection(selectionStart, selectionLength);
+                    else
+                        edit->setCursorPosition(cursorPosition);
+                    callback();
+                });
+        };
+        addEditAction(FileExplore::tr("Undo"), ":/icons/Undo.svg", QKeySequence::Undo,
+                      edit->isUndoAvailable(), [edit]() { edit->undo(); });
+        addEditAction(FileExplore::tr("Redo"), ":/icons/Redo.svg", QKeySequence::Redo,
+                      edit->isRedoAvailable(), [edit]() { edit->redo(); });
+        menu.addSeparator();
+        const bool selected = edit->hasSelectedText();
+        addEditAction(FileExplore::tr("Cut"), ":/icons/ActionCut.svg", QKeySequence::Cut,
+                      selected, [edit]() { edit->cut(); });
+        addEditAction(FileExplore::tr("Copy"), ":/icons/ActionCopy.svg", QKeySequence::Copy,
+                      selected, [edit]() { edit->copy(); });
+        addEditAction(FileExplore::tr("Paste"), ":/icons/ActionPaste.svg", QKeySequence::Paste,
+                      !QApplication::clipboard()->text().isEmpty(), [edit]() { edit->paste(); });
+        addEditAction(FileExplore::tr("Delete"), ":/icons/Remove.svg", QKeySequence(Qt::Key_Delete),
+                      selected, [edit]() { edit->del(); });
+        menu.addSeparator();
+        addEditAction(FileExplore::tr("Select All"), ":/icons/Selectall.svg", QKeySequence::SelectAll,
+                      !edit->text().isEmpty(), [edit]() { edit->selectAll(); });
+        menu.exec(edit->mapToGlobal(position));
+    });
+}
 }
 
 
@@ -314,6 +361,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     m_path = new FileExplorePathCombo(toolbar, locationsMenu);
     m_path->setObjectName("FileExplorePath");
     m_path->setEditable(true);
+    installRaditEditMenu(m_path->lineEdit());
     m_path->setInsertPolicy(QComboBox::NoInsert);
     m_path->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     m_path->setMinimumContentsLength(8);
@@ -411,49 +459,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     m_search->setFixedHeight(26);
     m_search->setClearButtonEnabled(true);
     m_search->addAction(explorerIcon(true), QLineEdit::LeadingPosition);
-    m_search->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_search, &QWidget::customContextMenuRequested, this, [this](const QPoint &position) {
-        Menu menu(this);
-        const int selectionStart = m_search->selectionStart();
-        const int selectionLength = m_search->selectedText().size();
-        const int cursorPosition = m_search->cursorPosition();
-        const auto addEditAction = [this, &menu, selectionStart, selectionLength, cursorPosition](const QString &text, const QString &iconPath,
-                                          const QKeySequence &shortcut, bool enabled,
-                                          const std::function<void()> &callback) {
-            QIcon icon(iconPath);
-            icon.addFile(iconPath, QSize(), QIcon::Disabled);
-            QAction *action = menu.addAction(icon, text);
-            action->setShortcut(shortcut);
-            action->setEnabled(enabled);
-            QObject::connect(action, &QAction::triggered, &menu,
-                [this, callback, selectionStart, selectionLength, cursorPosition]() {
-                    m_search->setFocus();
-                    if (selectionStart >= 0)
-                        m_search->setSelection(selectionStart, selectionLength);
-                    else
-                        m_search->setCursorPosition(cursorPosition);
-                    callback();
-                });
-        };
-        addEditAction(tr("Undo"), ":/icons/Undo.svg", QKeySequence::Undo,
-                      m_search->isUndoAvailable(), [this]() { m_search->undo(); });
-        addEditAction(tr("Redo"), ":/icons/Redo.svg", QKeySequence::Redo,
-                      m_search->isRedoAvailable(), [this]() { m_search->redo(); });
-        menu.addSeparator();
-        const bool selected = m_search->hasSelectedText();
-        addEditAction(tr("Cut"), ":/icons/ActionCut.svg", QKeySequence::Cut,
-                      selected, [this]() { m_search->cut(); });
-        addEditAction(tr("Copy"), ":/icons/ActionCopy.svg", QKeySequence::Copy,
-                      selected, [this]() { m_search->copy(); });
-        addEditAction(tr("Paste"), ":/icons/ActionPaste.svg", QKeySequence::Paste,
-                      !QApplication::clipboard()->text().isEmpty(), [this]() { m_search->paste(); });
-        addEditAction(tr("Delete"), ":/icons/Remove.svg", QKeySequence(Qt::Key_Delete),
-                      selected, [this]() { m_search->del(); });
-        menu.addSeparator();
-        addEditAction(tr("Select All"), ":/icons/Selectall.svg", QKeySequence::SelectAll,
-                      !m_search->text().isEmpty(), [this]() { m_search->selectAll(); });
-        menu.exec(m_search->mapToGlobal(position));
-    });
+    installRaditEditMenu(m_search);
     searchLayout->addWidget(m_search, 1);
     m_sort = new QComboBox(this);
     m_sort->setObjectName("FileExploreSort");

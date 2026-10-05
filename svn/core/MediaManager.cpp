@@ -74,6 +74,13 @@ struct MediaManager::Backend
 };
 
 namespace {
+bool initializeDecoder()
+{
+    static QMutex mutex;
+    const QMutexLocker lock(&mutex);
+    return BASS_SetDevice(0) || BASS_Init(0, 44100, 0, nullptr, nullptr);
+}
+
 struct InputDeviceUse
 {
     int users = 0;
@@ -163,14 +170,10 @@ AudioWaveform MediaManager::readWaveform(const QString &filePath,
     if (cancel->load())
         return waveform;
     // Contexto de decodificación independiente, sin abrir una salida audible.
-    static QMutex decoderInitMutex;
-    {
-        const QMutexLocker lock(&decoderInitMutex);
-        if (!BASS_SetDevice(0) && !BASS_Init(0, 44100, 0, nullptr, nullptr)) {
-            waveform.error = tr("Unable to initialize waveform decoding (error %1).")
-                .arg(BASS_ErrorGetCode());
-            return waveform;
-        }
+    if (!initializeDecoder()) {
+        waveform.error = tr("Unable to initialize waveform decoding (error %1).")
+            .arg(BASS_ErrorGetCode());
+        return waveform;
     }
 #ifdef Q_OS_WIN
     const HSTREAM stream = BASS_StreamCreateFile(FALSE, filePath.utf16(), 0, 0,
@@ -817,42 +820,34 @@ bool MediaManager::loadFile(const QString &filePath){
 //******************************************************************
 
 
-double MediaManager::getDurationSecond(const QString &filePath){
-
-#ifdef Q_OS_WIN
-    HSTREAM stream = BASS_StreamCreateFile(
-        FALSE,
-        filePath.utf16(),
-        0,
-        0,
-        BASS_STREAM_DECODE | BASS_UNICODE
-    );
-#else
-    QByteArray path = filePath.toUtf8();
-
-    HSTREAM stream = BASS_StreamCreateFile(
-        FALSE,
-        path.constData(),
-        0,
-        0,
-        BASS_STREAM_DECODE
-    );
-#endif
-
-    if (!stream) {
-        qDebug() << "BASS error:" << BASS_ErrorGetCode()
-                 << "File:" << filePath;
-        return -1.0;
-    }
-
-    QWORD length = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
-    double seconds = BASS_ChannelBytes2Seconds(stream, length);
-
-    BASS_StreamFree(stream);
-    return seconds;
+double MediaManager::getDurationSecond(const QString &filePath)
+{
+    return readFileDuration(filePath);
 }
 
-
+// Independent decoding context: safe to call from an import worker.
+double MediaManager::readFileDuration(const QString &filePath)
+{
+    const DWORD previousDevice = BASS_GetDevice();
+    struct DeviceGuard {
+        DWORD device;
+        ~DeviceGuard() { if (device != DWORD(-1)) BASS_SetDevice(device); }
+    } deviceGuard{previousDevice};
+    if (!initializeDecoder()) return -1.0;
+#ifdef Q_OS_WIN
+    const HSTREAM stream = BASS_StreamCreateFile(FALSE, filePath.utf16(), 0, 0,
+                                                BASS_STREAM_DECODE | BASS_UNICODE);
+#else
+    const QByteArray path = filePath.toUtf8();
+    const HSTREAM stream = BASS_StreamCreateFile(FALSE, path.constData(), 0, 0,
+                                                BASS_STREAM_DECODE);
+#endif
+    if (!stream) return -1.0;
+    const QWORD length = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
+    const double seconds = length == QWORD(-1) ? -1.0 : BASS_ChannelBytes2Seconds(stream, length);
+    BASS_StreamFree(stream);
+    return std::isfinite(seconds) && seconds > 0 ? seconds : -1.0;
+}
 
 //****************************************************
 

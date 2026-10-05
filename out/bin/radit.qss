@@ -1544,3 +1544,27 @@ QProgressBar#LoadingProgress::chunk {
     background-color: #4e4d7a;
     border-radius: 2px;
 }
+
+QDialog#LoadingDialog {
+    background-color: #262c3b;
+    border: 1px solid #686b74;
+}
+QDialog#LoadingDialog QLabel {
+    background: transparent;
+    color: #8a8d96;
+    border: none;
+    font-size: 14px;
+}
+
+/* Exit confirmation. */
+QDialog#QuitDialog { background-color: #303030; }
+QDialog#QuitDialog QLabel {
+    background: transparent; color: #eeeeee; border: none; font-size: 12px;
+}
+QDialog#QuitDialog QLabel#QuitTitle { font-weight: bold; }
+QDialog#QuitDialog QPushButton {
+    background-color: #454545; color: #eeeeee; border: none; border-radius: 3px; padding: 2px 6px;
+}
+QDialog#QuitDialog QPushButton:hover { background-color: #565656; }
+QDialog#QuitDialog QPushButton#SaveAndQuit { background-color: #80e6b4; color: #181e2c; }
+QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }

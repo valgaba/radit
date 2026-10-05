@@ -33,6 +33,14 @@
 #include <QTimer>
 #include <QApplication>
 #include <QMessageBox>
+#include <QCloseEvent>
+#include <QFileDialog>
+#include <QScopedValueRollback>
+#include <QStandardPaths>
+#include <QDir>
+#include <QKeySequence>
+#include "widgets/QuitDialog.h"
+#include "core/io.h"
 
 
 //#include "widgets/TabPlayer.h"
@@ -60,7 +68,15 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
        // Añadir los menús principales (sin submenús por ahora)
-       menubar->addMenu(tr("&File"));
+       QMenu *fileMenu = menubar->addMenu(tr("&File"));
+       fileMenu->setObjectName("FileMenu");
+       fileMenu->setSeparatorsCollapsible(false);
+       fileMenu->addSeparator();
+       QAction *quitAction = fileMenu->addAction(tr("Quit"));
+       quitAction->setObjectName("QuitAction");
+       quitAction->setShortcut(QKeySequence::Quit);
+       quitAction->setMenuRole(QAction::QuitRole);
+       connect(quitAction, &QAction::triggered, this, &QWidget::close);
        menubar->addMenu(tr("&Edit"));
        QMenu *vistasMenu = menubar->addMenu(tr("&View"));
        menubar->addMenu(tr("&Tools"));
@@ -278,4 +294,53 @@ void MainWindow::restoreInterface()
 MainWindow::~MainWindow(){
    mediamanager->shutdown();//libera recursos
 
+}
+
+bool MainWindow::saveBeforeQuit()
+{
+    Io io;
+    for (Player *player : players) {
+        if (!isAncestorOf(player)) continue;
+        auto *tabs = player->findChild<TabPlayer*>();
+        if (!tabs) continue;
+        QString filename = tabs->playerFileName();
+        if (filename.isEmpty()) {
+            const QString suggestion = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                .filePath(player->objectName() + ".player");
+            filename = QFileDialog::getSaveFileName(this, tr("Save player: %1").arg(player->title()),
+                                                   suggestion, tr("Radit Player (*.player)"));
+            if (filename.isEmpty()) return false;
+            if (!filename.endsWith(".player", Qt::CaseInsensitive)) filename += ".player";
+        }
+        QString error;
+        if (!io.SavePlayer(tabs, filename, &error)) {
+            QMessageBox::warning(this, tr("Player was not saved"), error);
+            return false;
+        }
+    }
+    QString error;
+    if (!Config::saveConfig("config.json", players, m_capture, &error)) {
+        QMessageBox::warning(this, tr("Configuration was not saved"), error);
+        return false;
+    }
+    return true;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (m_quitDialogOpen) {
+        event->ignore();
+        return;
+    }
+    QScopedValueRollback<bool> showing(m_quitDialogOpen, true);
+    QuitDialog dialog(this);
+    const int choice = dialog.exec();
+    if (choice == QuitDialog::Cancel ||
+        (choice == QuitDialog::SaveAndQuit && !saveBeforeQuit())) {
+        event->ignore();
+        return;
+    }
+    // Finalize recordings before the main audio context is released by the destructor.
+    for (auto *manager : findChildren<MediaManager*>()) manager->stopInput();
+    event->accept();
 }
