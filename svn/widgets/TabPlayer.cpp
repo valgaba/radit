@@ -28,6 +28,7 @@
 #include <QMimeData>
 #include <QUrl>
 #include <QTimer>
+#include <memory>
 #include "core/io.h"
 
 #include "widgets/TabPlayer.h"
@@ -115,18 +116,11 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
 
 
 
-    // **Crear 3 pestañas de ejemplo**
-        for (int i = 1; i <= 3; ++i) {
-            Container *container = new Container;
-            QString tabName = QString("List %1").arg(i);
+    // **Crear 1 pestañas de ejemplo**
 
-            int index = this->addTab(container, tabName);
-            this->setTabToolTip(index, tabName); //  el ToolTip
-            if (i == 1) this->setCurrentIndex(index); // Seleccionar la primera por defecto
-
-
-        }
-
+    Container *container = new Container;
+    int index = this->addTab(container, "noname");
+    this->setTabToolTip(index, "noname"); //  el ToolTip
 
 
 }
@@ -156,6 +150,21 @@ void TabPlayer::loadPlayerFile(const QString &filename)
     QString error;
     if (!io.LoadPlayer(this, filename, &error))
         QMessageBox::warning(this, tr("Load player"), error);
+}
+
+bool TabPlayer::loadListFile(const QString &filename, QString *error)
+{
+    // Each import gets its own container, even when the file was loaded before.
+    auto container = std::make_unique<Container>(this);
+    Io io;
+    auto *contents = qobject_cast<ContentsPlayer*>(container->widget());
+    if (!io.LoadListPlayer(contents, filename, error))
+        return false;
+    const QString name = QFileInfo(filename).completeBaseName();
+    const int index = addTab(container.release(), name);
+    setTabToolTip(index, QFileInfo(filename).absoluteFilePath());
+    setCurrentIndex(index);
+    return true;
 }
 
 QString TabPlayer::droppedPlayerFile(const QMimeData *data)

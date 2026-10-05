@@ -97,9 +97,9 @@ void ContentsMenu::setupActions() {
     pasteAction->setIcon(QIcon(":/icons/ActionPaste.svg"));
     deleteAction->setIcon(QIcon(":/icons/Remove.svg"));
 
-    loadAction = new QAction("Load", this);
-    saveAction = new QAction("Save", this);
-    saveasAction = new QAction("Save As", this);
+    loadAction = new QAction("Load list", this);
+    saveAction = new QAction("Save list", this);
+    saveasAction = new QAction("Save list as", this);
 
     loadAction->setIcon(QIcon(":/icons/Load.svg"));
     saveAction->setIcon(QIcon(":/icons/Save.svg"));

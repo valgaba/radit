@@ -548,3 +548,8 @@ QString Player::SecondToTime(double segundos){
 
 
 }
+
+float Player::committedVolume() const
+{
+    return frameoptionsplayer ? frameoptionsplayer->committedVolume() : volume();
+}

@@ -222,8 +222,8 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             contentsMenu->setPasteVisible(!this->clipboard.lista.isEmpty());
 
           //  contentsMenu->setLoadVisible(false);
-            contentsMenu->setSaveVisible(false);
-            contentsMenu->setSaveAsVisible(false);
+            contentsMenu->setSaveVisible(true);
+            contentsMenu->setSaveAsVisible(true);
 
             contentsMenu->exec(mapToGlobal(mousePos));
             return;
@@ -607,37 +607,55 @@ void ContentsPlayer::loadItems(){
     QString filename = QFileDialog::getOpenFileName(
                this,
                "Load list",
-               QString(),
+               m_listFileName,
                "Radit List (*.list);;All Files (*)"
            );
 
            if (filename.isEmpty())
                return;
 
-        this->clearItems();
+        QWidget *owner = this;
+        while (owner && !qobject_cast<TabPlayer*>(owner)) owner = owner->parentWidget();
+        QString error;
+        auto *tabs = qobject_cast<TabPlayer*>(owner);
         Io io;
-        io.LoadListPlayer(this, filename);
-        this->setTabName(filename);
+        const bool loaded = tabs ? tabs->loadListFile(filename, &error)
+                                 : io.LoadListPlayer(this, filename, &error);
+        if (!loaded)
+            QMessageBox::warning(this, tr("Load list"), error);
 
 }
 void ContentsPlayer::saveItems(){
+    if (m_listFileName.isEmpty()) {
+        saveAsItems();
+        return;
+    }
+    saveListFile(m_listFileName);
+}
 
-    QString filename = QFileDialog::getSaveFileName(
-            this,
-            "Save list",
-            QString(),
-            "Radit List (*.list);;All files (*)"
-        );
-
-        if (filename.isEmpty())
-            return;
-
-
-
+bool ContentsPlayer::saveListFile(const QString &filename)
+{
     Io io;
-    io.SaveListPlayer(layout, filename);
-    this->setTabName(filename);
+    QString error;
+    if (!io.SaveListPlayer(layout, filename, &error)) {
+        QMessageBox::warning(this, tr("Save list"), error);
+        return false;
+    }
+    m_listFileName = QFileInfo(filename).absoluteFilePath();
+    return true;
+}
 
-
+void ContentsPlayer::saveAsItems()
+{
+    QFileDialog dialog(this, tr("Save list as"), m_listFileName,
+                       tr("Radit List (*.list);;All files (*)"));
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setDefaultSuffix("list");
+    if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
+        return;
+    const QString filename = dialog.selectedFiles().first();
+    if (saveListFile(filename))
+        setTabName(filename);
 }
 

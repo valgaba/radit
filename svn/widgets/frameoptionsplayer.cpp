@@ -306,3 +306,11 @@ void FrameOptionsPlayer::hideEvent(QHideEvent *event)
     }
     Frame::hideEvent(event);
 }
+
+float FrameOptionsPlayer::committedVolume() const
+{
+    if (isVisible() && !m_volumeCommitted)
+        return m_previousVolume;
+    const auto *player = qobject_cast<Player *>(parentWidget());
+    return player ? player->volume() : 1.0f;
+}
