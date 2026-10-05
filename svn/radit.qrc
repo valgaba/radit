@@ -6,7 +6,6 @@
         <file>icons/Color.svg</file>
         <file>icons/Favorites.svg</file>
         <file>icons/Filesystem.svg</file>
-        <file>icons/Folder.png</file>
         <file>icons/list.png</file>
         <file>icons/Load.svg</file>
         <file>icons/Loop.svg</file>
@@ -65,5 +64,8 @@
         <file>icons/playpause2on.svg</file>
         <file>icons/eject.svg</file>
         <file>icons/unselect.svg</file>
+        <file>icons/rename.svg</file>
+        <file>icons/Undo.svg</file>
+        <file>icons/Redo.svg</file>
     </qresource>
 </RCC>

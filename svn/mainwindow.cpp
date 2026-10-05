@@ -30,6 +30,9 @@
 #include <QAction>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QTimer>
+#include <QApplication>
+#include <QMessageBox>
 
 
 //#include "widgets/TabPlayer.h"
@@ -176,20 +179,6 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
 
-    // Conectar cambios de configuración
-    for (Player *player : players) {
-
-        connect(player,
-                &Player::configurationChanged,
-                this,
-                [this]() {
-                    Config::saveConfig("config.json",players);
-                });
-    }
-
-
-
-
     // ----------------------------------------
     // Añadir Players a la interfaz
     // ----------------------------------------
@@ -240,7 +229,32 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 
 // cargar configuracion de los player*******************
-    Config::loadConfig("config.json",players);
+    QString loadError;
+    if (!Config::loadConfig("config.json", players, m_capture, &loadError))
+        QMessageBox::warning(this, tr("Configuration"), loadError);
+
+    const auto saveConfiguration = [this]() {
+        QString error;
+        if (!Config::saveConfig("config.json", players, m_capture, &error))
+            QMessageBox::warning(this, tr("Configuration was not saved"), error);
+    };
+    for (Player *player : players)
+        connect(player, &Player::configurationChanged, this, saveConfiguration);
+
+    // Coalesce input-volume slider changes, then flush on normal exit.
+    auto *captureSaveTimer = new QTimer(this);
+    captureSaveTimer->setSingleShot(true);
+    captureSaveTimer->setInterval(350);
+    connect(m_capture, &Capture::configurationChanged, this, [captureSaveTimer]() {
+        captureSaveTimer->start();
+    });
+    connect(captureSaveTimer, &QTimer::timeout, this, saveConfiguration);
+    connect(qApp, &QCoreApplication::aboutToQuit, this, [captureSaveTimer, saveConfiguration]() {
+        if (captureSaveTimer->isActive()) {
+            captureSaveTimer->stop();
+            saveConfiguration();
+        }
+    });
 
 
 }
