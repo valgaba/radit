@@ -17,6 +17,9 @@
 
 #include <QDebug>
 #include <QMessageBox>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QFileInfo>
 #include "widgets/Player.h"
 #include "widgets/vumeter.h"
 #include "widgets/contentsbase.h"
@@ -25,6 +28,7 @@
 
 
 Player::Player(QWidget *parent) : Frame(parent) {
+    setAcceptDrops(true);
 
 
 
@@ -377,6 +381,11 @@ Player::Player(QWidget *parent) : Frame(parent) {
     //parte del tabplayer
 
      tabplayer = new TabPlayer(this);
+     connect(tabplayer, &TabPlayer::playerFileNameChanged, this, [this](const QString &filename) {
+         const QString name = filename.isEmpty() ? QStringLiteral("noname")
+                                                 : QFileInfo(filename).completeBaseName();
+         labeltitle->setText(QStringLiteral("Player [%1]").arg(name));
+     });
      layout->addWidget(tabplayer);
 
 
@@ -454,6 +463,18 @@ void Player::pauseMain()
             btnpause->SetIcon("Pausemini.svg");  // opcional: vuelve icono pause
 
         }
+}
+
+void Player::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (!TabPlayer::droppedPlayerFile(event->mimeData()).isEmpty()) event->acceptProposedAction();
+    else event->ignore();
+}
+
+void Player::dropEvent(QDropEvent *event)
+{
+    if (tabplayer->loadDroppedPlayer(event->mimeData())) event->acceptProposedAction();
+    else event->ignore();
 }
 
 void Player::stopMain()

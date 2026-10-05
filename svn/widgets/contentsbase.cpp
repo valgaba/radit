@@ -107,6 +107,15 @@ void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
 // suelta evento
 void ContentsBase::dropEvent(QDropEvent *event){
 
+    QWidget *owner = this;
+    while (owner && !qobject_cast<TabPlayer*>(owner)) owner = owner->parentWidget();
+    if (auto *tabs = qobject_cast<TabPlayer*>(owner)) {
+        if (tabs->loadDroppedPlayer(event->mimeData())) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+
   //////////// viene del sistema de archivos
    if (event->mimeData()->hasUrls()) {
         QList<QUrl> urls = event->mimeData()->urls();
@@ -119,7 +128,7 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
                           this->clearItems();
                           Io io;
-                          io.loadContentsPlayer(this, filePath);
+                          io.LoadListPlayer(this, filePath);
                           this->setTabName(filePath);
                           continue;
                       }

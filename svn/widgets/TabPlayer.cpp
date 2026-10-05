@@ -23,6 +23,12 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QMessageBox>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QMimeData>
+#include <QUrl>
+#include <QTimer>
+#include "core/io.h"
 
 #include "widgets/TabPlayer.h"
 #include "widgets/TapPlayerMenu.h"
@@ -34,6 +40,7 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
     //  this->setCursor(QCursor(Qt::PointingHandCursor));  //cambiamos el cursor
 
     setContextMenuPolicy(Qt::DefaultContextMenu); // Habilitar la política de menú contextual predeterminada
+    setAcceptDrops(true);
 
     TabBar *tabbar=new TabBar(this);
     tabbar->setProperty("playerTabs", true);
@@ -42,6 +49,9 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
 
 
     menu = new TapPlayerMenu(this);
+    connect(menu, &TapPlayerMenu::loadPlayerRequested, this, &TabPlayer::loadPlayer);
+    connect(menu, &TapPlayerMenu::savePlayerRequested, this, &TabPlayer::savePlayer);
+    connect(menu, &TapPlayerMenu::savePlayerAsRequested, this, &TabPlayer::savePlayerAs);
 
     connect(menu, &TapPlayerMenu::colorRequested, this, [this, tabbar](const QColor &color) {
         const int index = m_colorTarget ? indexOf(m_colorTarget.data()) : currentIndex();
@@ -124,6 +134,89 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
 
 
 TabPlayer::~TabPlayer(){}
+
+void TabPlayer::setPlayerFileName(const QString &filename)
+{
+    m_playerFileName = filename;
+    emit playerFileNameChanged(filename);
+}
+
+void TabPlayer::loadPlayer()
+{
+    const QString filename = QFileDialog::getOpenFileName(
+        this, tr("Load player"), m_playerFileName, tr("Radit Player (*.player);;All files (*)"));
+    if (filename.isEmpty())
+        return;
+    loadPlayerFile(filename);
+}
+
+void TabPlayer::loadPlayerFile(const QString &filename)
+{
+    Io io;
+    QString error;
+    if (!io.LoadPlayer(this, filename, &error))
+        QMessageBox::warning(this, tr("Load player"), error);
+}
+
+QString TabPlayer::droppedPlayerFile(const QMimeData *data)
+{
+    if (!data) return {};
+    for (const auto &url : data->urls()) {
+        if (url.isLocalFile() && QFileInfo(url.toLocalFile()).suffix().compare("player", Qt::CaseInsensitive) == 0)
+            return url.toLocalFile();
+    }
+    return {};
+}
+
+bool TabPlayer::loadDroppedPlayer(const QMimeData *data)
+{
+    const QString filename = droppedPlayerFile(data);
+    if (filename.isEmpty()) return false;
+    // Loading removes the old tab pages, including the widget receiving the drop.
+    // Wait until that widget's drop event has returned before replacing the pages.
+    QTimer::singleShot(0, this, [this, filename]() { loadPlayerFile(filename); });
+    return true;
+}
+
+void TabPlayer::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (!droppedPlayerFile(event->mimeData()).isEmpty()) event->acceptProposedAction();
+    else event->ignore();
+}
+
+void TabPlayer::dropEvent(QDropEvent *event)
+{
+    if (loadDroppedPlayer(event->mimeData())) event->acceptProposedAction();
+    else event->ignore();
+}
+
+void TabPlayer::savePlayer()
+{
+    if (m_playerFileName.isEmpty()) {
+        savePlayerAs();
+        return;
+    }
+    Io io;
+    QString error;
+    if (!io.SavePlayer(this, m_playerFileName, &error))
+        QMessageBox::warning(this, tr("Save player"), error);
+}
+
+void TabPlayer::savePlayerAs()
+{
+    QFileDialog dialog(this, tr("Save player as"), m_playerFileName,
+                       tr("Radit Player (*.player);;All files (*)"));
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setDefaultSuffix("player");
+    if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
+        return;
+    const QString filename = dialog.selectedFiles().first();
+    Io io;
+    QString error;
+    if (!io.SavePlayer(this, filename, &error))
+        QMessageBox::warning(this, tr("Save player as"), error);
+}
 
 void TabPlayer::closeTab(int index){
 

@@ -28,6 +28,7 @@
 
 
 #include "widgets/tabbar.h"
+#include "widgets/TabPlayer.h"
 
 TabBar::TabBar(QWidget *parent):QTabBar(parent){
     this->setObjectName("TabBar"); //para qss
@@ -111,6 +112,13 @@ void TabBar::dragMoveEvent(QDragMoveEvent *event)
     }
 
     event->acceptProposedAction();
+}
+
+void TabBar::dropEvent(QDropEvent *event)
+{
+    auto *tabs = qobject_cast<TabPlayer*>(parentWidget());
+    if (tabs && tabs->loadDroppedPlayer(event->mimeData())) event->acceptProposedAction();
+    else event->ignore();
 }
 
 

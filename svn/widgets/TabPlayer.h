@@ -10,6 +10,7 @@
 #include <QPointer>
 class AudioItemMaxi;
 class TapPlayerMenu;
+class QMimeData;
 
 
 class TabPlayer: public Tab
@@ -21,6 +22,7 @@ class TabPlayer: public Tab
 private:
         TapPlayerMenu *menu;
         QPointer<QWidget> m_colorTarget;
+        QString m_playerFileName;
 
 
 public:
@@ -31,19 +33,30 @@ public:
     ~TabPlayer();
 
  void closeTab(int index);
+ QString playerFileName() const { return m_playerFileName; }
+ void setPlayerFileName(const QString &filename);
+ static QString droppedPlayerFile(const QMimeData *data);
+ bool loadDroppedPlayer(const QMimeData *data);
 
 
 
 protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 
 
 private slots:
+    void loadPlayer();
+    void loadPlayerFile(const QString &filename);
+    void savePlayer();
+    void savePlayerAs();
 
 public slots:
 
     signals:
         void requestPlayItem(AudioItemMaxi* item);
+        void playerFileNameChanged(const QString &filename);
 
 };
 

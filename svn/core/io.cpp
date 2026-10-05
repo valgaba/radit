@@ -19,190 +19,221 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFile>
-#include <QDebug>
-
+#include <QFileInfo>
+#include <QSaveFile>
+#include <QSignalBlocker>
+#include <cmath>
 #include "core/io.h"
 #include "widgets/AudioItemMaxi.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFilemaxi.h"
+#include "widgets/TabPlayer.h"
+#include "widgets/tabbar.h"
+#include "widgets/container.h"
 
-Io::Io(QObject *parent): QObject(parent){
-
+namespace {
+bool fail(QString *error, const QString &message)
+{
+    if (error) *error = message;
+    return false;
 }
 
-
-Io::~Io(){}
-
-void Io::saveContentsPlayer(QLayout* layout, const QString& filename)
+QJsonArray saveItems(QLayout *layout)
 {
-    QJsonObject rootObj;
-
-    rootObj["version"] = 1;
-
-    QJsonArray itemsArray;
-
+    QJsonArray items;
+    if (!layout) return items;
     for (int i = 0; i < layout->count(); ++i) {
-
-        QLayoutItem* layoutItem = layout->itemAt(i);
-
-        if (!layoutItem)
-            continue;
-
-        QWidget* widget = layoutItem->widget();
-
-        if (!widget)
-            continue;
-
-        AudioItemMaxi* item =
-            qobject_cast<AudioItemMaxi*>(widget);
-
-        if (!item)
-            continue;
-
-        QJsonObject itemObj;
-
-        itemObj["url"] = item->filePath();
-        itemObj["name"] = item->nameFile();
-        itemObj["second"] = item->second();
-
-        itemObj["select"] = item->isSelect();
-        itemObj["playNext"] = item->isPlayNext();
-        itemObj["purge"] = item->isPurge();
-        itemObj["loop"] = item->isLoop();
-
-        // Color
-        itemObj["color"] = item->color().name(QColor::HexArgb);
-
-        itemsArray.append(itemObj);
+        auto *item = qobject_cast<AudioItemMaxi*>(layout->itemAt(i)->widget());
+        if (!item) continue;
+        items.append(QJsonObject{
+            {"url", item->filePath()}, {"name", item->nameFile()},
+            {"second", item->second()}, {"secondStart", item->secondStart()},
+            {"select", item->isSelect()}, {"playNext", item->isPlayNext()},
+            {"purge", item->isPurge()}, {"loop", item->isLoop()},
+            {"color", item->color().name(QColor::HexArgb)}
+        });
     }
-
-    rootObj["count"] = itemsArray.count();
-    rootObj["items"] = itemsArray;
-
-    QJsonDocument document(rootObj);
-
-    QFile file(filename);
-
-    if (!file.open(QIODevice::WriteOnly)) {
-        qWarning() << "No se pudo abrir el fichero para escribir:"
-                   << filename;
-        return;
-    }
-
-    file.write(document.toJson(QJsonDocument::Indented));
-    file.close();
-
-    qDebug() << "Lista guardada en:" << filename;
+    return items;
 }
 
-
-
-
-void Io::loadContentsPlayer(ContentsBase* contents, const QString& filename)
+void loadItems(ContentsBase *contents, const QJsonArray &items)
 {
-    if (!contents)
-        return;
-
-    QFile file(filename);
-
-    if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "No se pudo abrir el fichero para leer:"
-                   << filename;
-        return;
-    }
-
-    QByteArray data = file.readAll();
-    file.close();
-
-    QJsonParseError error;
-    QJsonDocument document = QJsonDocument::fromJson(data, &error);
-
-    if (error.error != QJsonParseError::NoError) {
-        qWarning() << "Error leyendo JSON:"
-                   << error.errorString();
-        return;
-    }
-
-    if (!document.isObject()) {
-        qWarning() << "El fichero no contiene un objeto JSON";
-        return;
-    }
-
-    QJsonObject rootObj = document.object();
-
-    int version = rootObj["version"].toInt(1);
-
-    if (version != 1) {
-        qWarning() << "Versión de lista no soportada:"
-                   << version;
-        return;
-    }
-
-    QJsonArray itemsArray = rootObj["items"].toArray();
-
-    int count = rootObj["count"].toInt(itemsArray.count());
-
-
-    for (const QJsonValue &value : itemsArray) {
-
-        if (!value.isObject())
-            continue;
-
-        QJsonObject itemObj = value.toObject();
-
-        QString filePath = itemObj["url"].toString();
-
-        if (filePath.isEmpty()) {
-            qWarning() << "Item sin URL, se omite";
-            continue;
-        }
-
-        // Crear el item
-        AudioItemFileMaxi* item = new AudioItemFileMaxi(contents);
-
-        // Datos principales
-        item->setFilePath(filePath);
-        item->setNameFile(itemObj["name"].toString());
-
-        double second = itemObj["second"].toDouble();
-
-        item->setSecond(second);
-        item->setTiempoFile(second);
-
-        // Estados
-        item->setIsSelect(
-            itemObj["select"].toBool(false)
-        );
-
-        item->setIsPlayNext(
-            itemObj["playNext"].toBool(false)
-        );
-
-        item->setIsPurge(
-            itemObj["purge"].toBool(false)
-        );
-
-        item->setIsLoop(
-            itemObj["loop"].toBool(false)
-        );
-
-        // Color
-        if (itemObj.contains("color")) {
-
-            QColor color(itemObj["color"].toString());
-
-            if (color.isValid()) {
-                item->setColor(color);
-            }
-        }
-
-        // Añadir y conectar exactamente igual
-        // que cualquier item creado normalmente.
+    for (const auto &value : items) {
+        if (!value.isObject()) continue;
+        const auto object = value.toObject();
+        const QString path = object["url"].toString();
+        if (path.isEmpty()) continue;
+        auto *item = new AudioItemFileMaxi(contents);
+        item->setFilePath(path);
+        item->setToolTip(path);
+        item->setNameFile(object["name"].toString());
+        const double seconds = object["second"].toDouble();
+        item->setSecond(seconds);
+        item->setTiempoFile(seconds);
+        item->setSecondStart(object["secondStart"].toDouble());
+        item->setIsSelect(object["select"].toBool());
+        item->setIsPlayNext(object["playNext"].toBool());
+        item->setIsPurge(object["purge"].toBool());
+        item->setIsLoop(object["loop"].toBool());
+        const QColor color(object["color"].toString());
+        if (color.isValid()) item->setColor(color);
         contents->createItem(item);
     }
-
-    qDebug() << "Lista cargada correctamente:" << filename;
 }
 
+bool writeJson(const QString &filename, const QJsonObject &root, QString *error)
+{
+    QSaveFile file(filename);
+    if (!file.open(QIODevice::WriteOnly))
+        return fail(error, Io::tr("Cannot save %1: %2").arg(filename, file.errorString()));
+    const QByteArray bytes = QJsonDocument(root).toJson(QJsonDocument::Indented);
+    if (file.write(bytes) != bytes.size() || !file.commit())
+        return fail(error, Io::tr("Cannot save %1: %2").arg(filename, file.errorString()));
+    return true;
+}
 
+bool readJson(const QString &filename, QJsonObject &root, QString *error)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly))
+        return fail(error, Io::tr("Cannot open %1: %2").arg(filename, file.errorString()));
+    const QByteArray bytes = file.readAll();
+    if (file.error() != QFileDevice::NoError)
+        return fail(error, file.errorString());
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(bytes, &parseError);
+    if (parseError.error != QJsonParseError::NoError)
+        return fail(error, Io::tr("Invalid JSON: %1").arg(parseError.errorString()));
+    if (!document.isObject())
+        return fail(error, Io::tr("The file must contain a JSON object."));
+    root = document.object();
+    return true;
+}
+
+bool validItems(const QJsonArray &items)
+{
+    for (const auto &value : items) {
+        if (!value.isObject()) return false;
+        const auto item = value.toObject();
+        if (!item["url"].isString() || item["url"].toString().isEmpty()
+            || !item["name"].isString() || !item["second"].isDouble()
+            || item["second"].toDouble() < 0 || !std::isfinite(item["second"].toDouble()))
+            return false;
+        for (const auto *key : {"select", "playNext", "purge", "loop"})
+            if (item.contains(key) && !item[key].isBool()) return false;
+        if (item.contains("color") && !QColor(item["color"].toString()).isValid()) return false;
+        if (item.contains("secondStart") && (!item["secondStart"].isDouble()
+            || item["secondStart"].toDouble() < 0
+            || !std::isfinite(item["secondStart"].toDouble()))) return false;
+    }
+    return true;
+}
+}
+
+Io::Io(QObject *parent) : QObject(parent) {}
+Io::~Io() {}
+
+void Io::SaveListPlayer(QLayout *layout, const QString &filename)
+{
+    const QJsonArray items = saveItems(layout);
+    QString error;
+    if (!writeJson(filename, QJsonObject{{"version", 1}, {"count", items.size()}, {"items", items}}, &error))
+        qWarning() << error;
+}
+
+void Io::LoadListPlayer(ContentsBase *contents, const QString &filename)
+{
+    if (!contents) return;
+    QJsonObject root;
+    QString error;
+    if (!readJson(filename, root, &error)) {
+        qWarning() << error;
+        return;
+    }
+    if (root["version"].toInt(1) != 1 || !root["items"].isArray()) {
+        qWarning() << "Unsupported list format:" << filename;
+        return;
+    }
+    loadItems(contents, root["items"].toArray());
+}
+
+bool Io::SavePlayer(TabPlayer *player, const QString &filename, QString *error)
+{
+    if (error) error->clear();
+    if (!player || player->count() == 0)
+        return fail(error, tr("The player has no tabs to save."));
+    auto *bar = player->findChild<TabBar*>();
+    QJsonArray tabs;
+    for (int index = 0; index < player->count(); ++index) {
+        auto *container = qobject_cast<Container*>(player->widget(index));
+        auto *contents = container ? qobject_cast<ContentsPlayer*>(container->widget()) : nullptr;
+        if (!contents || !bar)
+            return fail(error, tr("Cannot read the contents of tab %1.").arg(index + 1));
+        const QColor color = bar->tabColor(index);
+        tabs.append(QJsonObject{{"name", player->tabText(index)},
+            {"color", color.isValid() ? color.name(QColor::HexArgb) : QColor(Qt::transparent).name(QColor::HexArgb)},
+            {"items", saveItems(contents->layout)}});
+    }
+    const QJsonObject root{{"format", "radit-player"}, {"version", 1},
+        {"currentTab", player->currentIndex()}, {"tabs", tabs}};
+    if (!writeJson(filename, root, error)) return false;
+    player->setPlayerFileName(QFileInfo(filename).absoluteFilePath());
+    return true;
+}
+
+bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
+{
+    if (error) error->clear();
+    if (!player) return fail(error, tr("No player was selected."));
+    auto *bar = player->findChild<TabBar*>();
+    if (!bar) return fail(error, tr("The player has no tab bar."));
+    QJsonObject root;
+    if (!readJson(filename, root, error)) return false;
+    if (root["format"].toString() != "radit-player" || root["version"].toDouble() != 1
+        || !root["tabs"].isArray() || root["tabs"].toArray().isEmpty())
+        return fail(error, tr("Unsupported player format or version."));
+    const QJsonArray tabs = root["tabs"].toArray();
+    const auto active = root["currentTab"];
+    const int currentIndex = active.toInt(-1);
+    if (!active.isDouble() || active.toDouble() != currentIndex
+        || currentIndex < 0 || currentIndex >= tabs.size())
+        return fail(error, tr("Invalid selected tab."));
+    for (const auto &value : tabs) {
+        if (!value.isObject()) return fail(error, tr("Invalid tab data."));
+        const auto tab = value.toObject();
+        if (!tab["name"].isString() || !tab["items"].isArray()
+            || !validItems(tab["items"].toArray())
+            || (tab.contains("color") && !QColor(tab["color"].toString()).isValid()))
+            return fail(error, tr("Invalid data in a player tab."));
+    }
+
+    // The full document is validated before replacing any existing tabs.
+    QWidget *owner = player->parentWidget();
+    while (owner && !qobject_cast<Player*>(owner)) owner = owner->parentWidget();
+    if (auto *audioPlayer = qobject_cast<Player*>(owner)) audioPlayer->stopMain();
+    QSignalBlocker blocker(player);
+    while (player->count() > 0) {
+        QWidget *page = player->widget(0);
+        auto &clipboard = Clipboard::instance().lista;
+        for (auto it = clipboard.begin(); it != clipboard.end();) {
+            if (*it == page || page->isAncestorOf(*it)) it = clipboard.erase(it);
+            else ++it;
+        }
+        player->removeTab(0);
+        delete page;
+    }
+    for (const auto &value : tabs) {
+        const auto tab = value.toObject();
+        auto *container = new Container(player);
+        const QString name = tab["name"].toString();
+        const int index = player->addTab(container, name);
+        player->setTabToolTip(index, name);
+        bar->setTabColor(index, QColor(tab["color"].toString()));
+        loadItems(qobject_cast<ContentsPlayer*>(container->widget()), tab["items"].toArray());
+    }
+    player->setCurrentIndex(currentIndex);
+    blocker.unblock();
+    player->setPlayerFileName(QFileInfo(filename).absoluteFilePath());
+    return true;
+}
 

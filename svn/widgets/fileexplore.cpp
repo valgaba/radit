@@ -119,6 +119,7 @@ QStringList explorerNameFilters()
 {
     QStringList filters = MediaManager::supportedAudioNameFilters();
     filters.append("*.list");
+    filters.append("*.player");
     filters.removeDuplicates();
     return filters;
 }

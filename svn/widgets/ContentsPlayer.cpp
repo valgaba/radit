@@ -616,7 +616,7 @@ void ContentsPlayer::loadItems(){
 
         this->clearItems();
         Io io;
-        io.loadContentsPlayer(this, filename);
+        io.LoadListPlayer(this, filename);
         this->setTabName(filename);
 
 }
@@ -635,7 +635,7 @@ void ContentsPlayer::saveItems(){
 
 
     Io io;
-    io.saveContentsPlayer(layout, filename);
+    io.SaveListPlayer(layout, filename);
     this->setTabName(filename);
 
 
