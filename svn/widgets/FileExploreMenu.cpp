@@ -48,7 +48,7 @@ void FileExploreMenu::setupActions(QWidget *shortcutTarget)
     m_copy = action(tr("Copy"), ":/icons/ActionCopy.svg", QKeySequence::Copy);
     m_paste = action(tr("Paste"), ":/icons/ActionPaste.svg", QKeySequence::Paste);
     addSeparator();
-    m_rename = action(tr("Rename"), ":/icons/properties.svg", QKeySequence(Qt::Key_F2));
+    m_rename = action(tr("Rename"), ":/icons/rename.svg", QKeySequence(Qt::Key_F2));
     m_delete = action(tr("Delete"), ":/icons/Remove.svg", QKeySequence::Delete);
     addSeparator();
     m_selectAll = action(tr("Select All"), ":/icons/Selectall.svg", QKeySequence::SelectAll);

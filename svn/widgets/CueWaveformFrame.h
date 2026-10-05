@@ -10,6 +10,7 @@ class Label;
 class QSlider;
 class QMouseEvent;
 class VuMeter;
+class LoadingProgress;
 
 class CueWaveformFrame : public Frame
 {
@@ -46,6 +47,7 @@ private:
     Button *m_zoomOut = nullptr;
     Label *m_time = nullptr;
     QSlider *m_position = nullptr;
+    QSlider *m_volume = nullptr;
     VuMeter *m_vumeter = nullptr;
     double m_windowSeconds = 12;
     double m_cursorFraction = 0.25;
@@ -53,6 +55,8 @@ private:
     bool m_dragging = false;
     QString m_filePath;
     QString m_status;
+    LoadingProgress *m_loading = nullptr;
+    std::shared_ptr<std::atomic_int> m_loadProgress;
     AudioWaveform m_waveform;
     std::shared_ptr<std::atomic_bool> m_cancel;
 };

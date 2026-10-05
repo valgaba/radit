@@ -128,7 +128,7 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     m_recordingIcon.addFile(":/icons/recon.svg", QSize(), QIcon::Disabled);
     m_recButton->setIcon(m_recordIcon);
     m_recButton->setIconSize(QSize(40, 50));
-    m_recButton->setFixedSize(50, 30);
+    m_recButton->setFixedSize(50, 24);
     m_recButton->setToolTip(tr("Record to MP3"));
     m_recButton->setAccessibleName(tr("Record to MP3"));
     m_stopButton = new Button(this);
@@ -137,14 +137,31 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     stopIcon.addFile(":/icons/Stop.svg", QSize(), QIcon::Disabled);
     m_stopButton->setIcon(stopIcon);
     m_stopButton->setIconSize(QSize(32, 32));
-    m_stopButton->setFixedSize(50, 30);
+    m_stopButton->setFixedSize(50, 24);
     m_stopButton->setToolTip(tr("Stop recording"));
     m_stopButton->setAccessibleName(tr("Stop recording"));
     m_recButton->setEnabled(false);
     m_stopButton->setEnabled(false);
     bottomRow->addWidget(m_recButton);
     bottomRow->addWidget(m_stopButton);
-    bottomRow->addStretch(1);
+    m_recordingMode = new QComboBox(this);
+    m_recordingMode->setObjectName("Combo"); // para qss
+    m_recordingMode->setFixedHeight(24);
+    m_recordingMode->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    m_recordingMode->setMinimumContentsLength(8);
+    m_recordingMode->setMinimumWidth(120);
+    m_recordingMode->setMaximumWidth(190);
+    m_recordingMode->setAccessibleName(tr("MP3 recording mode"));
+    for (const auto &mode : MediaManager::mp3RecordingModes()) {
+        const QString rate = mode.sampleRate == 44100 ? "44.1k" : "48k";
+        const QString channels = mode.channels == 2 ? tr("Stereo") : tr("Mono");
+        m_recordingMode->addItem(QString("%1 / %2 / %3k").arg(rate, channels)
+                                    .arg(mode.bitrateKbps), mode.id);
+        m_recordingMode->setItemData(m_recordingMode->count() - 1, mode.label, Qt::ToolTipRole);
+    }
+    m_recordingMode->setCurrentIndex(m_recordingMode->findData("mp3-44100-stereo-192"));
+    m_recordingMode->setToolTip(m_recordingMode->currentData(Qt::ToolTipRole).toString());
+    bottomRow->addWidget(m_recordingMode, 1);
     m_recordingTime = new Label(this);
     m_recordingTime->setText("00:00:00.00");
     m_recordingTime->setWordWrap(false);
@@ -153,8 +170,10 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     font.setPointSize(16);
     font.setBold(true);
     m_recordingTime->setFont(font);
-    m_recordingTime->setFixedHeight(25);
-    m_recordingTime->setMinimumWidth(QFontMetrics(font).horizontalAdvance(m_recordingTime->text()) + 4);
+    m_recordingTime->setFixedHeight(30);
+    m_recordingTime->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    m_recordingTime->ensurePolished();
+    m_recordingTime->setMinimumWidth(m_recordingTime->sizeHint().width());
     m_recordingTime->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_recordingTime->setToolTip(tr("Recording time"));
     m_recordingTime->setAccessibleName(tr("Recording time"));
@@ -192,6 +211,7 @@ Capture::Capture(QWidget *parent) : Frame(parent)
         m_inputDevice->setEnabled(!recording && m_inputDevice->currentData().toInt() >= 0);
         m_recButton->setEnabled(!recording && m_inputDevice->currentData().toInt() >= 0);
         m_stopButton->setEnabled(recording);
+        m_recordingMode->setEnabled(!recording);
     });
     connect(m_mediaManager, &MediaManager::recordingTimeChanged, this, [this](qint64 ms) {
         m_recordingTime->setText(QString("%1:%2:%3.%4")
@@ -206,10 +226,23 @@ Capture::Capture(QWidget *parent) : Frame(parent)
     connect(m_mediaManager, &MediaManager::recordingError, this, [this](const QString &message) {
         QMessageBox::warning(this, tr("Recording"), message);
     });
-    connect(m_inputDevice, &QComboBox::activated, this, &Capture::monitorInput);
+    connect(m_inputDevice, &QComboBox::activated, this, [this]() {
+        monitorInput();
+        emit configurationChanged();
+    });
     connect(m_volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         m_volumeValue->setText(QString::number(value) + " %");
         m_mediaManager->setInputVolume(value / 100.0f);
+        emit configurationChanged();
+    });
+    connect(m_recordingMode, &QComboBox::activated, this, [this]() {
+        if (m_mediaManager->setRecordingMode(m_recordingMode->currentData().toString())) {
+            m_recordingMode->setToolTip(m_recordingMode->currentData(Qt::ToolTipRole).toString());
+            emit configurationChanged();
+        } else {
+            const QSignalBlocker blocker(m_recordingMode);
+            m_recordingMode->setCurrentIndex(m_recordingMode->findData(m_mediaManager->recordingMode()));
+        }
     });
     updateInputDevices();
 }
@@ -262,7 +295,6 @@ void Capture::showEvent(QShowEvent *event)
     Frame::showEvent(event);
     updateInputDevices();
 }
-
 void Capture::hideEvent(QHideEvent *event)
 {
     // Ocultar Capture durante una grabación mantiene Rec activo hasta Stop.
@@ -273,4 +305,45 @@ void Capture::hideEvent(QHideEvent *event)
     m_mediaManager->stopInput();
     m_inputMeter->reset();
     Frame::hideEvent(event);
+}
+
+int Capture::inputDevice() const
+{
+    return m_inputDevice->currentData().toInt();
+}
+
+float Capture::inputVolume() const
+{
+    return m_volumeSlider->value() / 100.0f;
+}
+
+void Capture::setInputDevice(int device)
+{
+    const int index = m_inputDevice->findData(device);
+    if (index < 0) return;
+    const QSignalBlocker blocker(m_inputDevice);
+    m_inputDevice->setCurrentIndex(index);
+    if (isVisible()) monitorInput();
+}
+
+void Capture::setInputVolume(float volume)
+{
+    const QSignalBlocker blocker(m_volumeSlider);
+    const int value = qBound(0, qRound(volume * 100), 100);
+    m_volumeSlider->setValue(value);
+    m_volumeValue->setText(QString::number(value) + " %");
+    m_mediaManager->setInputVolume(value / 100.0f);
+}
+QString Capture::recordingMode() const
+{
+    return m_mediaManager->recordingMode();
+}
+
+bool Capture::setRecordingMode(const QString &id)
+{
+    if (!m_mediaManager->setRecordingMode(id)) return false;
+    const QSignalBlocker blocker(m_recordingMode);
+    m_recordingMode->setCurrentIndex(m_recordingMode->findData(id));
+    m_recordingMode->setToolTip(m_recordingMode->currentData(Qt::ToolTipRole).toString());
+    return true;
 }

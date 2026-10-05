@@ -52,6 +52,7 @@ class FrameOptionsPlayer: public Frame
 
 
        void UpdateDevice();
+       float committedVolume() const;
 
 
     protected:

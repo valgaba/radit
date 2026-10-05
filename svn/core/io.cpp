@@ -133,28 +133,28 @@ bool validItems(const QJsonArray &items)
 Io::Io(QObject *parent) : QObject(parent) {}
 Io::~Io() {}
 
-void Io::SaveListPlayer(QLayout *layout, const QString &filename)
+bool Io::SaveListPlayer(QLayout *layout, const QString &filename, QString *error)
 {
+    if (error) error->clear();
+    if (!layout) return fail(error, tr("No list was selected."));
     const QJsonArray items = saveItems(layout);
-    QString error;
-    if (!writeJson(filename, QJsonObject{{"version", 1}, {"count", items.size()}, {"items", items}}, &error))
-        qWarning() << error;
+    return writeJson(filename, QJsonObject{{"version", 1}, {"count", items.size()}, {"items", items}}, error);
 }
 
-void Io::LoadListPlayer(ContentsBase *contents, const QString &filename)
+bool Io::LoadListPlayer(ContentsBase *contents, const QString &filename, QString *error)
 {
-    if (!contents) return;
+    if (error) error->clear();
+    if (!contents) return fail(error, tr("No list was selected."));
     QJsonObject root;
-    QString error;
-    if (!readJson(filename, root, &error)) {
-        qWarning() << error;
-        return;
-    }
-    if (root["version"].toInt(1) != 1 || !root["items"].isArray()) {
-        qWarning() << "Unsupported list format:" << filename;
-        return;
-    }
+    if (!readJson(filename, root, error)) return false;
+    if (root["version"].toDouble(1) != 1 || !root["items"].isArray())
+        return fail(error, tr("Unsupported list format or version."));
+    if (!validItems(root["items"].toArray()))
+        return fail(error, tr("Invalid data in the list."));
     loadItems(contents, root["items"].toArray());
+    if (auto *list = qobject_cast<ContentsPlayer*>(contents))
+        list->setListFileName(QFileInfo(filename).absoluteFilePath());
+    return true;
 }
 
 bool Io::SavePlayer(TabPlayer *player, const QString &filename, QString *error)
@@ -171,6 +171,7 @@ bool Io::SavePlayer(TabPlayer *player, const QString &filename, QString *error)
             return fail(error, tr("Cannot read the contents of tab %1.").arg(index + 1));
         const QColor color = bar->tabColor(index);
         tabs.append(QJsonObject{{"name", player->tabText(index)},
+            {"listFile", contents->listFileName()},
             {"color", color.isValid() ? color.name(QColor::HexArgb) : QColor(Qt::transparent).name(QColor::HexArgb)},
             {"items", saveItems(contents->layout)}});
     }
@@ -202,6 +203,7 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         if (!value.isObject()) return fail(error, tr("Invalid tab data."));
         const auto tab = value.toObject();
         if (!tab["name"].isString() || !tab["items"].isArray()
+            || (tab.contains("listFile") && !tab["listFile"].isString())
             || !validItems(tab["items"].toArray())
             || (tab.contains("color") && !QColor(tab["color"].toString()).isValid()))
             return fail(error, tr("Invalid data in a player tab."));
@@ -229,7 +231,9 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         const int index = player->addTab(container, name);
         player->setTabToolTip(index, name);
         bar->setTabColor(index, QColor(tab["color"].toString()));
-        loadItems(qobject_cast<ContentsPlayer*>(container->widget()), tab["items"].toArray());
+        auto *contents = qobject_cast<ContentsPlayer*>(container->widget());
+        loadItems(contents, tab["items"].toArray());
+        contents->setListFileName(tab["listFile"].toString());
     }
     player->setCurrentIndex(currentIndex);
     blocker.unblock();

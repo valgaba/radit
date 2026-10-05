@@ -1,324 +1,143 @@
-/* This file is part of Radit.
-   Copyright 2022, Victor Algaba <victorengine@gmail.com> www.radit.org
-
-   Radit is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   radit is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with radit.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include "core/config.h"
-
-#include <QFile>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QJsonParseError>
+#include "core/MediaManager.h"
+#include "widgets/Player.h"
+#include "widgets/Capture.h"
 #include <QCoreApplication>
 #include <QDir>
-#include <QDebug>
+#include <QFile>
+#include <QSaveFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <cmath>
 
-#include "widgets/Player.h"
-
-
-// ============================================================
-// Ruta del fichero de configuración
-// ============================================================
-
-static QString configFilePath()
+namespace {
+QString configPath(const QString &filename)
 {
-    return QDir(QCoreApplication::applicationDirPath())
-        .filePath("config.json");
+    return QDir::isAbsolutePath(filename) ? filename
+        : QDir(QCoreApplication::applicationDirPath()).filePath(filename);
 }
 
-
-// ============================================================
-// SAVE
-// ============================================================
-
-bool Config::saveConfig(const QString& filename,
-                        const QList<Player*>& players)
+QJsonObject deviceSettings(int id, const QList<AudioDevice> &devices)
 {
-    Q_UNUSED(filename);
-
-    QJsonObject root;
-
-    root["version"] = 1;
-
-    QJsonArray playersArray;
-
-    for (int i = 0; i < players.size(); ++i) {
-
-        Player* player = players.at(i);
-
-        if (!player)
-            continue;
-
-        QJsonObject playerObject;
-
-        // ----------------------------------------
-        // Identificador del Player
-        // ----------------------------------------
-
-        playerObject["id"] = player->objectName();
-
-        if (playerObject["id"].toString().isEmpty()) {
-            playerObject["id"] =
-                QString("Player%1").arg(i + 1);
+    QJsonObject result;
+    for (const auto &device : devices) {
+        if (device.id == id) {
+            result["name"] = device.name;
+            result["key"] = device.key;
+            break;
         }
-
-
-        // ----------------------------------------
-        // PLAY DEVICE
-        // ----------------------------------------
-
-        QJsonObject playDevice;
-
-        int playIndex = player->devicePlay();
-
-        playDevice["index"] = playIndex;
-
-
-        // ----------------------------------------
-        // CUE DEVICE
-        // ----------------------------------------
-
-        QJsonObject cueDevice;
-
-        int cueIndex = player->deviceCue();
-
-        cueDevice["index"] = cueIndex;
-
-
-        playerObject["playDevice"] = playDevice;
-        playerObject["cueDevice"] = cueDevice;
-
-        playersArray.append(playerObject);
     }
+    return result;
+}
 
-    root["players"] = playersArray;
+int resolveDevice(const QJsonObject &saved, const QList<AudioDevice> &devices)
+{
+    const QString key = saved.value("key").toString();
+    const QString name = saved.value("name").toString();
+    // Never interpret an old index as another device when an identity was saved.
+    if (!key.isEmpty()) {
+        for (const auto &device : devices)
+            if (device.key == key) return device.id;
+    } else if (!name.isEmpty()) {
+        int match = -1;
+        for (const auto &device : devices) {
+            if (device.name != name) continue;
+            if (match >= 0) { match = -1; break; }
+            match = device.id;
+        }
+        if (match >= 0) return match;
+    }
+    for (const auto &device : devices)
+        if (device.isDefault) return device.id;
+    return devices.isEmpty() ? -1 : devices.first().id;
+}
 
+float savedVolume(const QJsonObject &object)
+{
+    const double value = object.value("volume").toDouble(1.0);
+    return std::isfinite(value) ? static_cast<float>(qBound(0.0, value, 1.0)) : 1.0f;
+}
+}
 
-    // ----------------------------------------
-    // Crear documento JSON
-    // ----------------------------------------
-
-    QJsonDocument document(root);
-
-
-    // ----------------------------------------
-    // Guardar junto al EXE
-    // ----------------------------------------
-
-    QString configPath = configFilePath();
-
-    QFile file(configPath);
-
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-
-        qWarning() << "No se puede guardar configuración:"
-                   << configPath;
-
+bool Config::saveConfig(const QString &filename, const QList<Player *> &players,
+                        Capture *capture, QString *error)
+{
+    if (error) error->clear();
+    const auto outputs = MediaManager::outputDevices();
+    QJsonArray playerArray;
+    for (int i = 0; i < players.size(); ++i) {
+        const Player *player = players.at(i);
+        if (!player) continue;
+        playerArray.append(QJsonObject{
+            {"id", player->objectName().isEmpty() ? QString("Player%1").arg(i + 1) : player->objectName()},
+            {"playDevice", deviceSettings(player->devicePlay(), outputs)},
+            {"cueDevice", deviceSettings(player->deviceCue(), outputs)},
+            {"volume", player->committedVolume()}
+        });
+    }
+    QJsonObject root{{"version", 2}, {"players", playerArray}};
+    if (capture) {
+        root["capture"] = QJsonObject{
+            {"inputDevice", deviceSettings(capture->inputDevice(), MediaManager::inputDevices())},
+            {"volume", capture->inputVolume()},
+            {"recordingMode", capture->recordingMode()}
+        };
+    }
+    QSaveFile file(configPath(filename));
+    const QByteArray json = QJsonDocument(root).toJson(QJsonDocument::Indented);
+    if (!file.open(QIODevice::WriteOnly) || file.write(json) != json.size() || !file.commit()) {
+        if (error) *error = QCoreApplication::translate("Config", "Could not save %1: %2")
+            .arg(file.fileName(), file.errorString());
         return false;
     }
-
-    file.write(document.toJson(QJsonDocument::Indented));
-
-    file.close();
     return true;
 }
 
-
-// ============================================================
-// LOAD
-// ============================================================
-
-bool Config::loadConfig(const QString& filename,
-                        const QList<Player*>& players)
+bool Config::loadConfig(const QString &filename, const QList<Player *> &players,
+                        Capture *capture, QString *error)
 {
-    Q_UNUSED(filename);
-
-
-    // ----------------------------------------
-    // Leer junto al EXE
-    // ----------------------------------------
-
-    QString configPath = configFilePath();
-
-    QFile file(configPath);
-
+    if (error) error->clear();
+    QFile file(configPath(filename));
+    if (!file.exists()) return true; // First start uses the normal defaults.
     if (!file.open(QIODevice::ReadOnly)) {
-
-        qWarning() << "No se puede abrir configuración:"
-                   << configPath;
-
+        if (error) *error = file.errorString();
         return false;
     }
-
-
-    QByteArray data = file.readAll();
-
-    file.close();
-
-
-    // ----------------------------------------
-    // Parsear JSON
-    // ----------------------------------------
-
-    QJsonParseError error;
-
-    QJsonDocument document =
-        QJsonDocument::fromJson(data, &error);
-
-
-    if (error.error != QJsonParseError::NoError) {
-
-        qWarning() << "Error leyendo configuración:"
-                   << error.errorString();
-
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()
+        || document.object().value("version").toInt() != 2
+        || !document.object().value("players").isArray()) {
+        if (error) *error = QCoreApplication::translate("Config", "Invalid configuration in %1")
+            .arg(file.fileName());
         return false;
     }
-
-
-    if (!document.isObject()) {
-
-        qWarning() << "Configuración inválida:"
-                   << "el elemento raíz no es un objeto";
-
-        return false;
-    }
-
-
-    QJsonObject root = document.object();
-
-
-    // ----------------------------------------
-    // Comprobar players
-    // ----------------------------------------
-
-    if (!root.contains("players") ||
-        !root["players"].isArray()) {
-
-        qWarning() << "Configuración inválida:"
-                   << "no existe 'players'";
-
-        return false;
-    }
-
-
-    QJsonArray playersArray =
-        root["players"].toArray();
-
-
-    // ----------------------------------------
-    // Recorrer Players guardados
-    // ----------------------------------------
-
-    for (const QJsonValue& value : playersArray) {
-
-        if (!value.isObject())
-            continue;
-
-
-        QJsonObject playerObject =
-            value.toObject();
-
-
-        QString playerId =
-            playerObject["id"].toString();
-
-
-        // ------------------------------------
-        // Buscar Player correspondiente
-        // ------------------------------------
-
-        Player* playerEncontrado = nullptr;
-
-
-        for (Player* player : players) {
-
-            if (!player)
-                continue;
-
-
-            if (player->objectName() == playerId) {
-
-                playerEncontrado = player;
-
-                break;
+    const QJsonObject root = document.object();
+    const auto outputs = MediaManager::outputDevices();
+    for (const auto &value : root.value("players").toArray()) {
+        const QJsonObject saved = value.toObject();
+        for (Player *player : players) {
+            if (!player || player->objectName() != saved.value("id").toString()) continue;
+            if (saved.value("playDevice").isObject())
+                player->setDevicePlay(resolveDevice(saved.value("playDevice").toObject(), outputs));
+            if (saved.value("cueDevice").isObject())
+                player->setDeviceCue(resolveDevice(saved.value("cueDevice").toObject(), outputs));
+            if (!player->setVolume(savedVolume(saved))) {
+                if (error) *error = QCoreApplication::translate("Config", "Could not restore playback volume.");
+                return false;
             }
         }
-
-
-        if (!playerEncontrado) {
-
-            qWarning() << "Player no encontrado:"
-                       << playerId;
-
-            continue;
-        }
-
-
-        // ------------------------------------
-        // PLAY DEVICE
-        // ------------------------------------
-
-        int playDevice = -1;
-
-
-        if (playerObject.contains("playDevice") &&
-            playerObject["playDevice"].isObject()) {
-
-            QJsonObject playObject =
-                playerObject["playDevice"].toObject();
-
-
-            playDevice =
-                playObject["index"].toInt(-1);
-        }
-
-
-        // ------------------------------------
-        // CUE DEVICE
-        // ------------------------------------
-
-        int cueDevice = -1;
-
-
-        if (playerObject.contains("cueDevice") &&
-            playerObject["cueDevice"].isObject()) {
-
-            QJsonObject cueObject =
-                playerObject["cueDevice"].toObject();
-
-
-            cueDevice =
-                cueObject["index"].toInt(-1);
-        }
-
-
-        // ------------------------------------
-        // Aplicar configuración
-        // ------------------------------------
-
-        if (playDevice >= 0)
-            playerEncontrado->setDevicePlay(playDevice);
-
-
-        if (cueDevice >= 0)
-            playerEncontrado->setDeviceCue(cueDevice);
-
-
     }
-
-
+    if (capture && root.value("capture").isObject()) {
+        const QJsonObject saved = root.value("capture").toObject();
+        if (saved.value("inputDevice").isObject())
+            capture->setInputDevice(resolveDevice(saved.value("inputDevice").toObject(), MediaManager::inputDevices()));
+        capture->setInputVolume(savedVolume(saved));
+        if (!capture->setRecordingMode(saved.value("recordingMode").toString("mp3-44100-stereo-192"))) {
+            if (error) *error = QCoreApplication::translate("Config", "Invalid MP3 recording mode.");
+            return false;
+        }
+    }
     return true;
 }

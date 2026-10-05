@@ -109,7 +109,8 @@ void ContentsBase::dropEvent(QDropEvent *event){
 
     QWidget *owner = this;
     while (owner && !qobject_cast<TabPlayer*>(owner)) owner = owner->parentWidget();
-    if (auto *tabs = qobject_cast<TabPlayer*>(owner)) {
+    auto *tabs = qobject_cast<TabPlayer*>(owner);
+    if (tabs) {
         if (tabs->loadDroppedPlayer(event->mimeData())) {
             event->acceptProposedAction();
             return;
@@ -126,10 +127,12 @@ void ContentsBase::dropEvent(QDropEvent *event){
                // Si es una lista .list, cargarla
                       if (QFileInfo(filePath).suffix().compare("list", Qt::CaseInsensitive) == 0) {
 
-                          this->clearItems();
                           Io io;
-                          io.LoadListPlayer(this, filePath);
-                          this->setTabName(filePath);
+                          QString error;
+                          const bool loaded = tabs ? tabs->loadListFile(filePath, &error)
+                                                   : io.LoadListPlayer(this, filePath, &error);
+                          if (!loaded)
+                              QMessageBox::warning(this, tr("Load list"), error);
                           continue;
                       }
 
@@ -315,7 +318,7 @@ void ContentsBase::setTabName(const QString &filename)
 {
     // 1. Extraemos el nombre limpio del archivo y manejamos si viene vacío
     QFileInfo fileInfo(filename);
-    QString tabName = fileInfo.baseName();
+    QString tabName = fileInfo.completeBaseName();
 
     if (tabName.isEmpty()) {
         tabName = "noname";

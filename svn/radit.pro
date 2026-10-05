@@ -66,6 +66,7 @@ HEADERS += \
     widgets/AudioItemNet.h \
     widgets/Capture.h \
     widgets/CueWaveformFrame.h \
+    widgets/LoadingProgress.h \
     widgets/ContentsMenu.h \
     widgets/ContentsPlayer.h \
     widgets/FileExploreMenu.h \

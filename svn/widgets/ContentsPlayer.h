@@ -31,6 +31,8 @@ private:
     QPoint mousePos;
     bool isCut;  //para las operaciones de cortar pegar
     ContentsMenu *contentsMenu = nullptr;
+    QString m_listFileName;
+    bool saveListFile(const QString &filename);
     //Player *m_player = nullptr;
 
 public:
@@ -55,7 +57,9 @@ public:
 
     void loadItems();
     void saveItems();
-    void saveAsItems() { /* TODO: implementar */ }
+    void saveAsItems();
+    QString listFileName() const { return m_listFileName; }
+    void setListFileName(const QString &filename) { m_listFileName = filename; }
 
     void setPlayer(Player *player);
 

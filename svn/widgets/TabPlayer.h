@@ -37,6 +37,7 @@ public:
  void setPlayerFileName(const QString &filename);
  static QString droppedPlayerFile(const QMimeData *data);
  bool loadDroppedPlayer(const QMimeData *data);
+ bool loadListFile(const QString &filename, QString *error = nullptr);
 
 
 

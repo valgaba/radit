@@ -89,6 +89,7 @@ public:
     void stopMain();
     bool setVolume(float volume);
     float volume() const;
+    float committedVolume() const;
 
     int devicePlay() const;
     void setDevicePlay(int device);

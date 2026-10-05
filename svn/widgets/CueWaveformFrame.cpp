@@ -2,12 +2,16 @@
 #include "widgets/button.h"
 #include "widgets/label.h"
 #include "widgets/vumeter.h"
+#include "widgets/LoadingProgress.h"
 
 #include <QFutureWatcher>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPainter>
 #include <QScreen>
+#include <QWindow>
+#include <QLabel>
+#include <QSizeGrip>
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QMouseEvent>
@@ -15,16 +19,77 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+class WaveformTitleBar : public QWidget
+{
+public:
+    explicit WaveformTitleBar(QWidget *parent) : QWidget(parent)
+    {
+        setObjectName("CueWaveformTitleBar");
+        setAttribute(Qt::WA_StyledBackground, true);
+        setFixedHeight(25);
+    }
+protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (event->button() != Qt::LeftButton) return;
+        if (window()->windowHandle() && window()->windowHandle()->startSystemMove()) return;
+        m_dragging = true;
+        m_offset = event->globalPosition().toPoint() - window()->frameGeometry().topLeft();
+        event->accept();
+    }
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if (m_dragging && (event->buttons() & Qt::LeftButton)) {
+            window()->move(event->globalPosition().toPoint() - m_offset);
+            event->accept();
+        }
+    }
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        m_dragging = false;
+        event->accept();
+    }
+private:
+    bool m_dragging = false;
+    QPoint m_offset;
+};
+}
+
 CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
     : Frame(parent), m_cue(cue)
 {
     setObjectName("CueWaveformFrame");
-    setWindowFlags(Qt::Tool | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
     setWindowTitle(tr("Cue waveform"));
-    setMinimumSize(545, 140);
+    setMinimumSize(665, 166);
     setMouseTracking(true);
-    resize(640, 260);
-    auto *header = new QVBoxLayout(this);
+    resize(740, 260);
+    auto *titleBar = new WaveformTitleBar(this);
+    auto *titleLayout = new QHBoxLayout(titleBar);
+    titleLayout->setContentsMargins(6, 0, 2, 0);
+    titleLayout->setSpacing(4);
+    auto *title = new QLabel(windowTitle(), titleBar);
+    title->setObjectName("CueWaveformTitle");
+    title->setAttribute(Qt::WA_TransparentForMouseEvents);
+    title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    titleLayout->addWidget(title, 1);
+    connect(this, &QWidget::windowTitleChanged, title, &QLabel::setText);
+    auto *titleClose = new Button(titleBar);
+    titleClose->setObjectName("CueWaveformTitleClose");
+    titleClose->SetIcon("Close.svg");
+    titleClose->setIconSize(QSize(15, 15));
+    titleClose->setFixedSize(23, 23);
+    titleClose->setToolTip(tr("Close cue waveform"));
+    titleClose->setAccessibleName(titleClose->toolTip());
+    titleLayout->addWidget(titleClose);
+    connect(titleClose, &QPushButton::clicked, this, &QWidget::close);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(1, 1, 1, 1);
+    outer->setSpacing(0);
+    outer->addWidget(titleBar);
+    auto *header = new QVBoxLayout;
+    outer->addLayout(header, 1);
     header->setContentsMargins(8, 6, 8, 6);
     header->setSpacing(4);
     header->addStretch();
@@ -53,6 +118,25 @@ CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
     m_vumeter = new VuMeter(this);
     m_vumeter->setFixedWidth(160);
     zoomBar->addWidget(m_vumeter);
+    m_volume = new QSlider(Qt::Horizontal, this);
+    m_volume->setObjectName("CueWaveformVolumeSlider");
+    m_volume->setRange(0, 100);
+    m_volume->setSingleStep(1);
+    m_volume->setPageStep(10);
+    m_volume->setFixedSize(100, 23);
+    m_volume->setAccessibleName(tr("Cue volume"));
+    m_volume->setEnabled(!m_cue.isNull());
+    m_volume->setValue(m_cue ? qRound(m_cue->volume() * 100) : 100);
+    m_volume->setToolTip(tr("Cue volume: %1 %").arg(m_volume->value()));
+    zoomBar->addWidget(m_volume);
+    connect(m_volume, &QSlider::valueChanged, this, [this](int value) {
+        if (!m_cue) return;
+        if (!m_cue->setVolume(value / 100.0f)) {
+            const QSignalBlocker blocker(m_volume);
+            m_volume->setValue(qRound(m_cue->volume() * 100));
+        }
+        m_volume->setToolTip(tr("Cue volume: %1 %").arg(m_volume->value()));
+    });
     auto *btnclose = new Button(this);
     btnclose->setObjectName("CueWaveformClose");
     btnclose->setText(tr("Closed"));
@@ -93,6 +177,9 @@ CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
         button->setAccessibleName(button->toolTip());
         zoomBar->addWidget(button);
     }
+    auto *sizeGrip = new QSizeGrip(this);
+    sizeGrip->setFixedSize(12, 12);
+    zoomBar->addWidget(sizeGrip, 0, Qt::AlignBottom);
     m_position = new QSlider(Qt::Horizontal, this);
     m_position->setObjectName("CueWaveformPosition");
     m_position->setRange(0, 10000);
@@ -109,6 +196,7 @@ CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
     });
     connect(m_zoomIn, &QPushButton::clicked, this, [this]() { setWindowSeconds(m_windowSeconds / 2); });
     connect(m_zoomOut, &QPushButton::clicked, this, [this]() { setWindowSeconds(m_windowSeconds * 2); });
+    m_loading = new LoadingProgress(this);
     m_refresh = new QTimer(this);
     m_refresh->setTimerType(Qt::PreciseTimer);
     m_refresh->setInterval(16);
@@ -117,11 +205,26 @@ CueWaveformFrame::CueWaveformFrame(MediaManager *cue, QWidget *parent)
 
 QRectF CueWaveformFrame::plotRect() const
 {
-    return QRectF(6, 28, width() - 12, height() - 90);
+    return QRectF(6, 54, width() - 12, height() - 116);
 }
 
 void CueWaveformFrame::refreshControls()
 {
+    if (m_loadProgress && !m_loading->isHidden()) {
+        const int percent = m_loadProgress->load();
+        if (percent >= 0) m_loading->setProgress(percent);
+        const QRectF plot = plotRect();
+        const int barWidth = qMin(420, int(plot.width()) - 24);
+        m_loading->setGeometry(int(plot.center().x()) - barWidth / 2,
+                               int(plot.center().y()) - 12, barWidth, 24);
+        m_loading->raise();
+    }
+    m_volume->setEnabled(!m_cue.isNull());
+    if (m_cue && !m_volume->isSliderDown()) {
+        const QSignalBlocker blocker(m_volume);
+        m_volume->setValue(qRound(m_cue->volume() * 100));
+        m_volume->setToolTip(tr("Cue volume: %1 %").arg(m_volume->value()));
+    }
     if (!m_cue || !m_cue->isPlaying())
         m_vumeter->reset();
     const double position = m_cue ? m_cue->getPosition() : 0;
@@ -215,9 +318,14 @@ void CueWaveformFrame::showWaveform(const QString &filePath, QWidget *player)
         m_status = tr("Loading waveform…");
         m_cancel = std::make_shared<std::atomic_bool>(false);
         const auto cancel = m_cancel;
+        m_loadProgress = std::make_shared<std::atomic_int>(-1);
+        const auto progress = m_loadProgress;
+        m_loading->begin(tr("Loading waveform…"));
         auto *watcher = new QFutureWatcher<AudioWaveform>(this);
         connect(watcher, &QFutureWatcher<AudioWaveform>::finished, this, [this, watcher, cancel]() {
             if (cancel == m_cancel && !cancel->load()) {
+                m_loading->finish();
+                m_loadProgress.reset();
                 m_waveform = watcher->result();
                 m_status = m_waveform.error;
                 if (m_status.isEmpty() && m_waveform.peaks.isEmpty())
@@ -227,8 +335,8 @@ void CueWaveformFrame::showWaveform(const QString &filePath, QWidget *player)
             }
             watcher->deleteLater();
         });
-        watcher->setFuture(QtConcurrent::run([filePath, cancel]() {
-            return MediaManager::readWaveform(filePath, cancel);
+        watcher->setFuture(QtConcurrent::run([filePath, cancel, progress]() {
+            return MediaManager::readWaveform(filePath, cancel, progress);
         }));
     }
     show();
@@ -249,6 +357,7 @@ void CueWaveformFrame::centerInApplication()
 
 void CueWaveformFrame::showEvent(QShowEvent *event)
 {
+    refreshControls();
     m_refresh->start();
     Frame::showEvent(event);
 }
@@ -266,6 +375,8 @@ void CueWaveformFrame::paintEvent(QPaintEvent *event)
     Frame::paintEvent(event);
     QPainter painter(this);
     const QRectF plot = plotRect();
+    if (!m_loading->isHidden())
+        return;
     if (!m_status.isEmpty()) {
         painter.setPen(QColor("#8a8d96"));
         painter.drawText(plot, Qt::AlignCenter | Qt::TextWordWrap, m_status);
@@ -278,6 +389,7 @@ void CueWaveformFrame::paintEvent(QPaintEvent *event)
     const double start = m_dragging ? m_dragStart : position - windowSeconds * m_cursorFraction;
     // La regla comparte el origen y la escala de la onda, también durante el arrastre.
     painter.save();
+    painter.translate(0, 26);
     painter.setClipRect(QRectF(plot.left(), 3, plot.width(), 25));
     QFont rulerFont = painter.font();
     rulerFont.setPixelSize(10);

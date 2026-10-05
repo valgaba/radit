@@ -21,8 +21,8 @@ public:
     ~Io();
 
 
-    void SaveListPlayer(QLayout* layout, const QString& filename);
-    void LoadListPlayer(ContentsBase* contents, const QString& filename);
+    bool SaveListPlayer(QLayout* layout, const QString& filename, QString* error = nullptr);
+    bool LoadListPlayer(ContentsBase* contents, const QString& filename, QString* error = nullptr);
     bool SavePlayer(TabPlayer* player, const QString& filename, QString* error = nullptr);
     bool LoadPlayer(TabPlayer* player, const QString& filename, QString* error = nullptr);
 

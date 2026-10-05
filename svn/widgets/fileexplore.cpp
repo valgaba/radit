@@ -17,6 +17,9 @@
 
 #include "widgets/fileexplore.h"
 #include "widgets/FileExploreMenu.h"
+#include "widgets/menu.h"
+#include <functional>
+#include <QKeySequence>
 #include "core/MediaManager.h"
 #include "widgets/button.h"
 #include "widgets/label.h"
@@ -57,13 +60,16 @@ class FileExploreFilter : public QSortFilterProxyModel
 {
 public:
     explicit FileExploreFilter(QObject *parent)
-        : QSortFilterProxyModel(parent), m_audioIcon(":/icons/audiofile.svg") {}
+        : QSortFilterProxyModel(parent), m_audioIcon(":/icons/audiofile.svg"),
+          m_folderIcon(":/icons/folder.svg") {}
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override
     {
         if (index.isValid() && index.column() == 0 && role == Qt::DecorationRole) {
             const auto *model = static_cast<QFileSystemModel *>(sourceModel());
             const QModelIndex source = mapToSource(index);
+            if (model->fileInfo(source).isDir())
+                return m_folderIcon;
             if (model->fileInfo(source).isFile())
                 return m_audioIcon;
         }
@@ -122,6 +128,7 @@ protected:
 private:
     QString m_search;
     QIcon m_audioIcon;
+    QIcon m_folderIcon;
     bool m_sortByCreationDate = false;
 };
 
@@ -341,6 +348,16 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
         addLocation(tr("Desktop"), QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
         addLocation(tr("Documents"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
         addLocation(tr("Downloads"), QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+        const QString capturePath = QDir(QCoreApplication::applicationDirPath()).filePath("capture");
+        QAction *captureAction = locationsMenu->addAction(tr("Capture"));
+        captureAction->setToolTip(QDir::toNativeSeparators(capturePath));
+        connect(captureAction, &QAction::triggered, this, [this, capturePath]() {
+            if (!QDir().mkpath(capturePath) || !setPath(capturePath)) {
+                QMessageBox::warning(this, tr("Capture folder"),
+                    tr("Unable to open the capture folder: %1")
+                        .arg(QDir::toNativeSeparators(capturePath)));
+            }
+        });
         locationsMenu->addSeparator();
         locationsMenu->addAction(tr("Favorites"))->setEnabled(false);
         for (const QString &path : m_favorites) {
@@ -394,6 +411,49 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     m_search->setFixedHeight(26);
     m_search->setClearButtonEnabled(true);
     m_search->addAction(explorerIcon(true), QLineEdit::LeadingPosition);
+    m_search->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_search, &QWidget::customContextMenuRequested, this, [this](const QPoint &position) {
+        Menu menu(this);
+        const int selectionStart = m_search->selectionStart();
+        const int selectionLength = m_search->selectedText().size();
+        const int cursorPosition = m_search->cursorPosition();
+        const auto addEditAction = [this, &menu, selectionStart, selectionLength, cursorPosition](const QString &text, const QString &iconPath,
+                                          const QKeySequence &shortcut, bool enabled,
+                                          const std::function<void()> &callback) {
+            QIcon icon(iconPath);
+            icon.addFile(iconPath, QSize(), QIcon::Disabled);
+            QAction *action = menu.addAction(icon, text);
+            action->setShortcut(shortcut);
+            action->setEnabled(enabled);
+            QObject::connect(action, &QAction::triggered, &menu,
+                [this, callback, selectionStart, selectionLength, cursorPosition]() {
+                    m_search->setFocus();
+                    if (selectionStart >= 0)
+                        m_search->setSelection(selectionStart, selectionLength);
+                    else
+                        m_search->setCursorPosition(cursorPosition);
+                    callback();
+                });
+        };
+        addEditAction(tr("Undo"), ":/icons/Undo.svg", QKeySequence::Undo,
+                      m_search->isUndoAvailable(), [this]() { m_search->undo(); });
+        addEditAction(tr("Redo"), ":/icons/Redo.svg", QKeySequence::Redo,
+                      m_search->isRedoAvailable(), [this]() { m_search->redo(); });
+        menu.addSeparator();
+        const bool selected = m_search->hasSelectedText();
+        addEditAction(tr("Cut"), ":/icons/ActionCut.svg", QKeySequence::Cut,
+                      selected, [this]() { m_search->cut(); });
+        addEditAction(tr("Copy"), ":/icons/ActionCopy.svg", QKeySequence::Copy,
+                      selected, [this]() { m_search->copy(); });
+        addEditAction(tr("Paste"), ":/icons/ActionPaste.svg", QKeySequence::Paste,
+                      !QApplication::clipboard()->text().isEmpty(), [this]() { m_search->paste(); });
+        addEditAction(tr("Delete"), ":/icons/Remove.svg", QKeySequence(Qt::Key_Delete),
+                      selected, [this]() { m_search->del(); });
+        menu.addSeparator();
+        addEditAction(tr("Select All"), ":/icons/Selectall.svg", QKeySequence::SelectAll,
+                      !m_search->text().isEmpty(), [this]() { m_search->selectAll(); });
+        menu.exec(m_search->mapToGlobal(position));
+    });
     searchLayout->addWidget(m_search, 1);
     m_sort = new QComboBox(this);
     m_sort->setObjectName("FileExploreSort");
