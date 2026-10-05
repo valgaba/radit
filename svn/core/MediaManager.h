@@ -70,6 +70,7 @@ public:
                                       const std::shared_ptr<std::atomic_bool> &cancel,
                                       const std::shared_ptr<std::atomic_int> &progress = nullptr);
 
+    static double readFileDuration(const QString &filePath);
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
     void play();
