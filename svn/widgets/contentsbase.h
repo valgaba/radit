@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QList>
 #include <QDebug>
+#include <QPointer>
 
 
 #include "core/Clipboard.h"
@@ -15,6 +16,8 @@
 #include "core/MediaManager.h"
 #include "widgets/Player.h"
 
+
+class LoadingDialog;
 
 class ContentsBase: public QWidget{
 
@@ -26,6 +29,15 @@ private:
 
 
     QList<QWidget*>  list;
+    bool m_importingFiles = false;
+    void importDroppedFiles(const QStringList &paths);
+    void importNextDroppedFile();
+    void finishDroppedFile();
+    void cancelDroppedFiles();
+    std::shared_ptr<std::atomic_bool> m_dropCancel;
+    QStringList m_dropPaths;
+    int m_dropIndex = 0;
+    QPointer<LoadingDialog> m_dropLoading;
    // QString formatTimeHhMmSsDd(double duration);
     MediaManager *mediamanager;
 

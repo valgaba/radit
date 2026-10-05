@@ -30,6 +30,12 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QMessageBox>
+#include <QFutureWatcher>
+#include <QEventLoop>
+#include <QPointer>
+#include <QTimer>
+#include <QtConcurrent/QtConcurrentRun>
+#include "widgets/LoadingDialog.h"
 
 //#include <QtConcurrent/QtConcurrentMap>
 //#include <QFuture>
@@ -62,7 +68,10 @@ ContentsBase::ContentsBase(QWidget *parent):QWidget(parent){
 
 
 
-ContentsBase::~ContentsBase(){}
+ContentsBase::~ContentsBase()
+{
+    if (m_dropCancel) m_dropCancel->store(true);
+}
 
 //***********************************
 
@@ -106,6 +115,7 @@ void ContentsBase::dragMoveEvent(QDragMoveEvent *event){
 
 // suelta evento
 void ContentsBase::dropEvent(QDropEvent *event){
+    if (m_importingFiles) { event->ignore(); return; }
 
     QWidget *owner = this;
     while (owner && !qobject_cast<TabPlayer*>(owner)) owner = owner->parentWidget();
@@ -117,59 +127,119 @@ void ContentsBase::dropEvent(QDropEvent *event){
         }
     }
 
-  //////////// viene del sistema de archivos
-   if (event->mimeData()->hasUrls()) {
-        QList<QUrl> urls = event->mimeData()->urls();
-            foreach(QUrl url, urls) {
-
-               QString filePath = url.toLocalFile();
-
-               // Si es una lista .list, cargarla
-                      if (QFileInfo(filePath).suffix().compare("list", Qt::CaseInsensitive) == 0) {
-
-                          Io io;
-                          QString error;
-                          const bool loaded = tabs ? tabs->loadListFile(filePath, &error)
-                                                   : io.LoadListPlayer(this, filePath, &error);
-                          if (!loaded)
-                              QMessageBox::warning(this, tr("Load list"), error);
-                          continue;
-                      }
-
-                      // Si no es .list, tratarlo como archivo de audio
-
-
-
-
-               double duration = mediamanager->getDurationSecond(filePath);
-
-
-                   if (duration <= 0.0) {
-                       qDebug() << "Archivo inválido:" << filePath;
-                       continue; // saltar este archivo
-                   }
-
-                   AudioItemFileMaxi *audioItem = new AudioItemFileMaxi(this);
-                   QFileInfo fileInfo(filePath);
-
-                   audioItem->setFilePath(filePath);
-                   audioItem->setSecond(duration);
-                   audioItem->setNameFile(fileInfo.completeBaseName());
-                   audioItem->setTiempoFile(duration);
-                   audioItem->setToolTip(filePath);
-
-                   createItem(audioItem );
-            }
-
-        event->acceptProposedAction();
-    } else {
+    if (!event->mimeData()->hasUrls() || m_importingFiles) {
         event->ignore();
+        return;
     }
-
-
+    QStringList paths;
+    for (const QUrl &url : event->mimeData()->urls())
+        if (url.isLocalFile()) paths.append(url.toLocalFile());
+    if (paths.isEmpty()) {
+        event->ignore();
+        return;
+    }
+    // Return from the native drop before starting work, so its drag image disappears.
+    m_importingFiles = true;
+    event->acceptProposedAction();
+    QTimer::singleShot(0, this, [this, paths]() {
+        importDroppedFiles(paths);
+    });
 }
 
+void ContentsBase::importDroppedFiles(const QStringList &paths)
+{
+    m_dropPaths = paths;
+    m_dropIndex = 0;
+    m_dropCancel = std::make_shared<std::atomic_bool>(false);
+    // Owned by the destination: deleting a tab closes its progress window too.
+    m_dropLoading = new LoadingDialog(this, tr("Loading files..."), Qt::NonModal);
+    m_dropLoading->setCancelHandler([this]() { cancelDroppedFiles(); });
+    m_dropLoading->setProgress(0, paths.size());
+    importNextDroppedFile();
+}
 
+void ContentsBase::importNextDroppedFile()
+{
+    if (!m_importingFiles || !m_dropCancel || m_dropCancel->load()) return;
+    if (m_dropIndex >= m_dropPaths.size()) {
+        cancelDroppedFiles();
+        return;
+    }
+    const QString path = m_dropPaths.at(m_dropIndex);
+    const QFileInfo info(path);
+    if (m_dropLoading)
+        m_dropLoading->setDetail(tr("Reading: %1 (%2/%3)")
+            .arg(info.fileName()).arg(m_dropIndex + 1).arg(m_dropPaths.size()));
+    if (info.suffix().compare("list", Qt::CaseInsensitive) == 0) {
+        QWidget *owner = this;
+        while (owner && !qobject_cast<TabPlayer*>(owner)) owner = owner->parentWidget();
+        auto *tabs = qobject_cast<TabPlayer*>(owner);
+        if (m_dropLoading) m_dropLoading->hide();
+        QPointer<ContentsBase> target(this);
+        Io io;
+        QString error;
+        const bool loaded = tabs ? tabs->loadListFile(path, &error)
+                                 : io.LoadListPlayer(this, path, &error);
+        if (!target) return;
+        if (!loaded) QMessageBox::warning(this, tr("Load list"), error);
+        if (m_dropLoading) m_dropLoading->show();
+        finishDroppedFile();
+        return;
+    }
+
+    const auto cancel = m_dropCancel;
+    auto *watcher = new QFutureWatcher<double>(this);
+    // The connection belongs to the destination. If it is removed while a network
+    // read is pending, no completion callback can touch deleted widgets.
+    connect(watcher, &QFutureWatcher<double>::finished, this, [this, watcher, path, cancel]() {
+        if (cancel != m_dropCancel || cancel->load()) {
+            watcher->deleteLater();
+            return;
+        }
+        const double duration = watcher->result();
+        watcher->deleteLater();
+        if (duration > 0) {
+            auto *item = new AudioItemFileMaxi(this);
+            item->setFilePath(path);
+            item->setSecond(duration);
+            item->setNameFile(QFileInfo(path).completeBaseName());
+            item->setTiempoFile(duration);
+            item->setToolTip(path);
+            createItem(item);
+        } else {
+            qWarning() << "Invalid or unavailable audio file:" << path;
+        }
+        finishDroppedFile();
+    });
+    watcher->setFuture(QtConcurrent::run([path, cancel]() {
+        if (cancel->load()) return -1.0;
+        const double duration = MediaManager::readFileDuration(path);
+        return cancel->load() ? -1.0 : duration;
+    }));
+}
+
+void ContentsBase::finishDroppedFile()
+{
+    ++m_dropIndex;
+    if (m_dropLoading) m_dropLoading->setProgress(m_dropIndex, m_dropPaths.size());
+    // Yield after every item: playback controls, painting and user input keep working.
+    const auto cancel = m_dropCancel;
+    QTimer::singleShot(0, this, [this, cancel]() {
+        if (cancel == m_dropCancel && !cancel->load()) importNextDroppedFile();
+    });
+}
+
+void ContentsBase::cancelDroppedFiles()
+{
+    if (m_dropCancel) m_dropCancel->store(true);
+    m_importingFiles = false;
+    m_dropPaths.clear();
+    if (m_dropLoading) {
+        m_dropLoading->hide();
+        m_dropLoading->deleteLater();
+        m_dropLoading.clear();
+    }
+}
 
 AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
 
