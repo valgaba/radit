@@ -21,10 +21,11 @@ SOURCES += \
     mainwindow.cpp \
     widgets/AudioItem.cpp \
     widgets/AudioItemFileMaxi.cpp \
+    widgets/AudioItemFolderMaxi.cpp \
     widgets/AudioItemFileMini.cpp \
     widgets/AudioItemMaxi.cpp \
     widgets/AudioItemMini.cpp \
-    widgets/AudioItemNet.cpp \
+    widgets/AudioItemNetMaxi.cpp \
     widgets/Capture.cpp \
     widgets/Cast.cpp \
     widgets/CueWaveformFrame.cpp \
@@ -61,10 +62,11 @@ HEADERS += \
     mainwindow.h \
     widgets/AudioItem.h \
     widgets/AudioItemFileMaxi.h \
+    widgets/AudioItemFolderMaxi.h \
     widgets/AudioItemFileMini.h \
     widgets/AudioItemMaxi.h \
     widgets/AudioItemMini.h \
-    widgets/AudioItemNet.h \
+    widgets/AudioItemNetMaxi.h \
     widgets/Capture.h \
     widgets/Cast.h \
     widgets/CueWaveformFrame.h \

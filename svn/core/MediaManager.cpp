@@ -29,6 +29,8 @@
 #include <QProcess>
 #include <QElapsedTimer>
 #include <QUrl>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
 #include <cmath>
 #include "core/MediaManager.h"
@@ -38,6 +40,9 @@
 struct MediaManager::Backend
 {
     HSTREAM stream = 0;
+    bool network = false;
+    bool loading = false;
+    bool playWhenReady = false;
     HRECORD inputStream = 0;
     int inputDevice = -1;
     DWORD inputRate = 0;
@@ -426,6 +431,9 @@ MediaManager::MediaManager(QObject *parent)
 
                emit audioFrameUpdated(frame);
            }
+           else if (m_backend->network && state == BASS_ACTIVE_STALLED) {
+               emit audioFrameUpdated(AudioFrame{getPosition(), -120.0f, -120.0f});
+           }
 
        });
 
@@ -434,6 +442,8 @@ MediaManager::MediaManager(QObject *parent)
 
 
 MediaManager::~MediaManager(){
+
+    cancelNetworkLoad();
 
     stopInput();
 
@@ -888,6 +898,8 @@ bool MediaManager::initialize()
 
 void MediaManager::shutdown(){
 
+    cancelNetworkLoad();
+
     stopInput();
     m_timer->stop();
     m_deviceRecoveryTimer->stop();
@@ -904,6 +916,11 @@ void MediaManager::shutdown(){
 
 
 bool MediaManager::loadFile(const QString &filePath){
+
+    if (isNetworkUrl(filePath)) return loadUrl(filePath);
+    cancelNetworkLoad();
+    m_backend->network = false;
+    m_timer->stop();
 
     // La selección de BASS es por hilo y puede haberla cambiado otro player.
     if (m_currentDevice >= 0 && !startDevice(m_currentDevice))
@@ -973,6 +990,97 @@ bool MediaManager::loadFile(const QString &filePath){
 
 //******************************************************************
 
+bool MediaManager::isNetworkUrl(const QString &text)
+{
+    const QUrl url(text.trimmed());
+    return url.isValid() && !url.host().isEmpty() &&
+        (url.scheme() == "http" || url.scheme() == "https");
+}
+
+bool MediaManager::isNetworkSource() const { return m_backend->network; }
+bool MediaManager::isLoading() const { return m_backend->loading; }
+
+void MediaManager::cancelNetworkLoad()
+{
+    ++m_networkGeneration;
+    m_backend->playWhenReady = false;
+    if (m_backend->loading) {
+        m_backend->loading = false;
+        emit networkLoadingChanged(false);
+    }
+}
+
+bool MediaManager::loadUrl(const QString &text)
+{
+    if (!isNetworkUrl(text)) {
+        emit playbackError(tr("Enter a valid HTTP or HTTPS audio stream URL."));
+        return false;
+    }
+    if (!setDevice(m_currentDevice)) {
+        emit playbackError(tr("The audio output device is unavailable."));
+        return false;
+    }
+    cancelNetworkLoad();
+    m_timer->stop();
+    m_deviceRecoveryTimer->stop();
+    if (m_backend->stream) {
+        BASS_StreamFree(m_backend->stream);
+        m_backend->stream = 0;
+    }
+    m_backend->network = true;
+    m_backend->loading = true;
+    emit networkLoadingChanged(true);
+    const quint64 generation = m_networkGeneration;
+    BASS_SetConfig(BASS_CONFIG_NET_PLAYLIST, 1);
+    const int device = m_currentDevice;
+    const QString url = QString::fromUtf8(QUrl(text.trimmed()).toEncoded());
+    // Own pending handles until adopted, including when the owner is destroyed
+    // or another item replaces the request before it finishes.
+    struct NetworkResult {
+        HSTREAM stream = 0;
+        int error = 0;
+        ~NetworkResult() { if (stream) BASS_StreamFree(stream); }
+    };
+    using Result = std::shared_ptr<NetworkResult>;
+    auto *watcher = new QFutureWatcher<Result>(this);
+    connect(watcher, &QFutureWatcher<Result>::finished, this, [this, watcher, generation]() {
+        const auto result = watcher->result();
+        watcher->deleteLater();
+        if (generation != m_networkGeneration) return;
+        const bool playRequested = m_backend->playWhenReady;
+        m_backend->loading = false;
+        m_backend->playWhenReady = false;
+        if (!result->stream) {
+            emit networkLoadingChanged(false);
+            emit playbackError(tr("Unable to open the radio stream (audio engine error %1).").arg(result->error));
+            return;
+        }
+        m_backend->stream = result->stream;
+        result->stream = 0;
+        BASS_ChannelSetAttribute(m_backend->stream, BASS_ATTRIB_VOL, m_volume);
+        BASS_ChannelSetSync(m_backend->stream, BASS_SYNC_END, 0, Backend::EndSyncCallback, this);
+        BASS_ChannelSetSync(m_backend->stream, BASS_SYNC_DEV_FAIL, 0, Backend::DeviceFailedSyncProc, this);
+        emit networkLoadingChanged(false);
+        if (playRequested) play();
+    });
+    watcher->setFuture(QtConcurrent::run([url, device]() {
+        auto result = std::make_shared<NetworkResult>();
+        if (!BASS_SetDevice(device)) {
+            result->error = BASS_ErrorGetCode();
+            return result;
+        }
+#ifdef Q_OS_WIN
+        result->stream = BASS_StreamCreateURL(reinterpret_cast<const wchar_t*>(url.utf16()),
+                                              0, BASS_UNICODE | BASS_STREAM_BLOCK, nullptr, nullptr);
+#else
+        const QByteArray encoded = url.toUtf8();
+        result->stream = BASS_StreamCreateURL(encoded.constData(), 0, BASS_STREAM_BLOCK, nullptr, nullptr);
+#endif
+        if (!result->stream) result->error = BASS_ErrorGetCode();
+        return result;
+    }));
+    return true;
+}
 
 double MediaManager::getDurationSecond(const QString &filePath)
 {
@@ -1008,6 +1116,10 @@ double MediaManager::readFileDuration(const QString &filePath)
 
 void MediaManager::play()
 {
+    if (m_backend->loading) {
+        m_backend->playWhenReady = true;
+        return;
+    }
     if (!m_backend->stream) return;
 
     const DWORD device = BASS_ChannelGetDevice(m_backend->stream);
@@ -1053,6 +1165,10 @@ float MediaManager::volume() const
 
 void MediaManager::pause()
 {
+    if (m_backend->loading) {
+        m_backend->playWhenReady = false;
+        return;
+    }
     if (!m_backend->stream) return;
 
         BASS_ChannelPause(m_backend->stream);
@@ -1061,12 +1177,17 @@ void MediaManager::pause()
 
 void MediaManager::stop()
 {
+    cancelNetworkLoad();
     if (!m_backend->stream)
          return;
 
 
         BASS_ChannelStop(m_backend->stream);
         m_timer->stop();
+        if (m_backend->network) {
+            BASS_StreamFree(m_backend->stream);
+            m_backend->stream = 0;
+        }
 
         emit positionChanged(0.0);
 }
@@ -1075,7 +1196,8 @@ void MediaManager::stop()
 bool MediaManager::isPlaying() const
 {
     if (!m_backend->stream) return false;
-    return BASS_ChannelIsActive(m_backend->stream) == BASS_ACTIVE_PLAYING;
+    const DWORD state = BASS_ChannelIsActive(m_backend->stream);
+    return state == BASS_ACTIVE_PLAYING || (m_backend->network && state == BASS_ACTIVE_STALLED);
 }
 
 bool MediaManager::isPaused() const
@@ -1096,6 +1218,7 @@ void MediaManager::forward()
 
 void MediaManager::seek(double seconds)
 {
+    if (m_backend->network) return;
     if (!m_backend->stream) return;
 
        // Duración total
@@ -1277,7 +1400,7 @@ void MediaManager::fadeOut(int durationMs)
 
 void CALLBACK MediaManager::Backend::EndSyncCallback(
         HSYNC,
-        DWORD,
+        DWORD channel,
         DWORD,
         void *user)
 {
@@ -1287,8 +1410,9 @@ void CALLBACK MediaManager::Backend::EndSyncCallback(
 
     QMetaObject::invokeMethod(
         self,
-        [self]()
+        [self, channel]()
         {
+            if (self->m_backend->stream != channel) return;
             if (self->m_timer)
                 self->m_timer->stop();
 

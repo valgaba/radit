@@ -243,6 +243,22 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         contentsMenu->setloopVisible(true);
         contentsMenu->setselectVisible(true);
 
+        bool hasSelection = false;
+        bool canPurge = false;
+        for (auto *item : findChildren<AudioItemMaxi*>()) {
+            if (!item->isSelect()) continue;
+            hasSelection = true;
+            canPurge |= !item->isLiveStream();
+        }
+        if (!hasSelection) {
+            QWidget *target = widget;
+            while (target && !qobject_cast<AudioItemMaxi*>(target))
+                target = target->parentWidget();
+            if (auto *item = qobject_cast<AudioItemMaxi*>(target))
+                canPurge = !item->isLiveStream();
+        }
+        contentsMenu->setpurgeVisible(canPurge);
+
       //  contentsMenu->setLoadVisible(true);
         contentsMenu->setSaveVisible(true);
         contentsMenu->setSaveAsVisible(true);

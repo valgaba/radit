@@ -31,6 +31,8 @@
 #include <cmath>
 #include "core/io.h"
 #include "widgets/AudioItemMaxi.h"
+#include "widgets/AudioItemNetMaxi.h"
+#include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFilemaxi.h"
 #include "widgets/TabPlayer.h"
@@ -54,6 +56,8 @@ QJsonArray saveItems(QLayout *layout)
         auto *item = qobject_cast<AudioItemMaxi*>(layout->itemAt(i)->widget());
         if (!item) continue;
         items.append(QJsonObject{
+            {"type", qobject_cast<AudioItemFolderMaxi*>(item) ? "folder" :
+                         item->isLiveStream() ? "net" : "file"},
             {"url", item->filePath()}, {"name", item->nameFile()},
             {"second", item->second()}, {"secondStart", item->secondStart()},
             {"select", item->isSelect()}, {"playNext", item->isPlayNext()},
@@ -72,18 +76,23 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
         const auto object = value.toObject();
         const QString path = object["url"].toString();
         if (path.isEmpty()) continue;
-        auto *item = new AudioItemFileMaxi(contents);
+        const bool network = MediaManager::isNetworkUrl(path);
+        const bool folder = object["type"].toString() == "folder";
+        AudioItemMaxi *item = folder ? static_cast<AudioItemMaxi*>(new AudioItemFolderMaxi(contents)) :
+            network ? static_cast<AudioItemMaxi*>(new AudioItemNetMaxi(contents)) :
+                      static_cast<AudioItemMaxi*>(new AudioItemFileMaxi(contents));
+        if (folder) static_cast<AudioItemFolderMaxi*>(item)->setFolderPath(path);
         item->setFilePath(path);
         item->setToolTip(path);
         item->setNameFile(object["name"].toString());
         const double seconds = object["second"].toDouble();
         item->setSecond(seconds);
-        item->setTiempoFile(seconds);
-        item->setSecondStart(object["secondStart"].toDouble());
+        if (!network && !folder) item->setTiempoFile(seconds);
+        if (!folder) item->setSecondStart(object["secondStart"].toDouble());
         item->setIsSelect(object["select"].toBool());
         item->setIsPlayNext(object["playNext"].toBool());
         item->setIsPurge(object["purge"].toBool());
-        item->setIsLoop(object["loop"].toBool());
+        if (!network) item->setIsLoop(object["loop"].toBool());
         const QColor color(object["color"].toString());
         if (color.isValid()) item->setColor(color);
         contents->createItem(item);
@@ -148,6 +157,8 @@ bool validItems(const QJsonArray &items, LoadingDialog &loading)
         loading.refresh();
         if (!value.isObject()) return false;
         const auto item = value.toObject();
+        if (item.contains("type") && (!item["type"].isString() ||
+            !QStringList{"file", "net", "folder"}.contains(item["type"].toString()))) return false;
         if (!item["url"].isString() || item["url"].toString().isEmpty()
             || !item["name"].isString() || !item["second"].isDouble()
             || item["second"].toDouble() < 0 || !std::isfinite(item["second"].toDouble()))

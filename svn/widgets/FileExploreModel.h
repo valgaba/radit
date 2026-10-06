@@ -141,8 +141,7 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const override
     {
         if (!index.isValid()) return Qt::NoItemFlags;
-        return Qt::ItemIsEnabled | Qt::ItemIsSelectable |
-               (isDir(index) ? Qt::NoItemFlags : Qt::ItemIsDragEnabled);
+        return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled;
     }
     QStringList mimeTypes() const override { return {QStringLiteral("text/uri-list")}; }
     QMimeData *mimeData(const QModelIndexList &indexes) const override
@@ -150,7 +149,7 @@ public:
         auto *mime = new QMimeData;
         QList<QUrl> urls;
         for (const auto &index : indexes) {
-            if (!index.isValid() || isDir(index)) continue;
+            if (!index.isValid()) continue;
             const QUrl url = QUrl::fromLocalFile(filePath(index));
             if (!urls.contains(url)) urls.append(url);
         }

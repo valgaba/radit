@@ -71,8 +71,20 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     logoImage.fill(Qt::transparent);
     logoImage.setDevicePixelRatio(2);
     QPainter logoPainter(&logoImage);
-    QSvgRenderer renderer(QString(":/icons/RaditLogo.svg"));
+    QSvgRenderer renderer(QString(":/icons/RaditAppIcon.svg"));
+    // Keep the large letter's original size while reusing the app icon effects.
+    renderer.setViewBox(QRectF(10, 8, 190, 180));
     renderer.render(&logoPainter, QRectF(0, 0, 190, 180));
+    // Qt SVG does not apply the icon's clipPath; mask with the original letter.
+    QPixmap letterMask(logoImage.size());
+    letterMask.fill(Qt::transparent);
+    letterMask.setDevicePixelRatio(2);
+    QPainter maskPainter(&letterMask);
+    QSvgRenderer letterRenderer(QString(":/icons/RaditLogo.svg"));
+    letterRenderer.render(&maskPainter, QRectF(0, 0, 190, 180));
+    maskPainter.end();
+    logoPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    logoPainter.drawPixmap(0, 0, letterMask);
     logoPainter.end();
     logo->setPixmap(logoImage);
     logo->setAccessibleName(tr("Radit logo"));

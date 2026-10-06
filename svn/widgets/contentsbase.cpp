@@ -42,6 +42,7 @@
 //#include <QFutureWatcher>
 
 #include "widgets/contentsbase.h"
+#include "widgets/AudioItemFolderMaxi.h"
 //#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFilemaxi.h"
 #include "core/io.h"
@@ -167,6 +168,13 @@ void ContentsBase::importNextDroppedFile()
     }
     const QString path = m_dropPaths.at(m_dropIndex);
     const QFileInfo info(path);
+    if (info.isDir()) {
+        auto *item = new AudioItemFolderMaxi(this);
+        item->setFolderPath(path);
+        createItem(item);
+        finishDroppedFile();
+        return;
+    }
     if (m_dropLoading)
         m_dropLoading->setDetail(tr("Reading: %1 (%2/%3)")
             .arg(info.fileName()).arg(m_dropIndex + 1).arg(m_dropPaths.size()));

@@ -85,6 +85,10 @@ public:
     static double readFileDuration(const QString &filePath);
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
+    bool loadUrl(const QString &url);
+    static bool isNetworkUrl(const QString &url);
+    bool isNetworkSource() const;
+    bool isLoading() const;
     void play();
     void pause();
     void stop();
@@ -125,6 +129,8 @@ public:
 
 
 signals:
+    void networkLoadingChanged(bool loading);
+    void playbackError(const QString &message);
     void streamingChanged(bool active);
     void streamingConnected();
     void streamingTimeChanged(qint64 milliseconds);
@@ -157,6 +163,8 @@ private:
     void recoverDevice();
     void flushRecordingData();
     void flushStreamingData();
+    void cancelNetworkLoad();
+    quint64 m_networkGeneration = 0;
 
 
     float m_silenceThresholdDb = -25.0f; //45

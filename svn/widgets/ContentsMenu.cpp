@@ -19,6 +19,9 @@
 #include "ContentsMenu.h"
 #include "ContentsPlayer.h"
 #include "widgets/AudioItemFileMaxi.h"
+#include "widgets/AudioItemNetMaxi.h"
+#include "widgets/AudioItemFolderMaxi.h"
+#include <QFileDialog>
 #include <QWidgetAction>
 #include <QPushButton>
 #include <QHBoxLayout>
@@ -54,8 +57,8 @@ void ContentsMenu::setSaveVisible(bool visible) { if (saveAction) saveAction->se
 void ContentsMenu::setSaveAsVisible(bool visible) { if (saveasAction) saveasAction->setVisible(visible); }
 
 
-void ContentsMenu::setnextVisible(bool visible) { if (purgeItemAction) purgeItemAction->setVisible(visible); }
-void ContentsMenu::setpurgeVisible(bool visible) { if (nextItemAction) nextItemAction->setVisible(visible); }
+void ContentsMenu::setnextVisible(bool visible) { if (nextItemAction) nextItemAction->setVisible(visible); }
+void ContentsMenu::setpurgeVisible(bool visible) { if (purgeItemAction) purgeItemAction->setVisible(visible); }
 void ContentsMenu::setloopVisible(bool visible) { if (loopItemAction)  loopItemAction->setVisible(visible); }
 void ContentsMenu::setselectVisible(bool visible) { if (selectItemAction) selectItemAction->setVisible(visible); }
 
@@ -191,6 +194,18 @@ QAction* ContentsMenu::createAddAction() {
 
     connect(addAudiofile, &QAction::triggered, player, [this]{
         player->createItem(new AudioItemFileMaxi(player));
+    });
+    connect(addNeturl, &QAction::triggered, player, [this]() {
+        auto *item = new AudioItemNetMaxi(player);
+        if (item->editStation()) player->createItem(item);
+        else delete item;
+    });
+    connect(addAudioFolder, &QAction::triggered, player, [this]() {
+        const QString path = QFileDialog::getExistingDirectory(player, tr("Select audio folder"));
+        if (path.isEmpty()) return;
+        auto *item = new AudioItemFolderMaxi(player);
+        item->setFolderPath(path);
+        player->createItem(item);
     });
 
     return action;

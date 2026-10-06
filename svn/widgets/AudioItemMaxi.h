@@ -106,6 +106,11 @@ public:
 
 
      virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
+     virtual bool isLiveStream() const { return false; }
+     virtual bool advancesOnLoop() const { return false; }
+     virtual bool preparePlayback() { return true; }
+     virtual QString playbackPath() const { return filePath(); }
+     virtual QString playbackName() const { return nameFile(); }
      void setIsSelect(bool value) override;
 
 
@@ -133,6 +138,7 @@ public:
 
 
     void setIsPurge(bool isPurge) {
+           if (isLiveStream()) isPurge = false;
            m_isPurge = isPurge;
            btnpurge->setProperty("purgecolor", m_isPurge); //active viene del css
            btnpurge->style()->polish(btnpurge);
@@ -157,6 +163,7 @@ public:
 
 
     void setIsLoop(bool isLoop) {
+           if (isLiveStream()) isLoop = false;
            m_isLoop = isLoop;
 
            btnloop->setProperty("loopcolor", m_isLoop); //active viene del css
@@ -176,7 +183,7 @@ public:
 
            // Control de visibilidad
               if (btnpurge) {
-                  btnpurge->setVisible(!m_isLoop);
+                  btnpurge->setVisible(!m_isLoop && !isLiveStream());
               }
 
               if (btnnext) {
@@ -209,6 +216,9 @@ public:
 
 
     protected:
+    void setLiveStreamPresentation();
+    void setFolderPresentation(const QString &status, bool ready);
+    Button *propertiesButton() const { return btnproperties; }
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 

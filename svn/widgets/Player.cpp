@@ -49,7 +49,8 @@ Player::Player(QWidget *parent) : Frame(parent) {
                  vumeter->reset();
          }
 
-         this->labeltiempo->setText(SecondToTime(m_duration-frame.position)); //cuenta atras del tiempo
+         this->labeltiempo->setText(SecondToTime(mediamanager->isNetworkSource()
+             ? frame.position : m_duration-frame.position));
 
          if (!m_userIsSeeking && m_duration > 0.0)
          {
@@ -59,6 +60,15 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
        });
 
+     connect(mediamanager, &MediaManager::networkLoadingChanged, this, [this](bool loading) {
+         labeltiempo->setText(loading ? tr("Connecting...") : "00:00:00.00");
+     });
+     connect(mediamanager, &MediaManager::playbackError, this, [this](const QString &message) {
+         stopMain();
+         labelnombre->setText(message);
+         labelnombre->setToolTip(message);
+     });
+
             //emite el final
        connect(mediamanager, &MediaManager::playbackFinished,
                this, [this]() {
@@ -67,6 +77,13 @@ Player::Player(QWidget *parent) : Frame(parent) {
                return;
 
            if (currentItem->isLoop()) {
+
+               if (currentItem->advancesOnLoop()) {
+                   AudioItemMaxi *item = currentItem;
+                   stopMain();
+                   playItem(item);
+                   return;
+               }
 
                // LOOP
                mediamanager->seek(currentItem->secondStart());
@@ -426,8 +443,9 @@ void Player::playItem(AudioItemMaxi *item)
            qWarning() << "Dispositivo de audio no disponible:" << this->devicePlay();
            return;
        }
-       if (!mediamanager->loadFile(item->filePath())) {
-           qWarning() << "No se pudo cargar el audio:" << item->filePath();
+       if (!item->preparePlayback()) return;
+       if (!mediamanager->loadFile(item->playbackPath())) {
+           qWarning() << "No se pudo cargar el audio:" << item->playbackPath();
            return;
        }
        mediamanager->seek(item->secondStart());
@@ -444,7 +462,8 @@ void Player::playItem(AudioItemMaxi *item)
 
 
        m_duration=item->second();
-       labelnombre->setText(item->nameFile());
+       slider->setEnabled(!mediamanager->isNetworkSource());
+       labelnombre->setText(item->playbackName());
        btnpause->SetIcon("Pausemini.svg");
 }
 

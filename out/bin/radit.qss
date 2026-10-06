@@ -1588,3 +1588,40 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
     padding: 2px; min-height: 20px;
 }
 #Cast QLineEdit:focus, #Cast QSpinBox:focus { border-color: #80A4AE; }
+
+/* Online radio item properties. */
+QDialog#OnlineRadioDialog {
+    background-color: #262c3b;
+    border: 1px solid #686b74;
+}
+#OnlineRadioDialog QLabel {
+    background: transparent;
+    border: none;
+    color: #8a8d96;
+    font-size: 14px;
+}
+#OnlineRadioDialog QLineEdit {
+    background-color: #181e2c;
+    border: 1px solid #686b74;
+    border-radius: 3px;
+    padding: 5px 6px;
+    color: #80A4AE;
+    font-size: 14px;
+    selection-background-color: #4e4d7a;
+    selection-color: #ffffff;
+}
+#OnlineRadioDialog QLineEdit:focus { border-color: #80A4AE; }
+#OnlineRadioDialog QDialogButtonBox { background: transparent; border: none; }
+#OnlineRadioDialog QPushButton {
+    min-width: 80px;
+    padding: 5px 12px;
+    border: 1px solid #686b74;
+    border-radius: 3px;
+    background-color: #262c3b;
+    color: #80A4AE;
+    font-size: 14px;
+}
+#OnlineRadioDialog QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
+#OnlineRadioDialog QPushButton:pressed { background-color: #1d2230; }
+#OnlineRadioDialog QPushButton:default { border-color: #80A4AE; }
+#OnlineRadioDialog QPushButton:disabled { color: #686b74; border-color: #333b4f; }

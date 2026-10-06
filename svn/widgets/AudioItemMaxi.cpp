@@ -319,8 +319,25 @@ bool AudioItemMaxi::prepareCue()
 
 AudioItemMaxi::~AudioItemMaxi(){}
 
+void AudioItemMaxi::setFolderPresentation(const QString &status, bool ready)
+{
+    m_cueButton->hide();
+    btnplay->setEnabled(ready);
+    labeltiempo->setText(status);
+}
+
+void AudioItemMaxi::setLiveStreamPresentation()
+{
+    m_cueButton->hide();
+    btnloop->hide();
+    setIsPurge(false);
+    btnpurge->hide();
+    labeltiempo->setText(tr("LIVE"));
+}
+
 void AudioItemMaxi::setSecondStart(double seconds)
 {
+    if (isLiveStream()) seconds = 0;
     m_secondstart = std::isfinite(seconds) && seconds > 0.0 ? seconds : 0.0;
     m_cueStartPosition = m_secondstart;
     updateCueIndicator();
