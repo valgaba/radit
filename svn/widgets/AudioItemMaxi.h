@@ -14,6 +14,8 @@
 #include "core/MediaManager.h"
 
 class CueWaveformFrame;
+class QTimer;
+class QGraphicsOpacityEffect;
 
 
 
@@ -60,6 +62,10 @@ private:
 
 
     CueWaveformFrame *m_cueWaveform = nullptr;
+    Button *m_cueButton = nullptr;
+    QTimer *m_cueBlinkTimer = nullptr;
+    QGraphicsOpacityEffect *m_cueOpacity = nullptr;
+    void updateCueIndicator();
 
 
      bool m_isPlayNext=false;
@@ -188,9 +194,7 @@ public:
 
 
 
-    void setSecondStart(double secondStart) {
-        m_secondstart = secondStart;
-    }
+    void setSecondStart(double secondStart);
 
     double secondStart() const {
         return m_secondstart;
@@ -205,6 +209,8 @@ public:
 
 
     protected:
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 
     private slots:

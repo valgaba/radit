@@ -27,6 +27,8 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QProcess>
+#include <QElapsedTimer>
+#include <QUrl>
 #include <algorithm>
 #include <cmath>
 #include "core/MediaManager.h"
@@ -43,6 +45,11 @@ struct MediaManager::Backend
     QMutex inputMutex;
     bool collectRecording = false;
     bool recording = false;
+    bool streaming = false;
+    bool castEncoder = false;
+    bool connected = false;
+    QElapsedTimer streamingWatch;
+    QByteArray progressData;
     bool overflow = false;
     float inputGain = 1.0f;
     QByteArray recordingData;
@@ -302,10 +309,44 @@ MediaManager::MediaManager(QObject *parent)
     connect(m_backend->encoder, &QProcess::readyReadStandardError, this, [this]() {
         // Evitar que los mensajes del codificador crezcan sin límite.
         const QByteArray error = m_backend->encoder->readAllStandardError();
-        if (!error.isEmpty())
+        if (!error.isEmpty() && !m_backend->castEncoder)
             qWarning().noquote() << "Capture:" << QString::fromUtf8(error).trimmed();
     });
+    connect(m_backend->encoder, &QProcess::readyReadStandardOutput, this, [this]() {
+        const QByteArray output = m_backend->encoder->readAllStandardOutput();
+        if (!isStreaming()) return;
+        m_backend->progressData += output;
+        int end;
+        while ((end = m_backend->progressData.indexOf('\n')) >= 0) {
+            const QByteArray line = m_backend->progressData.left(end).trimmed();
+            m_backend->progressData.remove(0, end + 1);
+            if (!line.startsWith("out_time_us=")) continue;
+            bool ok = false;
+            const qint64 us = line.mid(12).toLongLong(&ok);
+            if (!ok || us <= 0) continue;
+            m_backend->streamingWatch.restart();
+            if (!m_backend->connected) {
+                m_backend->connected = true;
+                emit streamingConnected();
+            }
+            emit streamingTimeChanged(us / 1000);
+        }
+    });
+    connect(m_backend->encoder, &QProcess::started, this, [this]() {
+        if (!isStreaming()) return;
+        const QMutexLocker lock(&m_backend->inputMutex);
+        m_backend->collectRecording = true;
+    });
+    connect(m_backend->encoder, &QProcess::errorOccurred, this, [this]() {
+        if (!isStreaming()) return;
+        stopStreaming();
+        emit streamingError(tr("The streaming encoder failed. Check FFmpeg and the server settings."));
+    });
     connect(m_backend->encoder, &QProcess::finished, this, [this]() {
+        if (isStreaming()) {
+            stopStreaming();
+            emit streamingError(tr("The stream ended unexpectedly. Check the connection, credentials and mount point."));
+        }
         if (isRecording())
             stopRecording();
     });
@@ -456,6 +497,7 @@ bool MediaManager::startInput(int deviceId)
 
 void MediaManager::stopInput()
 {
+    stopStreaming();
     stopRecording();
     m_inputTimer->stop();
     if (m_backend->inputStream) {
@@ -533,6 +575,7 @@ QStringList MediaManager::mp3EncodingOptions() const
 
 bool MediaManager::startRecording()
 {
+    if (isStreaming()) return false;
     if (isRecording())
         return true;
     if (!m_backend->inputStream || !m_backend->inputRate || !m_backend->inputChannels ||
@@ -573,6 +616,7 @@ bool MediaManager::startRecording()
         "-ac", QString::number(m_backend->inputChannels), "-i", "pipe:0"
     };
     arguments << mp3EncodingOptions() << "-f" << "mp3" << path;
+    m_backend->castEncoder = false;
     m_backend->encoder->start(program, arguments);
     if (!m_backend->encoder->waitForStarted(3000)) {
         const QString error = m_backend->encoder->errorString();
@@ -599,6 +643,10 @@ bool MediaManager::startRecording()
 
 void MediaManager::flushRecordingData()
 {
+    if (isStreaming()) {
+        flushStreamingData();
+        return;
+    }
     if (!isRecording())
         return;
     QByteArray data;
@@ -662,6 +710,112 @@ bool MediaManager::stopRecording()
         emit recordingError(tr("The recording could not be completed. Check the file: %1")
                             .arg(m_backend->recordingPath));
     return success;
+}
+
+bool MediaManager::isStreaming() const
+{
+    return m_backend->streaming;
+}
+
+bool MediaManager::startStreaming(const CastSettings &settings)
+{
+    if (isStreaming()) return true;
+    const auto fail = [this](const QString &message) {
+        emit streamingError(message);
+        return false;
+    };
+    if (isRecording())
+        return fail(tr("Stop recording before starting a stream on this audio session."));
+    if (!m_backend->inputStream || !m_backend->inputRate || !m_backend->inputChannels ||
+        BASS_ChannelIsActive(m_backend->inputStream) != BASS_ACTIVE_PLAYING)
+        return fail(tr("Select an available audio input before connecting."));
+    QUrl url;
+    url.setScheme("icecast");
+    url.setHost(settings.host.trimmed());
+    url.setPort(settings.port);
+    url.setUserName(settings.username.trimmed());
+    url.setPassword(settings.password);
+    url.setPath(settings.mount.trimmed());
+    if (!url.isValid() || url.host().isEmpty() || settings.port < 1 || settings.port > 65535 ||
+        settings.username.trimmed().isEmpty() || !settings.mount.startsWith('/') ||
+        settings.mount.trimmed().size() < 2 || settings.host.contains('/') ||
+        settings.host.contains('@') || settings.host.contains('?') || settings.host.contains('#'))
+        return fail(tr("Enter a server hostname, port, username and mount point such as /stream."));
+    QStringList encoding;
+    for (const auto &mode : mp3RecordingModes()) {
+        if (mode.id == settings.mode)
+            encoding = {"-ar", QString::number(mode.sampleRate), "-ac", QString::number(mode.channels),
+                        "-c:a", "libmp3lame", "-b:a", QString::number(mode.bitrateKbps) + "k"};
+    }
+    if (encoding.isEmpty()) return fail(tr("Select a supported MP3 streaming mode."));
+    const QString program = QDir(QCoreApplication::applicationDirPath()).filePath("ffmpeg/ffmpeg.exe");
+    if (!QFileInfo::exists(program)) return fail(tr("FFmpeg is missing from the ffmpeg folder."));
+    QStringList arguments{
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-nostats",
+        "-progress", "pipe:1", "-stats_period", "0.5", "-thread_queue_size", "32",
+        "-f", "f32le", "-ar", QString::number(m_backend->inputRate),
+        "-ac", QString::number(m_backend->inputChannels), "-i", "pipe:0"
+    };
+    arguments << encoding << "-content_type" << "audio/mpeg" << "-ice_name" << settings.name
+              << "-tls" << (settings.tls ? "1" : "0") << "-rw_timeout" << "10000000"
+              << "-flush_packets" << "1" << "-f" << "mp3"
+              << QString::fromUtf8(url.toEncoded(QUrl::FullyEncoded));
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        m_backend->recordingData.clear();
+        m_backend->recordingBytes = 0;
+        m_backend->overflow = false;
+        m_backend->collectRecording = false;
+    }
+    m_backend->progressData.clear();
+    m_backend->castEncoder = true;
+    m_backend->connected = false;
+    m_backend->streaming = true;
+    m_backend->streamingWatch.start();
+    emit streamingTimeChanged(0);
+    emit streamingChanged(true);
+    m_backend->encoder->start(program, arguments);
+    return true;
+}
+
+void MediaManager::flushStreamingData()
+{
+    if (m_backend->encoder->state() == QProcess::Starting) return;
+    QByteArray data;
+    bool overflow;
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        data.swap(m_backend->recordingData);
+        overflow = m_backend->overflow;
+    }
+    // Bound both queues; a stalled server must never grow memory indefinitely.
+    if (overflow || m_backend->encoder->bytesToWrite() > 4 * 1024 * 1024 ||
+        m_backend->encoder->state() != QProcess::Running ||
+        m_backend->streamingWatch.elapsed() > 15000 ||
+        (!data.isEmpty() && m_backend->encoder->write(data) != data.size())) {
+        stopStreaming();
+        emit streamingError(tr("Streaming stopped: the server is unavailable or stopped receiving audio."));
+    }
+}
+
+void MediaManager::stopStreaming()
+{
+    if (!isStreaming()) return;
+    m_backend->streaming = false;
+    m_backend->connected = false;
+    {
+        const QMutexLocker lock(&m_backend->inputMutex);
+        m_backend->collectRecording = false;
+        m_backend->recordingData.clear();
+    }
+    if (m_backend->encoder->state() != QProcess::NotRunning) {
+        m_backend->encoder->closeWriteChannel();
+        if (!m_backend->encoder->waitForFinished(1500)) {
+            m_backend->encoder->kill();
+            m_backend->encoder->waitForFinished(1000);
+        }
+    }
+    emit streamingChanged(false);
 }
 
 

@@ -18,6 +18,9 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QSpacerItem>
+#include <QTimer>
+#include <QGraphicsOpacityEffect>
+#include <cmath>
 
 
 
@@ -37,14 +40,9 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
      mediamanager = new MediaManager(this);
 
-     connect(mediamanager, &MediaManager::audioFrameUpdated,
-             this, [this](const AudioFrame &frame) {
-         setSecondStart(frame.position);
-     });
-
      connect(mediamanager, &MediaManager::playbackFinished, this, [this]() {
-         mediamanager->seek(0.0);
          mediamanager->stop();
+         mediamanager->seek(m_cueStartPosition);
      });
 //***************************************************
 
@@ -238,11 +236,21 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 // Botón para abrir los controles del cue en el waveform.
         auto *btnwaveform = new Button;
+        m_cueButton = btnwaveform;
+        btnwaveform->setObjectName("AudioItemShowCue");
         btnwaveform->SetIcon("waveform.svg");
         btnwaveform->setIconSize(QSize(20, 20));
         btnwaveform->setFixedSize(23, 23);
         btnwaveform->setToolTip(tr("Show cue waveform"));
         btnwaveform->setAccessibleName(btnwaveform->toolTip());
+        m_cueOpacity = new QGraphicsOpacityEffect(btnwaveform);
+        m_cueOpacity->setOpacity(1.0);
+        btnwaveform->setGraphicsEffect(m_cueOpacity);
+        m_cueBlinkTimer = new QTimer(this);
+        m_cueBlinkTimer->setInterval(500);
+        connect(m_cueBlinkTimer, &QTimer::timeout, this, [this]() {
+            m_cueOpacity->setOpacity(m_cueOpacity->opacity() < 1.0 ? 1.0 : 0.45);
+        });
         layouttop->insertWidget(layouttop->indexOf(btnproperties) + 1, btnwaveform);
         connect(btnwaveform, &QPushButton::clicked, this, [this]() {
             QWidget *player = parentWidget();
@@ -259,9 +267,10 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
                     if (!prepareCue()) return;
                     if (mediamanager->isPlaying()) mediamanager->pause();
                     mediamanager->seek(seconds);
-                    m_cueStartPosition = mediamanager->getPosition();
+                    setSecondStart(mediamanager->getPosition());
                 });
             }
+            if (m_secondstart > 0.0) prepareCue();
             m_cueWaveform->setWindowTitle(labelnombre->text());
             m_cueWaveform->showWaveform(filePath(), player ? player : this);
         });
@@ -283,7 +292,7 @@ void AudioItemMaxi::toggleCuePlayback()
     }
     if (!prepareCue()) return;
     if (!mediamanager->isPaused())
-        m_cueStartPosition = mediamanager->getPosition();
+        mediamanager->seek(m_cueStartPosition);
     mediamanager->play();
 }
 
@@ -293,16 +302,15 @@ bool AudioItemMaxi::prepareCue()
     const bool sameFile = m_loadedCuePath == filePath() && !m_loadedCuePath.isEmpty();
     if (sameFile && m_loadedCueDevice == device)
         return true;
-    const double position = sameFile ? mediamanager->getPosition() : 0;
+    const double position = sameFile ? mediamanager->getPosition() : m_secondstart;
     const bool playing = sameFile && mediamanager->isPlaying();
     const bool paused = sameFile && mediamanager->isPaused();
     if (!mediamanager->setDevice(device) || !mediamanager->loadFile(filePath()))
         return false;
     m_loadedCuePath = filePath();
     m_loadedCueDevice = device;
-    if (!sameFile) m_cueStartPosition = 0;
+    mediamanager->seek(position);
     if (sameFile) {
-        mediamanager->seek(position);
         if (playing || paused) mediamanager->play();
         if (paused) mediamanager->pause();
     }
@@ -310,6 +318,42 @@ bool AudioItemMaxi::prepareCue()
 }
 
 AudioItemMaxi::~AudioItemMaxi(){}
+
+void AudioItemMaxi::setSecondStart(double seconds)
+{
+    m_secondstart = std::isfinite(seconds) && seconds > 0.0 ? seconds : 0.0;
+    m_cueStartPosition = m_secondstart;
+    updateCueIndicator();
+}
+
+void AudioItemMaxi::updateCueIndicator()
+{
+    if (!m_cueButton || !m_cueBlinkTimer) return;
+    const bool marked = m_secondstart > 0.0;
+    m_cueButton->setProperty("cueMarked", marked);
+    m_cueButton->setToolTip(marked ? tr("Show cue waveform — Cue start: %1").arg(SecondToTime(m_secondstart))
+                                 : tr("Show cue waveform"));
+    m_cueButton->setAccessibleName(m_cueButton->toolTip());
+    if (marked && isVisible()) {
+        if (!m_cueBlinkTimer->isActive()) m_cueBlinkTimer->start();
+    } else {
+        m_cueBlinkTimer->stop();
+        m_cueOpacity->setOpacity(1.0);
+    }
+}
+
+void AudioItemMaxi::showEvent(QShowEvent *event)
+{
+    AudioItem::showEvent(event);
+    updateCueIndicator();
+}
+
+void AudioItemMaxi::hideEvent(QHideEvent *event)
+{
+    AudioItem::hideEvent(event);
+    if (m_cueBlinkTimer) m_cueBlinkTimer->stop();
+    if (m_cueOpacity) m_cueOpacity->setOpacity(1.0);
+}
 
 
 

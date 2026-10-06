@@ -11,6 +11,7 @@
 class Player;
 class FileExplore;
 class Capture;
+class Cast;
 
 class MainWindow : public QMainWindow
 {
@@ -45,6 +46,7 @@ private:
     QList<Player*> players;
     FileExplore *m_fileExplore = nullptr;
     Capture *m_capture = nullptr;
+    Cast *m_cast = nullptr;
 
 
 };

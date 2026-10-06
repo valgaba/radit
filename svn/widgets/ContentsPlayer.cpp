@@ -542,8 +542,10 @@ void ContentsPlayer::pasteClipboard()
 
     bool isCutOperation = clipboard.lista.constFirst()->property("iscut").toBool();
 
-    for (auto it = clipboard.lista.begin(); it != clipboard.lista.end(); ) {
-        if (auto *itemBase = qobject_cast<AudioItemMaxi*>(*it)) {
+    // deleteItem removes clipboard entries. Iterate over a snapshot when cutting.
+    const auto copiedItems = clipboard.lista;
+    for (QWidget *widget : copiedItems) {
+        if (auto *itemBase = qobject_cast<AudioItemMaxi*>(widget)) {
             AudioItemMaxi *newItem = itemBase->copy(this);
             createItem(newItem);
 
@@ -552,12 +554,7 @@ void ContentsPlayer::pasteClipboard()
             if (isCutOperation) {
                //itemBase->deleteLater();
                  deleteItem(itemBase);   //
-                it = clipboard.lista.erase(it);
-            } else {
-                ++it;
             }
-        } else {
-            ++it;
         }
     }
 

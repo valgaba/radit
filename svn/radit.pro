@@ -26,6 +26,7 @@ SOURCES += \
     widgets/AudioItemMini.cpp \
     widgets/AudioItemNet.cpp \
     widgets/Capture.cpp \
+    widgets/Cast.cpp \
     widgets/CueWaveformFrame.cpp \
     widgets/ContentsMenu.cpp \
     widgets/ContentsPlayer.cpp \
@@ -65,8 +66,10 @@ HEADERS += \
     widgets/AudioItemMini.h \
     widgets/AudioItemNet.h \
     widgets/Capture.h \
+    widgets/Cast.h \
     widgets/CueWaveformFrame.h \
     widgets/LoadingProgress.h \
+    widgets/FileExploreModel.h \
     widgets/LoadingDialog.h \
     widgets/QuitDialog.h \
     widgets/ContentsMenu.h \

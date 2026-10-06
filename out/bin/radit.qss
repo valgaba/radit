@@ -618,6 +618,7 @@ VuMeter LevelMeter {
 
 #PlayerVolumeSlider::groove:horizontal,
 #CaptureVolumeSlider::groove:horizontal,
+#CastVolumeSlider::groove:horizontal,
 #CueWaveformVolumeSlider::groove:horizontal {
     border: 1px solid #686b74;
     height: 6px;
@@ -627,6 +628,7 @@ VuMeter LevelMeter {
 
 #PlayerVolumeSlider::sub-page:horizontal,
 #CaptureVolumeSlider::sub-page:horizontal,
+#CastVolumeSlider::sub-page:horizontal,
 #CueWaveformVolumeSlider::sub-page:horizontal {
     background: #80A4AE;
     border-radius: 3px;
@@ -634,6 +636,7 @@ VuMeter LevelMeter {
 
 #PlayerVolumeSlider::handle:horizontal,
 #CaptureVolumeSlider::handle:horizontal,
+#CastVolumeSlider::handle:horizontal,
 #CueWaveformVolumeSlider::handle:horizontal {
     background: #80A4AE;
     border: 1px solid #80A4AE;
@@ -1263,13 +1266,15 @@ QMenu::separator{
 }
 
 #FileExplore Frame#framebarra,
-#Capture Frame#framebarra {
+#Capture Frame#framebarra,
+#Cast Frame#framebarra {
     background-color: #4e4d7a;
     border: none;
 }
 
 #FileExplore QLabel#PanelTitle,
-#Capture QLabel#PanelTitle {
+#Capture QLabel#PanelTitle,
+#Cast QLabel#PanelTitle {
     font-size: 14px;
     color: #8a8d96;
     background: transparent;
@@ -1568,3 +1573,18 @@ QDialog#QuitDialog QPushButton {
 QDialog#QuitDialog QPushButton:hover { background-color: #565656; }
 QDialog#QuitDialog QPushButton#SaveAndQuit { background-color: #80e6b4; color: #181e2c; }
 QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
+
+/* Cast: audio input and Icecast transmitter. */
+#Cast { background-color: #181e2c; border: 1px solid #333b4f; }
+#Cast QLabel, #Cast QCheckBox {
+    color: #8a8d96; background: transparent; border: none; font-size: 12px;
+}
+#Cast QLabel#CastTime { font-size: 16pt; font-weight: bold; padding: 0; }
+#Cast VuMeter QLabel { font-size: 10px; }
+#Cast Button { padding: 2px 6px; font-size: 12px; }
+#Cast Button:disabled { color: #686b74; border-color: #333b4f; }
+#Cast QLineEdit, #Cast QSpinBox {
+    background-color: #252b39; color: #80A4AE; border: 1px solid #535b6a;
+    padding: 2px; min-height: 20px;
+}
+#Cast QLineEdit:focus, #Cast QSpinBox:focus { border-color: #80A4AE; }

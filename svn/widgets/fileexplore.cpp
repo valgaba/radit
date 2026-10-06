@@ -17,6 +17,8 @@
 
 #include "widgets/fileexplore.h"
 #include "widgets/FileExploreMenu.h"
+#include "widgets/FileExploreModel.h"
+#include "widgets/LoadingProgress.h"
 #include "widgets/menu.h"
 #include <functional>
 #include <QKeySequence>
@@ -34,7 +36,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
-#include <QFileSystemModel>
+#include <QTimer>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLineEdit>
@@ -54,82 +56,22 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
-// Conserva la raíz y sus antecesores aunque no coincidan con la búsqueda.
-// El filtro se aplica por nombre a las entradas de la carpeta visible.
+// This proxy only filters names. Ordering is prepared on the directory worker.
 class FileExploreFilter : public QSortFilterProxyModel
 {
 public:
-    explicit FileExploreFilter(QObject *parent)
-        : QSortFilterProxyModel(parent), m_audioIcon(":/icons/audiofile.svg"),
-          m_folderIcon(":/icons/folder.svg") {}
-
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override
-    {
-        if (index.isValid() && index.column() == 0 && role == Qt::DecorationRole) {
-            const auto *model = static_cast<QFileSystemModel *>(sourceModel());
-            const QModelIndex source = mapToSource(index);
-            if (model->fileInfo(source).isDir())
-                return m_folderIcon;
-            if (model->fileInfo(source).isFile())
-                return m_audioIcon;
-        }
-        return QSortFilterProxyModel::data(index, role);
-    }
-
-    void setSearch(const QString &text)
-    {
-        m_search = text.trimmed();
-        invalidateFilter();
-    }
-
+    explicit FileExploreFilter(QObject *parent) : QSortFilterProxyModel(parent) {}
+    void setSearch(const QString &text) { m_search = text.trimmed(); invalidateFilter(); }
     void setSortByCreationDate(bool enabled)
-    {
-        if (m_sortByCreationDate == enabled)
-            return;
-        m_sortByCreationDate = enabled;
-        invalidate();
-    }
-
+    { static_cast<FileExploreModel *>(sourceModel())->setSortByCreationDate(enabled); }
 protected:
-    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override
-    {
-        const auto *model = static_cast<QFileSystemModel *>(sourceModel());
-        const QFileInfo leftInfo = model->fileInfo(left);
-        const QFileInfo rightInfo = model->fileInfo(right);
-        // Keep folders first and alphabetical in both modes.
-        if (leftInfo.isDir() != rightInfo.isDir())
-            return leftInfo.isDir();
-        if (m_sortByCreationDate && !leftInfo.isDir()) {
-            const QDateTime leftBirth = leftInfo.birthTime();
-            const QDateTime rightBirth = rightInfo.birthTime();
-            const QDateTime leftDate = leftBirth.isValid() ? leftBirth : leftInfo.lastModified();
-            const QDateTime rightDate = rightBirth.isValid() ? rightBirth : rightInfo.lastModified();
-            if (leftDate != rightDate)
-                return leftDate > rightDate;
-        }
-        const int comparison = QString::compare(leftInfo.fileName(), rightInfo.fileName(),
-                                                Qt::CaseInsensitive);
-        return comparison != 0 ? comparison < 0 : leftInfo.fileName() < rightInfo.fileName();
-    }
-
     bool filterAcceptsRow(int row, const QModelIndex &parent) const override
     {
-        const auto *model = static_cast<QFileSystemModel *>(sourceModel());
-        const QModelIndex index = model->index(row, 0, parent);
-        const QString path = model->filePath(index);
-        const QString root = model->rootPath();
-        const QString prefix = path.endsWith('/') ? path : path + '/';
-        if (path == root || root.startsWith(prefix))
-            return true;
-        return m_search.isEmpty() ||
-               model->fileName(index).contains(m_search, Qt::CaseInsensitive);
+        return m_search.isEmpty() || sourceModel()->index(row, 0, parent).data().toString()
+            .contains(m_search, Qt::CaseInsensitive);
     }
-
 private:
     QString m_search;
-    QIcon m_audioIcon;
-    QIcon m_folderIcon;
-    bool m_sortByCreationDate = false;
 };
 
 namespace {
@@ -162,7 +104,7 @@ QStringList explorerNameFilters()
     return filters;
 }
 
-QStringList clipboardFiles()
+QStringList clipboardFiles(bool validate = true)
 {
     QStringList paths;
     const QMimeData *data = QApplication::clipboard()->mimeData();
@@ -172,7 +114,7 @@ QStringList clipboardFiles()
         if (!url.isLocalFile())
             continue;
         const QFileInfo info(url.toLocalFile());
-        if (info.isFile() && QDir::match(explorerNameFilters(), info.fileName()))
+        if ((!validate || info.isFile()) && QDir::match(explorerNameFilters(), info.fileName()))
             paths.append(info.absoluteFilePath());
     }
     paths.removeDuplicates();
@@ -472,11 +414,30 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     searchLayout->addWidget(m_sort);
     layout->addLayout(searchLayout);
 
-    m_model = new QFileSystemModel(this);
-    m_model->setReadOnly(true);
-    m_model->setFilter(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
-    m_model->setNameFilterDisables(false);
-    m_model->setNameFilters(explorerNameFilters());
+    m_loading = new LoadingProgress(this);
+    layout->addWidget(m_loading);
+    m_model = new FileExploreModel(explorerNameFilters(), this);
+    m_model->rootProgress = [this](int completed, int total) {
+        if (completed < 0) {
+            m_loading->finish();
+            if (m_fileMenu) m_fileMenu->updateActions();
+        } else if (total == 0) {
+            m_restoreSelection.clear();
+            if (m_tree) {
+                for (const QModelIndex &index : m_tree->selectionModel()->selectedRows(0))
+                    m_restoreSelection.insert(m_model->filePath(m_filter->mapToSource(index)));
+            }
+            m_loading->begin(tr("Reading folder..."));
+        } else {
+            if (m_loading->maximum() != total)
+                m_loading->begin(tr("Loading files..."), total);
+            m_loading->setProgress(completed, total);
+        }
+    };
+    m_model->rootError = [this](const QString &error) {
+        m_path->setToolTip(error);
+        m_loading->finish();
+    };
     m_filter = new FileExploreFilter(this);
     m_filter->setSourceModel(m_model);
     m_filter->setSortCaseSensitivity(Qt::CaseInsensitive);
@@ -499,9 +460,23 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     m_tree->setDragDropMode(QAbstractItemView::DragOnly);
     m_tree->setVerticalScrollBar(new ScrollBar(m_tree));
     m_tree->setHorizontalScrollBar(new ScrollBar(m_tree));
-    m_tree->setSortingEnabled(true);
-    m_tree->sortByColumn(0, Qt::AscendingOrder);
+    m_tree->setSortingEnabled(false); // Worker supplies sorted rows; never sort during insertion.
     layout->addWidget(m_tree, 1);
+
+    // Restore selection after sorting/refresh without scanning the complete list.
+    connect(m_model, &QAbstractItemModel::rowsInserted, this,
+        [this](const QModelIndex &parent, int first, int last) {
+            if (m_restoreSelection.isEmpty()) return;
+            QItemSelection selection;
+            for (int row = first; row <= last; ++row) {
+                const QModelIndex source = m_model->index(row, 0, parent);
+                if (!m_restoreSelection.remove(m_model->filePath(source))) continue;
+                const QModelIndex index = m_filter->mapFromSource(source);
+                if (index.isValid()) selection.select(index, index);
+            }
+            if (!selection.isEmpty())
+                m_tree->selectionModel()->select(selection, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        });
 
     m_fileMenu = new FileExploreMenu(this, m_tree);
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -531,9 +506,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
             m_fileMenu, &FileExploreMenu::updateActions);
 
     connect(m_up, &Button::clicked, this, [this]() {
-        QDir dir(m_currentPath);
-        if (dir.cdUp())
-            setPath(dir.absolutePath());
+        setPath(QDir::cleanPath(m_currentPath + "/.."));
     });
     connect(m_path->lineEdit(), &QLineEdit::returnPressed, this, [this]() {
         const QString typedPath = m_path->currentText();
@@ -546,7 +519,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     });
     connect(m_search, &QLineEdit::textChanged, this, [this](const QString &text) {
         m_filter->setSearch(text);
-        m_tree->setRootIndex(m_filter->mapFromSource(m_model->index(m_currentPath)));
+        m_tree->setRootIndex(QModelIndex());
     });
     connect(m_sort, &QComboBox::currentIndexChanged, this, [this]() {
         m_filter->setSortByCreationDate(m_sort->currentData().toString() == "created");
@@ -589,18 +562,16 @@ QString FileExplore::currentPath() const
 
 bool FileExplore::setPath(const QString &path)
 {
-    const QFileInfo info(QDir::fromNativeSeparators(path.trimmed()));
-    if (path.trimmed().isEmpty() || !info.exists() || !info.isDir() || !info.isReadable())
-        return false;
-
-    const QString absolutePath = QDir::cleanPath(info.absoluteFilePath());
+    const QString normalized = QDir::fromNativeSeparators(path.trimmed());
+    if (normalized.isEmpty() || QDir::isRelativePath(normalized)) return false;
+    // Existence and permissions are checked by the worker, including offline shares.
+    const QString absolutePath = QDir::cleanPath(normalized);
     const bool changed = absolutePath != m_currentPath;
     m_currentPath = absolutePath;
-    m_model->setNameFilters(explorerNameFilters());
     m_model->setRootPath(m_currentPath);
     m_search->clear();
     m_filter->setSearch(QString());
-    m_tree->setRootIndex(m_filter->mapFromSource(m_model->index(m_currentPath)));
+    m_tree->setRootIndex(QModelIndex());
 
     m_history.removeAll(m_currentPath);
     m_history.prepend(m_currentPath);
@@ -644,11 +615,10 @@ QStringList FileExplore::selectedFilePaths() const
 {
     QStringList paths;
     for (const QModelIndex &index : m_tree->selectionModel()->selectedRows(0)) {
-        const QFileInfo info = m_model->fileInfo(m_filter->mapToSource(index));
-        // Las operaciones de este menú son para ficheros, no carpetas.
-        if (!info.isFile())
-            return {};
-        paths.append(info.absoluteFilePath());
+        const QModelIndex source = m_filter->mapToSource(index);
+        // Use cached directory flags and paths; selection must not query the network.
+        if (m_model->isDir(source)) return {};
+        paths.append(m_model->filePath(source));
     }
     paths.removeDuplicates();
     return paths;
@@ -658,17 +628,19 @@ QString FileExplore::pasteDestination() const
 {
     const QModelIndexList selection = m_tree->selectionModel()->selectedRows(0);
     if (selection.size() == 1) {
-        const QFileInfo info = m_model->fileInfo(m_filter->mapToSource(selection.first()));
-        if (info.isDir())
-            return info.absoluteFilePath();
+        const QModelIndex source = m_filter->mapToSource(selection.first());
+        if (m_model->isDir(source)) return m_model->filePath(source);
     }
     return m_currentPath;
 }
 
 bool FileExplore::canPasteFiles() const
 {
-    const QFileInfo destination(pasteDestination());
-    return destination.isDir() && destination.isWritable() && !clipboardFiles().isEmpty();
+    // Avoid touching the current network folder on every selection change.
+    if (clipboardFiles(false).isEmpty()) return false;
+    const QModelIndex destination = m_model->index(pasteDestination());
+    return m_model->isDir(destination) &&
+           (m_model->permissions(destination) & (QFile::WriteUser | QFile::WriteGroup | QFile::WriteOther));
 }
 
 void FileExplore::copySelectedFiles()
@@ -730,6 +702,7 @@ void FileExplore::pasteFiles()
         else
             setFileClipboard(remaining, true);
     }
+    m_model->refresh();
     m_fileMenu->updateActions();
     showFileErrors(this, errors);
 }
@@ -758,6 +731,7 @@ void FileExplore::renameSelectedFile()
     QFile file(source.absoluteFilePath());
     if (!file.rename(target))
         showFileErrors(this, {tr("Could not rename %1: %2").arg(source.fileName(), file.errorString())});
+    m_model->refresh();
     m_fileMenu->updateActions();
 }
 
@@ -777,6 +751,7 @@ void FileExplore::deleteSelectedFiles()
         if (!file.moveToTrash())
             errors.append(tr("Could not move %1 to the trash: %2").arg(path, file.errorString()));
     }
+    m_model->refresh();
     m_fileMenu->updateActions();
     showFileErrors(this, errors);
 }
@@ -786,7 +761,7 @@ void FileExplore::selectAllFiles()
     m_tree->selectAll();
     const QModelIndexList selection = m_tree->selectionModel()->selectedRows(0);
     for (const QModelIndex &index : selection) {
-        if (!m_model->fileInfo(m_filter->mapToSource(index)).isFile())
+        if (m_model->isDir(m_filter->mapToSource(index)))
             m_tree->selectionModel()->select(index, QItemSelectionModel::Deselect | QItemSelectionModel::Rows);
     }
 }

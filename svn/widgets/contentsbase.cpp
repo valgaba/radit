@@ -292,6 +292,7 @@ AudioItemMaxi* ContentsBase::createItem(AudioItemMaxi* item){
 void ContentsBase::deleteItem(AudioItemMaxi* item){
 
     if (!item) return;
+    clipboard.lista.removeAll(item);
 
 
         //  Buscar el player REAL del item

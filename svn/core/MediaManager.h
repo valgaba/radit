@@ -52,6 +52,18 @@ struct AudioFrame
 
 Q_DECLARE_METATYPE(AudioFrame)
 
+struct CastSettings
+{
+    QString host;
+    int port = 8000;
+    QString username = "source";
+    QString password;
+    QString mount = "/stream";
+    QString name = "Radit";
+    QString mode = "mp3-44100-stereo-192";
+    bool tls = false;
+};
+
 class MediaManager : public QObject
 {
     Q_OBJECT
@@ -106,9 +118,17 @@ public:
     bool stopRecording();
     bool isRecording() const;
 
+    bool startStreaming(const CastSettings &settings);
+    void stopStreaming();
+    bool isStreaming() const;
+
 
 
 signals:
+    void streamingChanged(bool active);
+    void streamingConnected();
+    void streamingTimeChanged(qint64 milliseconds);
+    void streamingError(const QString &message);
     void recordingChanged(bool recording);
     void recordingTimeChanged(qint64 milliseconds);
     void recordingFinished(const QString &filePath);
@@ -136,6 +156,7 @@ private:
     bool startDevice(int deviceId);
     void recoverDevice();
     void flushRecordingData();
+    void flushStreamingData();
 
 
     float m_silenceThresholdDb = -25.0f; //45

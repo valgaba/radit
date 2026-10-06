@@ -3,12 +3,14 @@
 
 #include "widgets/frame.h"
 #include <QStringList>
+#include <QSet>
 
 class Button;
 class FileExploreFilter;
 class FileExploreMenu;
 class QComboBox;
-class QFileSystemModel;
+class FileExploreModel;
+class LoadingProgress;
 class QLineEdit;
 class QMenu;
 class QTreeView;
@@ -42,7 +44,8 @@ private:
     void savePreferences();
     QString pasteDestination() const;
 
-    QFileSystemModel *m_model = nullptr;
+    FileExploreModel *m_model = nullptr;
+    LoadingProgress *m_loading = nullptr;
     FileExploreFilter *m_filter = nullptr;
     QTreeView *m_tree = nullptr;
     FileExploreMenu *m_fileMenu = nullptr;
@@ -54,6 +57,7 @@ private:
     QStringList m_favorites;
     QStringList m_history;
     QString m_currentPath;
+    QSet<QString> m_restoreSelection;
 };
 
 #endif // FILEEXPLORE_H

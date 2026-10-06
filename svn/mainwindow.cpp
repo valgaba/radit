@@ -50,6 +50,7 @@
 #include "core/config.h"
 #include "widgets/fileexplore.h"
 #include "widgets/Capture.h"
+#include "widgets/Cast.h"
 #include "widgets/Player.h"
 
 
@@ -202,8 +203,10 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
    // splittertop->addWidget(player1);
     m_fileExplore = new FileExplore;
     m_capture = new Capture;
+    m_cast = new Cast;
     splittertop->addWidget(m_fileExplore);
     splittertop->addWidget(m_capture);
+    splittertop->addWidget(m_cast);
     splittertop->addWidget(new TabAuto);
 
     splitterdown->addWidget(player2);
@@ -211,12 +214,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splitterdown->addWidget(player4);
 
 
-    // FileExplore y Capture con el mismo ancho inicial; TabAuto algo más ancho.
+    // FileExplore, Capture y Cast comparten el ancho inicial.
     splittertop->setStretchFactor(0, 2);
     splittertop->setStretchFactor(1, 2);
-    splittertop->setStretchFactor(2, 3);
+    splittertop->setStretchFactor(2, 2);
+    splittertop->setStretchFactor(3, 3);
     QList<int> sizesTop;
-    sizesTop << 400 << 400 << 600;
+    sizesTop << 400 << 400 << 400 << 600;
     splittertop->setSizes(sizesTop);
 
     QAction *resetInterface = vistasMenu->addAction(tr("Reset User Interface"));
@@ -242,6 +246,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     addPanelAction(tr("Show Player3"), player4);
     addPanelAction(tr("Show File Browser"), m_fileExplore);
     addPanelAction(tr("Show Capture"), m_capture);
+    addPanelAction(tr("Show Cast"), m_cast);
 
 
 // cargar configuracion de los player*******************
@@ -285,7 +290,7 @@ void MainWindow::restoreInterface()
     splittertop->show();
     splitterdown->show();
 
-    splittertop->setSizes({400, 400, 600});
+    splittertop->setSizes({400, 400, 400, 600});
     splitterdown->setSizes({400, 400, 400});
     const int height = qMax(3, splitterprincipal->height() - splitterprincipal->handleWidth());
     splitterprincipal->setSizes({height / 3, height - height / 3});
