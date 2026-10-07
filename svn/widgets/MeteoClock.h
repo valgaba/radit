@@ -13,6 +13,14 @@ class MeteoClock : public Frame
 {
     Q_OBJECT
 public:
+    struct Readings {
+        double temperature = 0;
+        int humidity = 0;
+        QString location;
+        QDateTime updated;
+        bool available = false;
+    };
+    static Readings currentReadings();
     explicit MeteoClock(QWidget *parent = nullptr);
     ~MeteoClock() override;
     static QString formatDate(const QDate &date);

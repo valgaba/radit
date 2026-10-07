@@ -13,6 +13,8 @@ TARGET = radit
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    core/LocutionPack.cpp \
+    widgets/AudioItemMeteoClockMaxi.cpp \
     core/Clipboard.cpp \
     core/MediaManager.cpp \
     core/WeatherService.cpp \
@@ -58,6 +60,8 @@ SOURCES += \
     widgets/tabbar.cpp
 
 HEADERS += \
+    core/LocutionPack.h \
+    widgets/AudioItemMeteoClockMaxi.h \
     core/Clipboard.h \
     core/MediaManager.h \
     core/WeatherService.h \

@@ -43,6 +43,7 @@
 
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemMeteoClockMaxi.h"
 //#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFilemaxi.h"
 #include "core/io.h"
@@ -168,6 +169,10 @@ void ContentsBase::importNextDroppedFile()
     }
     const QString path = m_dropPaths.at(m_dropIndex);
     const QFileInfo info(path);
+    if (info.suffix().compare("zip", Qt::CaseInsensitive)==0) {
+        auto *item=new AudioItemMeteoClockMaxi(this);
+        item->setVoicePackPath(path);createItem(item);finishDroppedFile();return;
+    }
     if (info.isDir()) {
         auto *item = new AudioItemFolderMaxi(this);
         item->setFolderPath(path);

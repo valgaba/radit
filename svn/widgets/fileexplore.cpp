@@ -100,6 +100,7 @@ QStringList explorerNameFilters()
     QStringList filters = MediaManager::supportedAudioNameFilters();
     filters.append("*.list");
     filters.append("*.player");
+    filters.append("*.zip");
     filters.removeDuplicates();
     return filters;
 }
@@ -338,6 +339,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
         addLocation(tr("Desktop"), QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
         addLocation(tr("Documents"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
         addLocation(tr("Downloads"), QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+        addLocation(tr("Locution"), QDir(QCoreApplication::applicationDirPath()).filePath("locution"));
         const QString capturePath = QDir(QCoreApplication::applicationDirPath()).filePath("capture");
         QAction *captureAction = locationsMenu->addAction(tr("Capture"));
         captureAction->setToolTip(QDir::toNativeSeparators(capturePath));

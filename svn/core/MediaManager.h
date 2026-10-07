@@ -85,6 +85,7 @@ public:
     static double readFileDuration(const QString &filePath);
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
+    bool loadAudioSequence(const QStringList &files, QString *error = nullptr);
     bool loadUrl(const QString &url);
     static bool isNetworkUrl(const QString &url);
     bool isNetworkSource() const;
@@ -160,6 +161,7 @@ private:
     float m_volume = 1.0f;
 
     bool startDevice(int deviceId);
+    bool configurePlaybackStream();
     void recoverDevice();
     void flushRecordingData();
     void flushStreamingData();

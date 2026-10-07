@@ -109,6 +109,7 @@ public:
      virtual bool isLiveStream() const { return false; }
      virtual bool advancesOnLoop() const { return false; }
      virtual bool preparePlayback() { return true; }
+     virtual bool loadPreparedPlayback(MediaManager *manager) { return manager->loadFile(playbackPath()); }
      virtual QString playbackPath() const { return filePath(); }
      virtual QString playbackName() const { return nameFile(); }
      void setIsSelect(bool value) override;

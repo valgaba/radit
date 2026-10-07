@@ -28,6 +28,7 @@
 #include <QMutexLocker>
 #include <QProcess>
 #include <QElapsedTimer>
+#include <QtEndian>
 #include <QUrl>
 #include <QFutureWatcher>
 #include <QtConcurrent/QtConcurrentRun>
@@ -40,6 +41,7 @@
 struct MediaManager::Backend
 {
     HSTREAM stream = 0;
+    QByteArray sequenceData;
     bool network = false;
     bool loading = false;
     bool playWhenReady = false;
@@ -932,6 +934,7 @@ bool MediaManager::loadFile(const QString &filePath){
           BASS_StreamFree(m_backend->stream);
           m_backend->stream = 0;
       }
+    m_backend->sequenceData.clear();
 
   #ifdef Q_OS_WIN
       m_backend->stream = BASS_StreamCreateFile(
@@ -956,6 +959,11 @@ bool MediaManager::loadFile(const QString &filePath){
            return false;
          }
 
+    return configurePlaybackStream();
+}
+
+bool MediaManager::configurePlaybackStream()
+{
          // Volumen normal de reproducción, sin amplificación.
          if (!BASS_ChannelSetAttribute(m_backend->stream, BASS_ATTRIB_VOL, m_volume)) {
              BASS_StreamFree(m_backend->stream);
@@ -986,6 +994,76 @@ bool MediaManager::loadFile(const QString &filePath){
 
 
          return true;
+}
+
+bool MediaManager::loadAudioSequence(const QStringList &files, QString *error)
+{
+    const auto fail=[error](const QString &message) { if(error)*error=message;return false; };
+    if (files.isEmpty() || files.size()>8) return fail(tr("Invalid audio sequence."));
+    QByteArray pcm;
+    {
+        const DWORD previous=BASS_GetDevice();
+        struct DeviceGuard {DWORD device;~DeviceGuard(){if(device!=DWORD(-1))BASS_SetDevice(device);}} deviceGuard{previous};
+        if (!initializeDecoder()) return fail(tr("Unable to initialize locution decoding."));
+        for (const auto &file:files) {
+#ifdef Q_OS_WIN
+            const HSTREAM stream=BASS_StreamCreateFile(FALSE,file.utf16(),0,0,BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT|BASS_STREAM_PRESCAN|BASS_UNICODE);
+#else
+            const QByteArray path=file.toUtf8();
+            const HSTREAM stream=BASS_StreamCreateFile(FALSE,path.constData(),0,0,BASS_STREAM_DECODE|BASS_SAMPLE_FLOAT|BASS_STREAM_PRESCAN);
+#endif
+            if (!stream) return fail(tr("Unable to decode voice clip: %1").arg(QFileInfo(file).fileName()));
+            struct StreamGuard {HSTREAM stream;~StreamGuard(){BASS_StreamFree(stream);}} streamGuard{stream};
+            BASS_CHANNELINFO info={};
+            if (!BASS_ChannelGetInfo(stream,&info) || info.freq<8000 || info.freq>192000 || info.chans<1 || info.chans>2)
+                return fail(tr("Unsupported voice clip format."));
+            QVector<float> samples,buffer(8192*info.chans);
+            while (true) {
+                const DWORD bytes=BASS_ChannelGetData(stream,buffer.data(),buffer.size()*sizeof(float));
+                if (bytes==DWORD(-1)) {
+                    if (BASS_ErrorGetCode()!=BASS_ERROR_ENDED) return fail(tr("Unable to read voice clip."));
+                    break;
+                }
+                if (!bytes) break;
+                if (bytes%(sizeof(float)*info.chans)!=0 || samples.size()+bytes/sizeof(float)>info.freq*info.chans*30)
+                    return fail(tr("Invalid or oversized voice clip."));
+                const qsizetype count=bytes/sizeof(float),offset=samples.size();
+                samples.resize(offset+count);std::copy_n(buffer.constData(),count,samples.data()+offset);
+            }
+            const qsizetype frames=samples.size()/info.chans;
+            if (!frames) return fail(tr("Empty voice clip."));
+            const qsizetype outputFrames=qRound64(double(frames)*44100/info.freq),offset=pcm.size();
+            if (offset+outputFrames*4>32*1024*1024) return fail(tr("Locution is too long."));
+            pcm.resize(offset+outputFrames*4);
+            for (qsizetype i=0;i<outputFrames;++i) {
+                const double position=double(i)*info.freq/44100;
+                const qsizetype first=qMin(qsizetype(position),frames-1),second=qMin(first+1,frames-1);
+                const double blend=position-first;
+                for (int ch=0;ch<2;++ch) {
+                    const int source=info.chans==1 ? 0 : ch;
+                    const double value=samples[first*info.chans+source]*(1-blend)+samples[second*info.chans+source]*blend;
+                    if (!std::isfinite(value)) return fail(tr("Invalid voice sample."));
+                    const qint16 sample=qint16(qRound(qBound(-1.0,value,1.0)*32767));
+                    qToLittleEndian<qint16>(sample,pcm.data()+offset+(i*2+ch)*2);
+                }
+            }
+        }
+    }
+    QByteArray wave(44,'\0');
+    std::copy_n("RIFF",4,wave.data());qToLittleEndian<quint32>(36+pcm.size(),wave.data()+4);
+    std::copy_n("WAVEfmt ",8,wave.data()+8);qToLittleEndian<quint32>(16,wave.data()+16);
+    qToLittleEndian<quint16>(1,wave.data()+20);qToLittleEndian<quint16>(2,wave.data()+22);
+    qToLittleEndian<quint32>(44100,wave.data()+24);qToLittleEndian<quint32>(44100*4,wave.data()+28);
+    qToLittleEndian<quint16>(4,wave.data()+32);qToLittleEndian<quint16>(16,wave.data()+34);
+    std::copy_n("data",4,wave.data()+36);qToLittleEndian<quint32>(pcm.size(),wave.data()+40);wave.append(pcm);
+    cancelNetworkLoad();m_backend->network=false;m_timer->stop();
+    if (m_currentDevice>=0 && !startDevice(m_currentDevice)) return fail(tr("Audio device is unavailable."));
+    m_deviceRecoveryTimer->stop();
+    if (m_backend->stream) {BASS_StreamFree(m_backend->stream);m_backend->stream=0;}
+    m_backend->sequenceData=std::move(wave);
+    m_backend->stream=BASS_StreamCreateFile(TRUE,m_backend->sequenceData.constData(),0,m_backend->sequenceData.size(),0);
+    if (!m_backend->stream || !configurePlaybackStream()) return fail(tr("Unable to play the locution."));
+    return true;
 }
 
 //******************************************************************
@@ -1027,6 +1105,7 @@ bool MediaManager::loadUrl(const QString &text)
         BASS_StreamFree(m_backend->stream);
         m_backend->stream = 0;
     }
+    m_backend->sequenceData.clear();
     m_backend->network = true;
     m_backend->loading = true;
     emit networkLoadingChanged(true);

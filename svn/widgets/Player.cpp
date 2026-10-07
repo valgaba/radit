@@ -490,7 +490,7 @@ void Player::playItem(AudioItemMaxi *item)
            return;
        }
        if (!item->preparePlayback()) return;
-       if (!mediamanager->loadFile(item->playbackPath())) {
+       if (!item->loadPreparedPlayback(mediamanager)) {
            qWarning() << "No se pudo cargar el audio:" << item->playbackPath();
            return;
        }
@@ -547,10 +547,10 @@ bool Player::tryFolderMix(double position)
         connect(incoming, &MediaManager::playbackError, this, [this, incoming](const QString &) {
             if (incoming == m_pendingMixManager) cancelPendingMix();
         });
-        if (!incoming->loadFile(next->playbackPath())) cancelPendingMix();
+        if (!next->loadPreparedPlayback(incoming)) cancelPendingMix();
         return false;
     }
-    if (!prepared || !incoming->loadFile(next->playbackPath())) {
+    if (!prepared || !next->loadPreparedPlayback(incoming)) {
         if (prepared) restoreSelection();
         delete incoming;
         return false;
