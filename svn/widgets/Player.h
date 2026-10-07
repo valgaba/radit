@@ -6,6 +6,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QStyle>
+#include <QPointer>
+#include <QElapsedTimer>
 
 #include "widgets/button.h"
 #include "widgets/label.h"
@@ -53,6 +55,26 @@ private:
     MediaManager *mediamanager;
     VuMeter *vumeter = nullptr;
     AudioItemMaxi* currentItem = nullptr;
+    MediaManager *m_outgoingManager = nullptr;
+    MediaManager *m_pendingMixManager = nullptr;
+    QPointer<AudioItemMaxi> m_pendingMixItem;
+    QPointer<AudioItemMaxi> m_outgoingItem;
+    QTimer *m_mixTimer = nullptr;
+    QElapsedTimer m_mixClock;
+    int m_mixElapsedMs = 0;
+    int m_mixDurationMs = 0;
+    float m_mixProgress = 1.0f;
+    float m_playerVolume = 1.0f;
+    bool m_purgeOutgoing = false;
+    bool m_mixAttempted = false;
+    float m_outgoingLeft = -120.0f, m_outgoingRight = -120.0f;
+    void bindMediaManager();
+    bool tryFolderMix(double position);
+    void beginMix(AudioItemMaxi *next, MediaManager *incoming, double remaining);
+    void finishPendingMix();
+    void cancelPendingMix();
+    void updateMix();
+    void finishMix(bool purge);
 
 
 

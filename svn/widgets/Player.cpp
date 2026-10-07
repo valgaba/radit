@@ -23,6 +23,28 @@
 #include "widgets/Player.h"
 #include "widgets/vumeter.h"
 #include "widgets/contentsbase.h"
+#include "widgets/AudioItemFolderMaxi.h"
+#include <cmath>
+#include <algorithm>
+
+namespace {
+AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder)
+{
+    if (folder->isLoop()) return folder;
+    QWidget *owner = folder->parentWidget();
+    while (owner && !qobject_cast<ContentsBase*>(owner)) owner = owner->parentWidget();
+    auto *contents = qobject_cast<ContentsBase*>(owner);
+    if (!contents || !contents->layout) return nullptr;
+    const int index = contents->layout->indexOf(folder);
+    if (index < 0) return nullptr;
+    for (int offset = 1; offset < contents->layout->count(); ++offset) {
+        const int row = (index + offset) % contents->layout->count();
+        auto *item = qobject_cast<AudioItemMaxi*>(contents->layout->itemAt(row)->widget());
+        if (item && item->isPlayNext()) return item;
+    }
+    return nullptr;
+}
+}
 
 //#include "widgets/container.h"
 
@@ -39,104 +61,11 @@ Player::Player(QWidget *parent) : Frame(parent) {
        mediamanager = new MediaManager(this);
 
 
-     connect(mediamanager, &MediaManager::audioFrameUpdated,
-               this, [this](const AudioFrame &frame) {
-
-         if (vumeter) {
-             if (mediamanager->isPlaying())
-                 vumeter->setLevels(frame.left, frame.right);
-             else
-                 vumeter->reset();
-         }
-
-         this->labeltiempo->setText(SecondToTime(mediamanager->isNetworkSource()
-             ? frame.position : m_duration-frame.position));
-
-         if (!m_userIsSeeking && m_duration > 0.0)
-         {
-             int value = static_cast<int>((frame.position / m_duration) * 1000.0);
-             slider->setValue(value);
-         }
-
-       });
-
-     connect(mediamanager, &MediaManager::networkLoadingChanged, this, [this](bool loading) {
-         labeltiempo->setText(loading ? tr("Connecting...") : "00:00:00.00");
-     });
-     connect(mediamanager, &MediaManager::playbackError, this, [this](const QString &message) {
-         stopMain();
-         labelnombre->setText(message);
-         labelnombre->setToolTip(message);
-     });
-
-            //emite el final
-       connect(mediamanager, &MediaManager::playbackFinished,
-               this, [this]() {
-
-           if (!currentItem)
-               return;
-
-           if (currentItem->isLoop()) {
-
-               if (currentItem->advancesOnLoop()) {
-                   AudioItemMaxi *item = currentItem;
-                   stopMain();
-                   playItem(item);
-                   return;
-               }
-
-               // LOOP
-               mediamanager->seek(currentItem->secondStart());
-               mediamanager->play();
-               return;
-           }
-
-           // guardar antes de parar
-           AudioItemMaxi* finishedItem = currentItem;
-
-           //  PRIORIDAD: NEXT + PURGE → repetir y NO borrar
-           if (finishedItem->isPlayNext() && finishedItem->isPurge()) {
-
-               this->stopMain();
-               playItem(finishedItem);
-               return;
-           }
-
-           // 1️⃣ Buscar el siguiente
-           AudioItemMaxi* nextItem = nullptr;
-
-           ContentsBase* contents = nullptr;
-           QWidget* w = finishedItem;
-
-           while (w) {
-               contents = qobject_cast<ContentsBase*>(w);
-               if (contents)
-                   break;
-               w = w->parentWidget();
-           }
-
-           if (contents) {
-               nextItem = contents->findNextPlayItem(finishedItem);
-           }
-
-           // 2️⃣ parar
-           this->stopMain();
-
-           // 3️⃣ reproducir siguiente
-           if (nextItem) {
-               playItem(nextItem);
-           }
-
-           // 4️⃣ PURGE (solo si no era NEXT prioritario)
-           if (finishedItem->isPurge()) {
-               emit finishedItem->requestAutoDelete(finishedItem);
-           }
-
-        });
-
-
-
-
+    bindMediaManager();
+    m_mixTimer = new QTimer(this);
+    m_mixTimer->setInterval(20);
+    m_mixTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_mixTimer, &QTimer::timeout, this, &Player::updateMix);
 
       layout = new QVBoxLayout(this);  // layout general
       layout->setContentsMargins(0, 0, 0, 0);
@@ -364,11 +293,13 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
                connect(btnpause, &QPushButton::clicked, this, &Player::pauseMain);
 
-               connect(btnrewind, &QPushButton::clicked,
-                       mediamanager, &MediaManager::rewind);
+               connect(btnrewind, &QPushButton::clicked, this, [this]() {
+                   finishMix(false); mediamanager->rewind();
+               });
 
-               connect(btnforward, &QPushButton::clicked,
-                       mediamanager, &MediaManager::forward);
+               connect(btnforward, &QPushButton::clicked, this, [this]() {
+                   finishMix(false); mediamanager->forward();
+               });
 
 
 
@@ -382,6 +313,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
                   m_userIsSeeking = false;
 
                    double percent = slider->value() / 1000.0;
+                   finishMix(false);
                    mediamanager->seek(percent * m_duration);
                });
 
@@ -429,10 +361,124 @@ QString Player::title() const
 
 
 
+void Player::bindMediaManager()
+{
+    MediaManager *manager = mediamanager;
+     connect(mediamanager, &MediaManager::audioFrameUpdated,
+               this, [this, manager](const AudioFrame &frame) {
+         if (manager != mediamanager) return;
+
+         if (vumeter) {
+             if (mediamanager->isPlaying())
+                 vumeter->setLevels(m_outgoingManager ? std::max(frame.left, m_outgoingLeft) : frame.left,
+                                    m_outgoingManager ? std::max(frame.right, m_outgoingRight) : frame.right);
+             else
+                 vumeter->reset();
+         }
+
+         this->labeltiempo->setText(SecondToTime(mediamanager->isNetworkSource()
+             ? frame.position : m_duration-frame.position));
+
+         if (!m_userIsSeeking && m_duration > 0.0)
+         {
+             int value = static_cast<int>((frame.position / m_duration) * 1000.0);
+             slider->setValue(value);
+         }
+         tryFolderMix(frame.position);
+
+       });
+
+     connect(mediamanager, &MediaManager::networkLoadingChanged, this, [this, manager](bool loading) {
+         if (manager != mediamanager) return;
+         labeltiempo->setText(loading ? tr("Connecting...") : "00:00:00.00");
+     });
+     connect(mediamanager, &MediaManager::playbackError, this, [this, manager](const QString &message) {
+         if (manager != mediamanager) return;
+         stopMain();
+         labelnombre->setText(message);
+         labelnombre->setToolTip(message);
+     });
+
+            //emite el final
+       connect(mediamanager, &MediaManager::playbackFinished,
+               this, [this, manager]() {
+           if (manager != mediamanager) return;
+           finishMix(true);
+
+           if (!currentItem)
+               return;
+
+           if (currentItem->isLoop()) {
+
+               if (currentItem->advancesOnLoop()) {
+                   AudioItemMaxi *item = currentItem;
+                   stopMain();
+                   playItem(item);
+                   return;
+               }
+
+               // LOOP
+               mediamanager->seek(currentItem->secondStart());
+               mediamanager->play();
+               return;
+           }
+
+           // guardar antes de parar
+           AudioItemMaxi* finishedItem = currentItem;
+
+           //  PRIORIDAD: NEXT + PURGE → repetir y NO borrar
+           if (finishedItem->isPlayNext() && finishedItem->isPurge()) {
+
+               this->stopMain();
+               playItem(finishedItem);
+               return;
+           }
+
+           // 1️⃣ Buscar el siguiente
+           AudioItemMaxi* nextItem = nullptr;
+
+           ContentsBase* contents = nullptr;
+           QWidget* w = finishedItem;
+
+           while (w) {
+               contents = qobject_cast<ContentsBase*>(w);
+               if (contents)
+                   break;
+               w = w->parentWidget();
+           }
+
+           if (contents) {
+               nextItem = contents->findNextPlayItem(finishedItem);
+           }
+
+           // 2️⃣ parar
+           this->stopMain();
+
+           // 3️⃣ reproducir siguiente
+           if (nextItem) {
+               playItem(nextItem);
+           }
+
+           // 4️⃣ PURGE (solo si no era NEXT prioritario)
+           if (finishedItem->isPurge()) {
+               emit finishedItem->requestAutoDelete(finishedItem);
+           }
+
+        });
+
+
+
+
+
+
+}
+
 void Player::playItem(AudioItemMaxi *item)
 {
     if (!item)
            return;
+    finishMix(false);
+    m_mixAttempted = false;
 
 
     if (currentItem && currentItem != item) {
@@ -467,6 +513,145 @@ void Player::playItem(AudioItemMaxi *item)
        btnpause->SetIcon("Pausemini.svg");
 }
 
+bool Player::tryFolderMix(double position)
+{
+    auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    if (!folder || !folder->mixEnabled() || m_outgoingManager || m_pendingMixManager || m_mixAttempted
+        || m_userIsSeeking || !mediamanager->isPlaying()) return false;
+    const double remaining = m_duration - position;
+    if (remaining <= 0.02 || remaining > folder->mixSeconds()) return false;
+    AudioItemMaxi *next = folderTransitionTarget(folder);
+    if (!next) return false;
+    m_mixAttempted = true;
+    auto *nextFolder = qobject_cast<AudioItemFolderMaxi*>(next);
+    const auto oldSequence = nextFolder && nextFolder->m_sequence
+        ? std::make_unique<AudioItemFolderMaxi::Sequence>(*nextFolder->m_sequence) : nullptr;
+    const QString oldTrack = nextFolder ? nextFolder->m_currentTrack : QString();
+    const double oldSeconds = next->second(), oldStart = next->secondStart();
+    const auto restoreSelection = [&]() {
+        if (!nextFolder || !oldSequence) return;
+        if (nextFolder->m_sequence->revision == oldSequence->revision + 1)
+            *nextFolder->m_sequence = *oldSequence;
+        nextFolder->m_currentTrack = oldTrack;
+        nextFolder->setSecond(oldSeconds); nextFolder->setTiempoFile(oldSeconds); nextFolder->setSecondStart(oldStart);
+    };
+    auto *incoming = new MediaManager(this);
+    const bool prepared = incoming->setDevice(devicePlay()) && next->preparePlayback();
+    if (prepared && next->isLiveStream()) {
+        // Keep the current audio playing until the asynchronous radio connection is ready.
+        incoming->setVolume(0.0f);
+        m_pendingMixManager = incoming; m_pendingMixItem = next;
+        connect(incoming, &MediaManager::networkLoadingChanged, this, [this, incoming](bool loading) {
+            if (incoming == m_pendingMixManager && !loading) finishPendingMix();
+        });
+        connect(incoming, &MediaManager::playbackError, this, [this, incoming](const QString &) {
+            if (incoming == m_pendingMixManager) cancelPendingMix();
+        });
+        if (!incoming->loadFile(next->playbackPath())) cancelPendingMix();
+        return false;
+    }
+    if (!prepared || !incoming->loadFile(next->playbackPath())) {
+        if (prepared) restoreSelection();
+        delete incoming;
+        return false;
+    }
+    const double available = incoming->getDuration() - next->secondStart();
+    if (available <= 0.02) {
+        restoreSelection();
+        delete incoming;
+        return false;
+    }
+    beginMix(next, incoming, remaining);
+    return true;
+}
+
+void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remaining)
+{
+    auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    const double available = incoming->isNetworkSource() ? remaining * 2.0 : incoming->getDuration() - next->secondStart();
+    incoming->seek(next->secondStart());
+    incoming->setVolume(0.0f);
+    m_outgoingManager = mediamanager;
+    m_outgoingItem = currentItem;
+    m_purgeOutgoing = next != currentItem && currentItem->isPurge();
+    m_outgoingLeft = m_outgoingRight = -120.0f;
+    if (next != currentItem) {
+        currentItem->setPlaying(false); currentItem->playColor(false);
+    }
+    mediamanager = incoming;
+    bindMediaManager();
+    connect(m_outgoingManager, &MediaManager::playbackFinished, this, [this, outgoing = m_outgoingManager]() {
+        if (outgoing == m_outgoingManager) finishMix(true);
+    });
+    connect(m_outgoingManager, &MediaManager::audioFrameUpdated, this,
+        [this, outgoing = m_outgoingManager](const AudioFrame &frame) {
+            if (outgoing != m_outgoingManager) return;
+            m_outgoingLeft = frame.left; m_outgoingRight = frame.right;
+        });
+    currentItem = next;
+    next->setPlaying(true); next->playColor(true); next->setIsPlayNext(false);
+    m_duration = incoming->getDuration();
+    slider->setEnabled(!incoming->isNetworkSource());
+    labelnombre->setText(next->playbackName());
+    btnpause->SetIcon("Pausemini.svg");
+    m_mixDurationMs = std::max(1, qRound(1000.0 * std::min({folder->mixSeconds(), remaining, available / 2.0})));
+    m_mixElapsedMs = 0; m_mixProgress = 0.0f; m_mixAttempted = false;
+    m_mixClock.restart();
+    incoming->play();
+    m_mixTimer->start();
+}
+
+void Player::finishPendingMix()
+{
+    auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    if (!folder || !m_pendingMixItem || !folder->mixEnabled()
+        || folderTransitionTarget(folder) != m_pendingMixItem) { cancelPendingMix(); return; }
+    if (!mediamanager->isPlaying()) return; // Pause also holds a connection that becomes ready.
+    MediaManager *incoming = m_pendingMixManager;
+    if (!incoming || incoming->isLoading()) return;
+    incoming->play();
+    const double remaining = m_duration - mediamanager->getPosition();
+    if (!incoming->isPlaying() || remaining <= 0.02) { cancelPendingMix(); return; }
+    auto *next = m_pendingMixItem.data();
+    m_pendingMixManager = nullptr; m_pendingMixItem.clear();
+    beginMix(next, incoming, remaining);
+}
+
+void Player::cancelPendingMix()
+{
+    if (!m_pendingMixManager) return;
+    MediaManager *pending = m_pendingMixManager;
+    m_pendingMixManager = nullptr; m_pendingMixItem.clear();
+    pending->stop(); pending->deleteLater();
+}
+
+void Player::updateMix()
+{
+    if (!m_outgoingManager) return;
+    const int elapsed = m_mixElapsedMs + int(m_mixClock.elapsed());
+    m_mixProgress = std::clamp(float(elapsed) / m_mixDurationMs, 0.0f, 1.0f);
+    mediamanager->setVolume(m_playerVolume * m_mixProgress);
+    m_outgoingManager->setVolume(m_playerVolume * (1.0f - m_mixProgress));
+    if (elapsed >= m_mixDurationMs) finishMix(true);
+}
+
+void Player::finishMix(bool purge)
+{
+    cancelPendingMix();
+    if (!m_outgoingManager) return;
+    m_mixTimer->stop();
+    MediaManager *outgoing = m_outgoingManager;
+    m_outgoingManager = nullptr;
+    outgoing->stop(); outgoing->deleteLater();
+    m_mixProgress = 1.0f;
+    mediamanager->setVolume(m_playerVolume);
+    auto item = m_outgoingItem;
+    m_outgoingItem.clear();
+    if (purge && m_purgeOutgoing && item && item != currentItem)
+        emit item->requestAutoDelete(item);
+    m_purgeOutgoing = false;
+}
+
 void Player::pauseMain()
 {
     if (!currentItem)
@@ -474,11 +659,21 @@ void Player::pauseMain()
 
         if (mediamanager->isPlaying()) {
             mediamanager->pause();
+            if (m_outgoingManager) {
+                m_outgoingManager->pause();
+                m_mixElapsedMs += int(m_mixClock.elapsed());
+                m_mixTimer->stop();
+            }
             vumeter->reset();
             btnpause->SetIcon("Playmini.svg");   // opcional: cambia icono a play
 
         } else {
             mediamanager->play();
+            if (m_pendingMixManager && !m_pendingMixManager->isLoading()) finishPendingMix();
+            if (m_outgoingManager) {
+                m_outgoingManager->play();
+                m_mixClock.restart(); m_mixTimer->start();
+            }
             btnpause->SetIcon("Pausemini.svg");  // opcional: vuelve icono pause
 
         }
@@ -498,6 +693,7 @@ void Player::dropEvent(QDropEvent *event)
 
 void Player::stopMain()
 {
+    finishMix(false);
 
     if (!currentItem)
            return;
@@ -522,12 +718,17 @@ void Player::stopMain()
 
 bool Player::setVolume(float volume)
 {
-    return mediamanager->setVolume(volume);
+    if (!std::isfinite(volume)) return false;
+    m_playerVolume = std::clamp(volume, 0.0f, 1.0f);
+    bool result = mediamanager->setVolume(m_playerVolume * m_mixProgress);
+    if (m_outgoingManager)
+        result = m_outgoingManager->setVolume(m_playerVolume * (1.0f - m_mixProgress)) && result;
+    return result;
 }
 
 float Player::volume() const
 {
-    return mediamanager->volume();
+    return m_playerVolume;
 }
 
 int Player::devicePlay() const {return m_deviceplay;}

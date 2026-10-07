@@ -1267,14 +1267,18 @@ QMenu::separator{
 
 #FileExplore Frame#framebarra,
 #Capture Frame#framebarra,
-#Cast Frame#framebarra {
+#Cast Frame#framebarra,
+#MeteoClock Frame#framebarra,
+#FolderPropertiesFrame Frame#framebarra {
     background-color: #4e4d7a;
     border: none;
 }
 
 #FileExplore QLabel#PanelTitle,
 #Capture QLabel#PanelTitle,
-#Cast QLabel#PanelTitle {
+#Cast QLabel#PanelTitle,
+#MeteoClock QLabel#PanelTitle,
+#FolderPropertiesFrame QLabel#PanelTitle {
     font-size: 14px;
     color: #8a8d96;
     background: transparent;
@@ -1625,3 +1629,37 @@ QDialog#OnlineRadioDialog {
 #OnlineRadioDialog QPushButton:pressed { background-color: #1d2230; }
 #OnlineRadioDialog QPushButton:default { border-color: #80A4AE; }
 #OnlineRadioDialog QPushButton:disabled { color: #686b74; border-color: #333b4f; }
+
+/* Audio folder properties. */
+Frame#FolderPropertiesFrame { background-color: #181e2c; border: 1px solid #333b4f; }
+#FolderPropertiesFrame QCheckBox::indicator { width: 13px; height: 13px; border: 1px solid #686b74; border-radius: 2px; background: #181e2c; }
+#FolderPropertiesFrame QCheckBox::indicator:checked { background: #80A4AE; border-color: #80A4AE; }
+#FolderPropertiesFrame QLabel, #FolderPropertiesFrame QCheckBox {
+    background: transparent; border: none; color: #8a8d96; font-size: 12px;
+}
+#FolderPropertiesFrame QLineEdit {
+    background-color: #252b39; border: 1px solid #535b6a;
+    padding: 2px; min-height: 20px; color: #80A4AE; font-size: 12px;
+    selection-background-color: #4e4d7a; selection-color: white;
+}
+#FolderPropertiesFrame QLineEdit:focus { border-color: #80A4AE; }
+#FolderPropertiesFrame QPushButton {
+    padding: 2px 6px; border: 1px solid #686b74;
+    background-color: #262c3b; color: #80A4AE; font-size: 12px;
+}
+#FolderPropertiesFrame QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
+#FolderPropertiesFrame QPushButton:pressed { background-color: #1d2230; }
+#FolderPropertiesFrame QPushButton:disabled, #FolderPropertiesFrame QLineEdit:disabled { color: #686b74; border-color: #333b4f; }
+
+/* MeteoClock: local clock and weather. */
+#MeteoClock { background-color: #181e2c; border: 1px solid #333b4f; }
+#MeteoClock QLabel { color: #8a8d96; background: transparent; border: none; padding: 0; }
+#MeteoClock QLabel#MeteoDate, #MeteoClock QLabel#MeteoLocation, #MeteoClock QLabel#MeteoStatus { font-size: 12px; }
+#MeteoClock QLabel#MeteoTime { color: #80A4AE; font-weight: bold; }
+#MeteoClock QLabel#MeteoTemperature, #MeteoClock QLabel#MeteoHumidity { color: #80A4AE; font-size: 20pt; font-weight: bold; }
+#MeteoClock QLabel#MeteoProvider { font-size: 10px; }
+#MeteoClock QWidget#MeteoSettings { background: transparent; border: none; }
+#MeteoClock Button { padding: 2px 6px; font-size: 12px; }
+#MeteoClock Button:disabled { color: #686b74; border-color: #333b4f; }
+#MeteoClock QLineEdit { background-color: #252b39; color: #80A4AE; border: 1px solid #535b6a; min-height: 20px; padding: 2px 5px; font-size: 12px; }
+#MeteoClock QLineEdit:focus { border-color: #80A4AE; }

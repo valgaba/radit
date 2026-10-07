@@ -1,6 +1,6 @@
 
 
-QT += core gui concurrent svg
+QT += core gui concurrent svg network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -15,6 +15,8 @@ TARGET = radit
 SOURCES += \
     core/Clipboard.cpp \
     core/MediaManager.cpp \
+    core/WeatherService.cpp \
+    core/SystemLocation.cpp \
     core/config.cpp \
     core/io.cpp \
     main.cpp \
@@ -28,6 +30,7 @@ SOURCES += \
     widgets/AudioItemNetMaxi.cpp \
     widgets/Capture.cpp \
     widgets/Cast.cpp \
+    widgets/MeteoClock.cpp \
     widgets/CueWaveformFrame.cpp \
     widgets/ContentsMenu.cpp \
     widgets/ContentsPlayer.cpp \
@@ -57,18 +60,22 @@ SOURCES += \
 HEADERS += \
     core/Clipboard.h \
     core/MediaManager.h \
+    core/WeatherService.h \
+    core/SystemLocation.h \
     core/config.h \
     core/io.h \
     mainwindow.h \
     widgets/AudioItem.h \
     widgets/AudioItemFileMaxi.h \
     widgets/AudioItemFolderMaxi.h \
+    widgets/FolderPropertiesFrame.h \
     widgets/AudioItemFileMini.h \
     widgets/AudioItemMaxi.h \
     widgets/AudioItemMini.h \
     widgets/AudioItemNetMaxi.h \
     widgets/Capture.h \
     widgets/Cast.h \
+    widgets/MeteoClock.h \
     widgets/CueWaveformFrame.h \
     widgets/LoadingProgress.h \
     widgets/FileExploreModel.h \

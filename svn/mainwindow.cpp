@@ -51,6 +51,7 @@
 #include "widgets/fileexplore.h"
 #include "widgets/Capture.h"
 #include "widgets/Cast.h"
+#include "widgets/MeteoClock.h"
 #include "widgets/Player.h"
 
 
@@ -204,9 +205,11 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     m_fileExplore = new FileExplore;
     m_capture = new Capture;
     m_cast = new Cast;
+    m_meteoClock = new MeteoClock;
     splittertop->addWidget(m_fileExplore);
     splittertop->addWidget(m_capture);
     splittertop->addWidget(m_cast);
+    splittertop->addWidget(m_meteoClock);
     splittertop->addWidget(new TabAuto);
 
     splitterdown->addWidget(player2);
@@ -214,13 +217,14 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splitterdown->addWidget(player4);
 
 
-    // FileExplore, Capture y Cast comparten el ancho inicial.
+    // Los paneles superiores comparten el ancho inicial.
     splittertop->setStretchFactor(0, 2);
     splittertop->setStretchFactor(1, 2);
     splittertop->setStretchFactor(2, 2);
-    splittertop->setStretchFactor(3, 3);
+    splittertop->setStretchFactor(3, 2);
+    splittertop->setStretchFactor(4, 3);
     QList<int> sizesTop;
-    sizesTop << 400 << 400 << 400 << 600;
+    sizesTop << 400 << 400 << 400 << 400 << 600;
     splittertop->setSizes(sizesTop);
 
     QAction *resetInterface = vistasMenu->addAction(tr("Reset User Interface"));
@@ -247,6 +251,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     addPanelAction(tr("Show File Browser"), m_fileExplore);
     addPanelAction(tr("Show Capture"), m_capture);
     addPanelAction(tr("Show Cast"), m_cast);
+    addPanelAction(tr("Show MeteoClock"), m_meteoClock);
 
 
 // cargar configuracion de los player*******************
@@ -290,7 +295,7 @@ void MainWindow::restoreInterface()
     splittertop->show();
     splitterdown->show();
 
-    splittertop->setSizes({400, 400, 400, 600});
+    splittertop->setSizes({400, 400, 400, 400, 600});
     splitterdown->setSizes({400, 400, 400});
     const int height = qMax(3, splitterprincipal->height() - splitterprincipal->handleWidth());
     splitterprincipal->setSizes({height / 3, height - height / 3});

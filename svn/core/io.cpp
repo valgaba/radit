@@ -55,7 +55,7 @@ QJsonArray saveItems(QLayout *layout)
     for (int i = 0; i < layout->count(); ++i) {
         auto *item = qobject_cast<AudioItemMaxi*>(layout->itemAt(i)->widget());
         if (!item) continue;
-        items.append(QJsonObject{
+        QJsonObject object{
             {"type", qobject_cast<AudioItemFolderMaxi*>(item) ? "folder" :
                          item->isLiveStream() ? "net" : "file"},
             {"url", item->filePath()}, {"name", item->nameFile()},
@@ -63,7 +63,12 @@ QJsonArray saveItems(QLayout *layout)
             {"select", item->isSelect()}, {"playNext", item->isPlayNext()},
             {"purge", item->isPurge()}, {"loop", item->isLoop()},
             {"color", item->color().name(QColor::HexArgb)}
-        });
+        };
+        if (auto *folder = qobject_cast<AudioItemFolderMaxi*>(item)) {
+            object["mixEnabled"] = folder->mixEnabled();
+            object["mixSeconds"] = folder->mixSeconds();
+        }
+        items.append(object);
     }
     return items;
 }
@@ -81,7 +86,11 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
         AudioItemMaxi *item = folder ? static_cast<AudioItemMaxi*>(new AudioItemFolderMaxi(contents)) :
             network ? static_cast<AudioItemMaxi*>(new AudioItemNetMaxi(contents)) :
                       static_cast<AudioItemMaxi*>(new AudioItemFileMaxi(contents));
-        if (folder) static_cast<AudioItemFolderMaxi*>(item)->setFolderPath(path);
+        if (folder) {
+            auto *folderItem = static_cast<AudioItemFolderMaxi*>(item);
+            folderItem->setFolderPath(path);
+            folderItem->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
+        }
         item->setFilePath(path);
         item->setToolTip(path);
         item->setNameFile(object["name"].toString());
@@ -166,6 +175,10 @@ bool validItems(const QJsonArray &items, LoadingDialog &loading)
         for (const auto *key : {"select", "playNext", "purge", "loop"})
             if (item.contains(key) && !item[key].isBool()) return false;
         if (item.contains("color") && !QColor(item["color"].toString()).isValid()) return false;
+        if (item.contains("mixEnabled") && !item["mixEnabled"].isBool()) return false;
+        if (item.contains("mixSeconds") && (!item["mixSeconds"].isDouble()
+            || !std::isfinite(item["mixSeconds"].toDouble()) || item["mixSeconds"].toDouble() < 0.1
+            || item["mixSeconds"].toDouble() > 30)) return false;
         if (item.contains("secondStart") && (!item["secondStart"].isDouble()
             || item["secondStart"].toDouble() < 0
             || !std::isfinite(item["secondStart"].toDouble()))) return false;

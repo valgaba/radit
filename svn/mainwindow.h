@@ -12,6 +12,7 @@ class Player;
 class FileExplore;
 class Capture;
 class Cast;
+class MeteoClock;
 
 class MainWindow : public QMainWindow
 {
@@ -47,6 +48,7 @@ private:
     FileExplore *m_fileExplore = nullptr;
     Capture *m_capture = nullptr;
     Cast *m_cast = nullptr;
+    MeteoClock *m_meteoClock = nullptr;
 
 
 };

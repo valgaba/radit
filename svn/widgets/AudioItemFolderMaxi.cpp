@@ -4,9 +4,10 @@
 */
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/Player.h"
+#include "widgets/FolderPropertiesFrame.h"
+#include <cmath>
 #include <QDir>
 #include <QDirIterator>
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QRandomGenerator>
@@ -19,18 +20,74 @@ AudioItemFolderMaxi::AudioItemFolderMaxi(QWidget *parent) : AudioItemMaxi(parent
     setNameFile(tr("Audio folder"));
     setFolderPresentation(tr("FOLDER"), false);
     connect(propertiesButton(), &Button::clicked, this, [this]() {
-        const QString path = QFileDialog::getExistingDirectory(this, tr("Select audio folder"), folderPath());
-        if (path.isEmpty()) return;
-        if (isPlaying()) {
-            QWidget *owner = parentWidget();
-            while (owner && !qobject_cast<Player*>(owner)) owner = owner->parentWidget();
-            if (auto *player = qobject_cast<Player*>(owner)) player->stopMain();
+        if (!m_propertiesFrame) {
+            m_propertiesFrame = new FolderPropertiesFrame(this);
         }
-        setFolderPath(path);
+        m_propertiesFrame->show();
+        m_propertiesFrame->raise();
+        m_propertiesFrame->activateWindow();
     });
 }
 
 AudioItemFolderMaxi::~AudioItemFolderMaxi() { if (m_cancel) m_cancel->store(true); }
+
+void AudioItemFolderMaxi::setMixSettings(bool enabled, double seconds)
+{
+    if (!std::isfinite(seconds)) return;
+    m_mixEnabled = enabled;
+    m_mixSeconds = qBound(0.1, seconds, 30.0);
+}
+
+QString AudioItemFolderMaxi::trackKey(const QString &path)
+{
+    QString key = QDir::cleanPath(QDir::fromNativeSeparators(path));
+#ifdef Q_OS_WIN
+    key = key.toCaseFolded();
+#endif
+    return key;
+}
+
+std::shared_ptr<AudioItemFolderMaxi::Sequence> AudioItemFolderMaxi::sequenceForFolder(const QString &path)
+{
+    // Accessed only by widgets on the GUI thread; scans publish their results there.
+    static QHash<QString, std::weak_ptr<Sequence>> sequences;
+    for (auto it = sequences.begin(); it != sequences.end(); ) {
+        if (it.value().expired()) it = sequences.erase(it);
+        else ++it;
+    }
+    const QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    const QString key = trackKey(canonical.isEmpty() ? info.absoluteFilePath() : canonical);
+    auto sequence = sequences.value(key).lock();
+    if (!sequence) {
+        sequence = std::make_shared<Sequence>();
+        sequences.insert(key, sequence);
+    }
+    return sequence;
+}
+
+void AudioItemFolderMaxi::updateSequence(const QVector<Track> &tracks)
+{
+    QHash<QString, Track> available;
+    for (const auto &track : tracks) available.insert(trackKey(track.path), track);
+    QSet<QString> played;
+    for (const auto &key : m_sequence->played)
+        if (available.contains(key)) played.insert(key);
+    QStringList remaining;
+    QSet<QString> queued;
+    for (const auto &key : m_sequence->remaining) {
+        if (available.contains(key) && !played.contains(key) && !queued.contains(key)) {
+            remaining.append(key); queued.insert(key);
+        }
+    }
+    for (auto it = available.cbegin(); it != available.cend(); ++it) {
+        if (!played.contains(it.key()) && !queued.contains(it.key())) remaining.append(it.key());
+    }
+    m_sequence->tracks = available;
+    m_sequence->played = played;
+    m_sequence->remaining = remaining;
+    ++m_sequence->revision;
+}
 
 void AudioItemFolderMaxi::setFolderPath(const QString &path)
 {
@@ -38,11 +95,12 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancel = m_cancel;
     const QString folder = QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+    m_sequence = sequenceForFolder(folder);
     setFilePath(folder);
     const QString name = QDir(folder).dirName();
     setNameFile(name.isEmpty() ? QDir::toNativeSeparators(folder) : name);
     setToolTip(folder);
-    m_tracks.clear(); m_remaining.clear(); m_currentTrack.clear(); m_lastTrack.clear();
+    m_tracks.clear(); m_currentTrack.clear();
     m_scanning = true;
     setSecond(0); setSecondStart(0);
     setFolderPresentation(tr("Loading..."), false);
@@ -53,6 +111,7 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
         watcher->deleteLater();
         if (cancel != m_cancel || cancel->load()) return;
         m_tracks = tracks; m_scanning = false;
+        updateSequence(tracks);
         setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
         setToolTip(tr("%1\n%2 audio files — random playback without repeats").arg(folder).arg(m_tracks.size()));
         emit scanFinished();
@@ -62,7 +121,9 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
         QDirIterator files(folder, filters, QDir::Files | QDir::Readable | QDir::NoSymLinks,
                            QDirIterator::Subdirectories);
         while (!cancel->load() && files.hasNext()) {
-            const QString path = files.next();
+            files.next();
+            const QString path = files.fileInfo().canonicalFilePath();
+            if (path.isEmpty()) continue;
             const double seconds = MediaManager::readFileDuration(path);
             if (seconds > 0) tracks.append({path, seconds});
         }
@@ -72,17 +133,26 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
 
 bool AudioItemFolderMaxi::preparePlayback()
 {
-    if (m_scanning || m_tracks.isEmpty()) return false;
-    if (m_remaining.isEmpty())
-        for (int i = 0; i < m_tracks.size(); ++i) m_remaining.append(i);
-    while (!m_remaining.isEmpty()) {
-        int index = QRandomGenerator::global()->bounded(int(m_remaining.size()));
+    if (m_scanning || !m_sequence || m_sequence->tracks.isEmpty()) return false;
+    auto &sequence = *m_sequence;
+    if (sequence.remaining.isEmpty()) {
+        sequence.played.clear();
+        sequence.remaining = sequence.tracks.keys();
+    }
+    ++sequence.revision;
+    while (!sequence.remaining.isEmpty()) {
+        int index = QRandomGenerator::global()->bounded(int(sequence.remaining.size()));
         // Also avoid an immediate repeat at the boundary between two cycles.
-        if (m_remaining.size() > 1 && m_tracks[m_remaining[index]].path == m_lastTrack)
-            index = (index + 1 + QRandomGenerator::global()->bounded(int(m_remaining.size()) - 1)) % m_remaining.size();
-        const Track track = m_tracks[m_remaining.takeAt(index)];
-        if (!QFileInfo(track.path).isFile()) continue;
-        m_currentTrack = track.path; m_lastTrack = track.path;
+        if (sequence.remaining.size() > 1 && sequence.remaining[index] == sequence.lastTrack)
+            index = (index + 1 + QRandomGenerator::global()->bounded(int(sequence.remaining.size()) - 1)) % sequence.remaining.size();
+        const QString key = sequence.remaining.takeAt(index);
+        const Track track = sequence.tracks.value(key);
+        if (!QFileInfo(track.path).isFile()) {
+            sequence.tracks.remove(key); sequence.played.remove(key);
+            continue;
+        }
+        sequence.played.insert(key);
+        m_currentTrack = track.path; sequence.lastTrack = key;
         setSecond(track.seconds); setTiempoFile(track.seconds); setSecondStart(0);
         return true;
     }
@@ -99,12 +169,13 @@ QString AudioItemFolderMaxi::playbackName() const
 AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
 {
     auto *item = new AudioItemFolderMaxi(newParent);
+    item->setMixSettings(m_mixEnabled, m_mixSeconds);
     item->setIsPurge(isPurge()); item->setIsPlayNext(isPlayNext());
     item->setIsLoop(isLoop()); item->setIsSelect(isSelect()); item->setColor(color());
     if (m_scanning) item->setFolderPath(folderPath());
     else {
         item->setFilePath(folderPath()); item->setNameFile(nameFile());
-        item->m_tracks = m_tracks; item->m_remaining = m_remaining; item->m_lastTrack = m_lastTrack;
+        item->m_tracks = m_tracks; item->m_sequence = m_sequence;
         item->setToolTip(toolTip());
         item->setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
     }
