@@ -12,6 +12,6 @@ public:
     bool isLiveStream() const override { return true; }
     bool setUrl(const QString &url);
     QString url() const { return filePath(); }
-    bool editStation();
+    virtual bool editStation();
 };
 #endif

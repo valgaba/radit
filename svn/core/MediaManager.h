@@ -25,6 +25,19 @@ struct AudioWaveform
     QString error;
 };
 
+struct AudioFileMetadata
+{
+    QString title;
+    QString artist;
+    QString album;
+    QString year;
+    QString comment;
+    QString genre;
+    QString format;
+    double duration = -1.0;
+    qint64 sizeBytes = 0;
+};
+
 struct AudioDevice
 {
     int id = -1;
@@ -83,6 +96,7 @@ public:
                                       const std::shared_ptr<std::atomic_int> &progress = nullptr);
 
     static double readFileDuration(const QString &filePath);
+    static AudioFileMetadata readAudioFileMetadata(const QString &filePath);
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
     bool loadAudioSequence(const QStringList &files, QString *error = nullptr);
@@ -93,6 +107,7 @@ public:
     void play();
     void pause();
     void stop();
+    void finishPlayback();
 
     double getDuration() const;
     double getPosition() const;

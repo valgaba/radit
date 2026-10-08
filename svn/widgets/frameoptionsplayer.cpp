@@ -24,6 +24,7 @@
 #include "widgets/frameoptionsplayer.h"
 #include "widgets/label.h"
 #include "widgets/Player.h"
+#include "widgets/Planner.h"
 #include "core/MediaManager.h"
 
 
@@ -78,16 +79,18 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
     frametop->setStyleSheet("background-color: #4e4d7a; border: none;");
 
 
-     Label * labeltext = new Label(this);
-     labeltext->setMaximumHeight(QWIDGETSIZE_MAX);
-     labeltext->setWordWrap(false);
+     optionsTitle = new Label(this);
+     optionsTitle->setMaximumHeight(QWIDGETSIZE_MAX);
+     optionsTitle->setWordWrap(false);
      QFont font;
           font.setPointSize(10);
           font.setBold(true);
-          labeltext->setFont(font);
+          optionsTitle->setFont(font);
 
-     labeltext->setText("Player options");
-     layouttop->addWidget(labeltext);
+     optionsTitle->setText(qobject_cast<Planner *>(parent)
+                               ? tr("Planner options")
+                               : tr("Player options"));
+     layouttop->addWidget(optionsTitle);
 
 //parte media **************************************
 
@@ -138,13 +141,17 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
     layoutcenter->addRow(volumeLabel, volumeRow);
     connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         auto *player = qobject_cast<Player *>(parentWidget());
-        if (!player)
+        auto *planner = qobject_cast<Planner *>(parentWidget());
+        if (!player && !planner)
             return;
-        if (player->setVolume(value / 100.0f)) {
+        const bool accepted = player
+            ? player->setVolume(value / 100.0f)
+            : (planner && planner->setVolume(value / 100.0f));
+        if (accepted) {
             volumeValue->setText(QString::number(value) + " %");
         } else {
             const QSignalBlocker blocker(volumeSlider);
-            const int current = qRound(player->volume() * 100);
+            const int current = qRound((player ? player->volume() : planner->volume()) * 100);
             volumeSlider->setValue(current);
             volumeValue->setText(QString::number(current) + " %");
         }
@@ -197,13 +204,18 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
            // cast  clase padre
 
           Player *player = qobject_cast<Player*>(this->parent());
+          Planner *planner = qobject_cast<Planner*>(this->parent());
 
            if (player) {
                player->setDevicePlay(selectedPlay);
                player->setDeviceCue(selectedCue);
                m_volumeCommitted = true;
                emit player->configurationChanged();
-
+           } else if (planner) {
+               planner->setDevicePlay(selectedPlay);
+               planner->setDeviceCue(selectedCue);
+               m_volumeCommitted = true;
+               emit planner->configurationChanged();
            }
 
            this->hide();
@@ -242,8 +254,9 @@ void FrameOptionsPlayer::UpdateDevice(){
           // ----------------------------------------
 
           Player *player = qobject_cast<Player*>(this->parent());
+          Planner *planner = qobject_cast<Planner*>(this->parent());
 
-          if (!player)
+          if (!player && !planner)
               return;
 
 
@@ -251,8 +264,8 @@ void FrameOptionsPlayer::UpdateDevice(){
           // Recuperar configuración actual
           // ----------------------------------------
 
-          int currentPlay = player->devicePlay();
-          int currentCue  = player->deviceCue();
+          int currentPlay = player ? player->devicePlay() : planner->devicePlay();
+          int currentCue  = player ? player->deviceCue() : planner->deviceCue();
 
 
           // ----------------------------------------
@@ -295,6 +308,12 @@ void FrameOptionsPlayer::showEvent(QShowEvent *event) {
         const int value = qRound(m_previousVolume * 100);
         volumeSlider->setValue(value);
         volumeValue->setText(QString::number(value) + " %");
+    } else if (auto *planner = qobject_cast<Planner *>(parentWidget())) {
+        m_previousVolume = planner->volume();
+        const QSignalBlocker blocker(volumeSlider);
+        const int value = qRound(m_previousVolume * 100);
+        volumeSlider->setValue(value);
+        volumeValue->setText(QString::number(value) + " %");
     }
 }
 
@@ -303,6 +322,8 @@ void FrameOptionsPlayer::hideEvent(QHideEvent *event)
     if (!m_volumeCommitted) {
         if (auto *player = qobject_cast<Player *>(parentWidget()))
             player->setVolume(m_previousVolume);
+        else if (auto *planner = qobject_cast<Planner *>(parentWidget()))
+            planner->setVolume(m_previousVolume);
     }
     Frame::hideEvent(event);
 }
@@ -312,5 +333,8 @@ float FrameOptionsPlayer::committedVolume() const
     if (isVisible() && !m_volumeCommitted)
         return m_previousVolume;
     const auto *player = qobject_cast<Player *>(parentWidget());
-    return player ? player->volume() : 1.0f;
+    if (player)
+        return player->volume();
+    const auto *planner = qobject_cast<Planner *>(parentWidget());
+    return planner ? planner->volume() : 1.0f;
 }

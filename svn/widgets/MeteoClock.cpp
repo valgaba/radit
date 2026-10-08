@@ -14,6 +14,7 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QSettings>
+#include <QPointer>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -21,6 +22,7 @@
 
 namespace {
 MeteoClock::Readings meteoReadings;
+QPointer<MeteoClock> meteoClockInstance;
 QString settingsPath() { return QDir(QCoreApplication::applicationDirPath()).filePath("meteo.ini"); }
 bool validCoordinates(double latitude, double longitude)
 {
@@ -30,6 +32,7 @@ bool validCoordinates(double latitude, double longitude)
 
 MeteoClock::MeteoClock(QWidget *parent) : Frame(parent)
 {
+    meteoClockInstance=this;
     setObjectName("MeteoClock");
     setMinimumSize(210, 180);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -118,6 +121,7 @@ MeteoClock::MeteoClock(QWidget *parent) : Frame(parent)
     });
     connect(m_weather, &WeatherService::searchFailed, this, [this](const QString &message) { m_search->setEnabled(true); setStatus(message); });
     connect(m_weather, &WeatherService::currentReady, this, [this](double temperature, int humidity, const QDateTime &observed) {
+        m_weatherRequestPending=false;
         meteoReadings={temperature,humidity,m_locationName,QDateTime::currentDateTimeUtc(),true};
         m_temperature->setText(QLocale(QLocale::Spanish, QLocale::Spain).toString(temperature, 'f', 1)+" °C");
         m_humidity->setText(QString::number(humidity)+" %"); m_lastUpdate=QDateTime::currentDateTimeUtc();
@@ -125,6 +129,7 @@ MeteoClock::MeteoClock(QWidget *parent) : Frame(parent)
         m_temperature->setToolTip(info); m_humidity->setToolTip(info); setStatus({});
     });
     connect(m_weather, &WeatherService::weatherFailed, this, [this](const QString &message) {
+        m_weatherRequestPending=false;
         meteoReadings.available=false;
         m_temperature->setText("-- °C"); m_humidity->setText("-- %"); m_lastUpdate={}; setStatus(message);
     });
@@ -136,8 +141,38 @@ MeteoClock::MeteoClock(QWidget *parent) : Frame(parent)
     m_options->setChecked(!m_hasLocation); m_settings->setVisible(!m_hasLocation);
     if (!m_hasLocation) setStatus(tr("Choose a city or use system location."));
 }
-MeteoClock::~MeteoClock() { m_weather->cancel(); m_systemLocation->cancel(); }
+MeteoClock::~MeteoClock()
+{
+    if (meteoClockInstance==this)
+        meteoClockInstance.clear();
+    m_weather->cancel();
+    m_systemLocation->cancel();
+}
 MeteoClock::Readings MeteoClock::currentReadings() { return meteoReadings; }
+bool MeteoClock::hasFreshReadings()
+{
+    if (!meteoReadings.available || !meteoReadings.updated.isValid())
+        return false;
+    const qint64 age=meteoReadings.updated.secsTo(QDateTime::currentDateTimeUtc());
+    return age>=0 && age<=1800;
+}
+bool MeteoClock::requestCurrentReadings()
+{
+    if (!meteoClockInstance || !meteoClockInstance->m_hasLocation)
+        return false;
+    if (hasFreshReadings())
+        return true;
+
+    MeteoClock *clock=meteoClockInstance;
+    if (!clock->m_weatherRequestPending
+        && (!clock->m_lastWeatherRequest.isValid()
+            || clock->m_lastWeatherRequest.secsTo(QDateTime::currentDateTimeUtc())>=60)) {
+        clock->m_weatherRequestPending=true;
+        clock->m_lastWeatherRequest=QDateTime::currentDateTimeUtc();
+        clock->m_weather->requestCurrent(clock->m_latitude,clock->m_longitude);
+    }
+    return true;
+}
 QString MeteoClock::formatDate(const QDate &date)
 {
     return QLocale(QLocale::Spanish, QLocale::Spain).toString(date, "dddd dd 'de' MMMM yyyy");
@@ -157,14 +192,17 @@ void MeteoClock::setStatus(const QString &text) { m_status->setText(text); m_sta
 void MeteoClock::setLocation(const QString &name, double latitude, double longitude)
 {
     if (name.trimmed().isEmpty() || !validCoordinates(latitude,longitude)) return;
-    m_weather->cancel(); m_locationName=name.trimmed(); m_latitude=latitude; m_longitude=longitude; m_hasLocation=true; m_lastUpdate={};
+    m_weather->cancel(); m_weatherRequestPending=false; m_lastWeatherRequest={};
+    m_locationName=name.trimmed(); m_latitude=latitude; m_longitude=longitude; m_hasLocation=true; m_lastUpdate={};
     meteoReadings.available=false;
     m_location->setText(m_locationName); m_temperature->setText("-- °C"); m_humidity->setText("-- %"); saveSettings();
     if (isVisible()) refreshWeather();
 }
 void MeteoClock::refreshWeather()
 {
-    if (!m_hasLocation) return;
+    if (!m_hasLocation || m_weatherRequestPending) return;
+    m_weatherRequestPending=true;
+    m_lastWeatherRequest=QDateTime::currentDateTimeUtc();
     setStatus(tr("Updating weather...")); m_weather->requestCurrent(m_latitude,m_longitude);
 }
 void MeteoClock::searchCity()

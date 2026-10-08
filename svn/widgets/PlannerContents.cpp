@@ -6,6 +6,12 @@
 #include "widgets/AudioItem.h"
 #include "widgets/AudioItemFilePlanner.h"
 #include "widgets/AudioItemFileMaxi.h"
+#include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemFolderPlanner.h"
+#include "widgets/AudioItemMeteoClockMaxi.h"
+#include "widgets/AudioItemMeteoClockPlanner.h"
+#include "widgets/AudioItemNetMaxi.h"
+#include "widgets/AudioItemNetPlanner.h"
 #include "widgets/menu.h"
 
 #include <QAction>
@@ -15,25 +21,57 @@
 #include <QIcon>
 #include <QMimeData>
 
+namespace {
+AudioItemMaxi *makePlannerItem(AudioItemMaxi *source, QWidget *parent)
+{
+    if (auto *fileItem=qobject_cast<AudioItemFileMaxi*>(source)) {
+        if (auto *plannerItem=qobject_cast<AudioItemFilePlanner*>(fileItem))
+            return plannerItem->copy(parent);
+        auto *item=new AudioItemFilePlanner(parent);
+        item->setNameFile(fileItem->nameFile());
+        item->setFilePath(fileItem->filePath());
+        item->setSecond(fileItem->second());
+        item->setTiempoFile(fileItem->second());
+        item->setSecondStart(fileItem->secondStart());
+        item->setToolTip(fileItem->toolTip());
+        return item;
+    }
+    if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(source))
+        return new AudioItemFolderPlanner(*folderItem,parent);
+    if (auto *netItem=qobject_cast<AudioItemNetMaxi*>(source))
+        return new AudioItemNetPlanner(*netItem,parent);
+    if (auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(source))
+        return new AudioItemMeteoClockPlanner(*meteoItem,parent);
+    return nullptr;
+}
+
+bool isPlannerItem(AudioItemMaxi *item)
+{
+    return qobject_cast<AudioItemFilePlanner*>(item)
+        || qobject_cast<AudioItemFolderPlanner*>(item)
+        || qobject_cast<AudioItemNetPlanner*>(item)
+        || qobject_cast<AudioItemMeteoClockPlanner*>(item);
+}
+}
+
 PlannerContents::PlannerContents(QWidget *parent) : ContentsPlayer(parent)
 {
 }
 
 AudioItemMaxi *PlannerContents::createItem(AudioItemMaxi *item)
 {
-    auto *fileItem=qobject_cast<AudioItemFileMaxi*>(item);
-    if (fileItem && !qobject_cast<AudioItemFilePlanner*>(item)) {
-        auto *compact=new AudioItemFilePlanner(this);
-        compact->setNameFile(fileItem->nameFile());
-        compact->setFilePath(fileItem->filePath());
-        compact->setSecond(fileItem->second());
-        compact->setTiempoFile(fileItem->second());
-        compact->setSecondStart(fileItem->secondStart());
-        compact->setToolTip(fileItem->toolTip());
-        delete fileItem;
-        item=compact;
+    if (item && !isPlannerItem(item)) {
+        if (AudioItemMaxi *compact=makePlannerItem(item,this)) {
+            delete item;
+            item=compact;
+        }
     }
     AudioItemMaxi *created=ContentsPlayer::createItem(item);
+    if (auto *netItem=qobject_cast<AudioItemNetPlanner*>(created)) {
+        connect(netItem,&AudioItemNetPlanner::connectionDurationChanged,this,[this]() {
+            emit contentDurationsChanged();
+        });
+    }
     emit contentDurationsChanged();
     if (created)
         emit contentAdded();
@@ -61,6 +99,8 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
 
     Menu menu(this);
     menu.setFixedWidth(190);
+    QAction *addOnlineRadioAction=menu.addAction(QIcon(":/icons/net.svg"),tr("Add online radio"));
+    menu.addSeparator();
     QAction *selectAllAction=menu.addAction(QIcon(":/icons/Selectall.svg"),tr("Select All"));
     QAction *unselectAllAction=menu.addAction(QIcon(":/icons/unselect.svg"),tr("Unselect All"));
     QAction *selectAction=menu.addAction(tr("Select"));
@@ -71,7 +111,7 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     menu.addSeparator();
     QAction *deleteAction=menu.addAction(QIcon(":/icons/Remove.svg"),tr("Delete"));
     menu.addSeparator();
-    QAction *propertiesAction=menu.addAction(QIcon(":/icons/properties.svg"),tr("Properties"));
+    QAction *propertiesAction=menu.addAction(QIcon(":/icons/settings.svg"),tr("Properties"));
 
     const bool hasTarget=target!=nullptr;
     selectAllAction->setEnabled(!findChildren<AudioItemMaxi*>().isEmpty());
@@ -83,7 +123,14 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     pasteAction->setEnabled(!clipboard.lista.isEmpty());
 
     QAction *chosen=menu.exec(mapToGlobal(event->pos()));
-    if (chosen==selectAllAction)
+    if (chosen==addOnlineRadioAction) {
+        auto *radio=new AudioItemNetPlanner(this);
+        if (radio->editStation())
+            createItem(radio);
+        else
+            radio->deleteLater();
+    }
+    else if (chosen==selectAllAction)
         selectAllItems();
     else if (chosen==unselectAllAction)
         unSelectAllItems();
@@ -147,23 +194,11 @@ void PlannerContents::dropEvent(QDropEvent *event)
     }
 
     for (AudioItem *source : draggedItems) {
-        auto *fileItem=qobject_cast<AudioItemFileMaxi*>(source);
-        if (!fileItem)
+        auto *audioSource=qobject_cast<AudioItemMaxi*>(source);
+        if (!audioSource)
             continue;
-
-        AudioItemFilePlanner *compact=nullptr;
-        if (auto *plannerItem=qobject_cast<AudioItemFilePlanner*>(source)) {
-            compact=qobject_cast<AudioItemFilePlanner*>(plannerItem->copy(this));
-        } else {
-            compact=new AudioItemFilePlanner(this);
-            compact->setNameFile(fileItem->nameFile());
-            compact->setFilePath(fileItem->filePath());
-            compact->setSecond(fileItem->second());
-            compact->setTiempoFile(fileItem->second());
-            compact->setSecondStart(fileItem->secondStart());
-            compact->setToolTip(fileItem->toolTip());
-        }
-        createItem(compact);
+        if (AudioItemMaxi *compact=makePlannerItem(audioSource,this))
+            createItem(compact);
     }
     event->acceptProposedAction();
 }

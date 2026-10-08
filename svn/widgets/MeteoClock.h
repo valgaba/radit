@@ -21,6 +21,8 @@ public:
         bool available = false;
     };
     static Readings currentReadings();
+    static bool hasFreshReadings();
+    static bool requestCurrentReadings();
     explicit MeteoClock(QWidget *parent = nullptr);
     ~MeteoClock() override;
     static QString formatDate(const QDate &date);
@@ -49,6 +51,8 @@ private:
     QString m_locationName;
     double m_latitude = 0, m_longitude = 0;
     bool m_hasLocation = false;
+    bool m_weatherRequestPending = false;
+    QDateTime m_lastWeatherRequest;
     QDateTime m_lastUpdate;
 };
 #endif

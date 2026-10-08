@@ -17,6 +17,7 @@
 
 #include <QDebug>
 #include <QDateTime>
+#include "widgets/FilePropertiesFrame.h"
 
 
 
@@ -26,6 +27,13 @@ AudioItemFileMaxi::AudioItemFileMaxi(QWidget *parent):AudioItemMaxi(parent){
 
 
    this->setObjectName("AudioItemFileMaxi"); //para qss
+   connect(propertiesButton(), &Button::clicked, this, [this]() {
+       if (!m_propertiesFrame)
+           m_propertiesFrame = new FilePropertiesFrame(this);
+       m_propertiesFrame->show();
+       m_propertiesFrame->raise();
+       m_propertiesFrame->activateWindow();
+   });
   // this->setMinimumSize(100,30); // alto del item
    //this->setNameFile(this->metaObject()->className());
 }

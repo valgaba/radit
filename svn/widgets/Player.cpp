@@ -24,6 +24,7 @@
 #include "widgets/vumeter.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemMeteoClockMaxi.h"
 #include <cmath>
 #include <algorithm>
 
@@ -74,6 +75,13 @@ Player::Player(QWidget *parent) : Frame(parent) {
     m_mixTimer->setInterval(20);
     m_mixTimer->setTimerType(Qt::PreciseTimer);
     connect(m_mixTimer, &QTimer::timeout, this, &Player::updateMix);
+    m_playbackLimitTimer=new QTimer(this);
+    m_playbackLimitTimer->setSingleShot(true);
+    connect(m_playbackLimitTimer,&QTimer::timeout,this,[this]() {
+        m_playbackLimitRemainingMs=0;
+        if (currentItem && currentItem->playbackLimitSeconds()>0.0)
+            mediamanager->finishPlayback();
+    });
 
       layout = new QVBoxLayout(this);  // layout general
       layout->setContentsMargins(0, 0, 0, 0);
@@ -383,6 +391,7 @@ void Player::bindMediaManager()
              else
                  vumeter->reset();
          }
+         emit audioLevelsChanged(frame.left, frame.right);
 
          this->labeltiempo->setText(SecondToTime(mediamanager->isNetworkSource()
              ? frame.position : m_duration-frame.position));
@@ -392,6 +401,8 @@ void Player::bindMediaManager()
              int value = static_cast<int>((frame.position / m_duration) * 1000.0);
              slider->setValue(value);
          }
+         emit playbackProgressChanged(frame.position,m_duration,
+                                      !mediamanager->isNetworkSource() && m_duration>0.0);
          tryFolderMix(frame.position);
 
        });
@@ -402,6 +413,10 @@ void Player::bindMediaManager()
      });
      connect(mediamanager, &MediaManager::playbackError, this, [this, manager](const QString &message) {
          if (manager != mediamanager) return;
+         if (m_sequenceContents) {
+             advanceSequence();
+             return;
+         }
          stopMain();
          labelnombre->setText(message);
          labelnombre->setToolTip(message);
@@ -412,6 +427,11 @@ void Player::bindMediaManager()
                this, [this, manager]() {
            if (manager != mediamanager) return;
            finishMix(true);
+
+           if (m_sequenceContents) {
+               advanceSequence();
+               return;
+           }
 
            if (!currentItem)
                return;
@@ -497,9 +517,16 @@ void Player::playItem(AudioItemMaxi *item)
            qWarning() << "Dispositivo de audio no disponible:" << this->devicePlay();
            return;
        }
-       if (!item->preparePlayback()) return;
+       if (!item->preparePlayback()) {
+           const auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(item);
+           qWarning().noquote() << "No se pudo preparar el audio:" << item->playbackName()
+                                << (meteoItem ? meteoItem->error() : QString());
+           return;
+       }
        if (!item->loadPreparedPlayback(mediamanager)) {
-           qWarning() << "No se pudo cargar el audio:" << item->playbackPath();
+           const auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(item);
+           qWarning().noquote() << "No se pudo cargar el audio:" << item->playbackName()
+                                << (meteoItem ? meteoItem->error() : item->playbackPath());
            return;
        }
        mediamanager->seek(item->secondStart());
@@ -516,9 +543,94 @@ void Player::playItem(AudioItemMaxi *item)
 
 
        m_duration=item->second();
+       emit playbackProgressChanged(mediamanager->getPosition(),m_duration,
+                                    !mediamanager->isNetworkSource() && m_duration>0.0);
+       startPlaybackLimit(item->playbackLimitSeconds());
        slider->setEnabled(!mediamanager->isNetworkSource());
        labelnombre->setText(item->playbackName());
        btnpause->SetIcon("Pausemini.svg");
+}
+
+bool Player::startSequentialPlayback(ContentsBase *contents, bool repeat)
+{
+    stopSequentialPlayback();
+    if (!contents || !contents->layout)
+        return false;
+    if (currentItem)
+        stopMain();
+    m_sequenceContents=contents;
+    m_sequenceRepeat=repeat;
+    m_sequenceIndex=-1;
+    if (playSequenceFrom(0))
+        return true;
+    m_sequenceContents.clear();
+    return false;
+}
+
+void Player::stopSequentialPlayback()
+{
+    m_sequenceContents.clear();
+    m_sequenceRepeat=false;
+    m_sequenceIndex=-1;
+    if (currentItem)
+        stopMain();
+}
+
+bool Player::playSequenceFrom(int index)
+{
+    ContentsBase *contents=m_sequenceContents;
+    if (!contents || !contents->layout)
+        return false;
+    const int count=contents->layout->count();
+    if (count<=0)
+        return false;
+    for (int offset=0; offset<count; ++offset) {
+        int candidate=index+offset;
+        if (candidate>=count) {
+            if (!m_sequenceRepeat)
+                break;
+            candidate%=count;
+        }
+        auto *item=qobject_cast<AudioItemMaxi*>(contents->layout->itemAt(candidate)->widget());
+        if (!item)
+            continue;
+        playItem(item);
+        if (currentItem==item) {
+            m_sequenceIndex=candidate;
+            return true;
+        }
+    }
+    return false;
+}
+
+void Player::advanceSequence()
+{
+    ContentsBase *contents=m_sequenceContents;
+    if (!contents || !contents->layout) {
+        stopSequentialPlayback();
+        emit sequentialPlaybackFinished();
+        return;
+    }
+    const int count=contents->layout->count();
+    const int next=m_sequenceIndex+1;
+    if (count<=0 || (next>=count && !m_sequenceRepeat)) {
+        stopMain();
+        m_sequenceContents.clear();
+        m_sequenceRepeat=false;
+        m_sequenceIndex=-1;
+        emit sequentialPlaybackFinished();
+        return;
+    }
+    stopMain();
+    if (playSequenceFrom(next))
+        return;
+
+    // No item could be started. Stop cleanly instead of spinning on an empty playlist.
+    stopMain();
+    m_sequenceContents.clear();
+    m_sequenceRepeat=false;
+    m_sequenceIndex=-1;
+    emit sequentialPlaybackFinished();
 }
 
 bool Player::tryFolderMix(double position)
@@ -597,6 +709,7 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
             m_outgoingLeft = frame.left; m_outgoingRight = frame.right;
         });
     currentItem = next;
+    startPlaybackLimit(next->playbackLimitSeconds());
     next->setPlaying(true); next->playColor(true); next->setIsPlayNext(false);
     m_duration = incoming->getDuration();
     slider->setEnabled(!incoming->isNetworkSource());
@@ -668,6 +781,7 @@ void Player::pauseMain()
 
         if (mediamanager->isPlaying()) {
             mediamanager->pause();
+            pausePlaybackLimit();
             if (m_outgoingManager) {
                 m_outgoingManager->pause();
                 m_mixElapsedMs += int(m_mixClock.elapsed());
@@ -678,6 +792,7 @@ void Player::pauseMain()
 
         } else {
             mediamanager->play();
+            resumePlaybackLimit();
             if (m_pendingMixManager && !m_pendingMixManager->isLoading()) finishPendingMix();
             if (m_outgoingManager) {
                 m_outgoingManager->play();
@@ -702,6 +817,9 @@ void Player::dropEvent(QDropEvent *event)
 
 void Player::stopMain()
 {
+    if (m_playbackLimitTimer)
+        m_playbackLimitTimer->stop();
+    m_playbackLimitRemainingMs=0;
     finishMix(false);
 
     if (!currentItem)
@@ -721,7 +839,48 @@ void Player::stopMain()
 
         labelnombre->setText("");
         labeltiempo->setText("00:00:00.00");
+        emit playbackProgressChanged(0.0,0.0,false);
 
+}
+
+bool Player::seekPlaybackPosition(double seconds)
+{
+    if (!currentItem || mediamanager->isNetworkSource() || m_duration<=0.0
+        || !std::isfinite(seconds))
+        return false;
+
+    finishMix(false);
+    mediamanager->seek(std::clamp(seconds,0.0,m_duration));
+    return true;
+}
+
+void Player::startPlaybackLimit(double seconds)
+{
+    if (!m_playbackLimitTimer)
+        return;
+    m_playbackLimitTimer->stop();
+    m_playbackLimitRemainingMs=seconds>0.0 ? qRound64(seconds*1000.0) : 0;
+    if (m_playbackLimitRemainingMs<=0)
+        return;
+    m_playbackLimitClock.restart();
+    m_playbackLimitTimer->start(static_cast<int>(m_playbackLimitRemainingMs));
+}
+
+void Player::pausePlaybackLimit()
+{
+    if (!m_playbackLimitTimer || !m_playbackLimitTimer->isActive())
+        return;
+    m_playbackLimitRemainingMs=qMax<qint64>(0,m_playbackLimitRemainingMs-m_playbackLimitClock.elapsed());
+    m_playbackLimitTimer->stop();
+}
+
+void Player::resumePlaybackLimit()
+{
+    if (!m_playbackLimitTimer || m_playbackLimitRemainingMs<=0
+        || !currentItem || currentItem->playbackLimitSeconds()<=0.0)
+        return;
+    m_playbackLimitClock.restart();
+    m_playbackLimitTimer->start(static_cast<int>(m_playbackLimitRemainingMs));
 }
 
 

@@ -111,7 +111,7 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
 
         btnproperties = new Button;
-        btnproperties->SetIcon("more.svg");
+        btnproperties->SetIcon("settings.svg");
         btnproperties->setIconSize(QSize(18, 18));
         btnproperties->setFixedSize(21, 21);  //Tamaño fijo
         btnproperties->setToolTip("Properties");
@@ -185,8 +185,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         framecenter->setFixedHeight(43);  // prueba 35–50
         btnplay = new Button;
-        btnplay->SetIcon("playpause2.svg");
-        btnplay->setIconSize(QSize(40, 50));  // ajusta al tamaño que quieras
+        btnplay->SetIcon("Play.svg");
+        btnplay->setIconSize(QSize(30, 30));
         btnplay->setFixedSize(50, 30);  //Tamaño fijo 35
         btnplay->setToolTip("Play");
 
@@ -319,7 +319,7 @@ bool AudioItemMaxi::prepareCue()
 
 AudioItemMaxi::~AudioItemMaxi(){}
 
-void AudioItemMaxi::setCompactPresentation()
+void AudioItemMaxi::setCompactPresentation(bool showProperties)
 {
     frametop->hide();
     setFixedHeight(31);
@@ -344,7 +344,14 @@ void AudioItemMaxi::setCompactPresentation()
     labeltiempo->setFont(compactTimeFont);
 
     layouttop->removeWidget(btnproperties);
-    btnproperties->hide();
+    if (showProperties) {
+        btnproperties->setParent(framecenterright);
+        btnproperties->setFixedSize(23,23);
+        layoutcenterright->addWidget(btnproperties);
+        btnproperties->show();
+    } else {
+        btnproperties->hide();
+    }
 
     layouttop->removeWidget(btnselect);
     btnselect->setParent(framecenterright);
@@ -493,6 +500,7 @@ void AudioItemMaxi::setPlaying(bool playing) {
 void AudioItemMaxi::playColor(bool playing){
 
     btnplay->setProperty("playing", playing);
+    btnplay->setStyleSheet(playing ? QStringLiteral("background-color: #5a7a83;") : QString());
     btnplay->style()->unpolish(btnplay);
     btnplay->style()->polish(btnplay);
     btnplay->update();
@@ -506,12 +514,12 @@ void AudioItemMaxi::playColor(bool playing){
 
 
     if (playing) {
-           btnplay->SetIcon("playpause2on.svg");
-           btnplay->setIconSize(QSize(40, 50));
+           btnplay->SetIcon("Play.svg");
+           btnplay->setIconSize(QSize(30, 30));
 
        } else {
-           btnplay->SetIcon("playpause2.svg");
-           btnplay->setIconSize(QSize(40, 50));
+           btnplay->SetIcon("Play.svg");
+           btnplay->setIconSize(QSize(30, 30));
 
 
        }

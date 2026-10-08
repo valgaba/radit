@@ -8,10 +8,17 @@
 #include "widgets/label.h"
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItemFilePlanner.h"
+#include "widgets/AudioItemNetPlanner.h"
+#include "widgets/AudioItemMeteoClockMaxi.h"
+#include "widgets/MeteoClock.h"
 #include "widgets/PlannerContents.h"
 #include "widgets/ScheduleSlot.h"
+#include "widgets/Player.h"
 #include "widgets/ScheduleSlotOptionsDialog.h"
+#include "widgets/frameoptionsplayer.h"
 #include "widgets/menu.h"
+#include "widgets/vumeter.h"
+#include "widgets/slider.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QSplitter>
@@ -29,8 +36,13 @@
 #include <QAction>
 #include <QIcon>
 #include <QTime>
+#include <QDate>
+#include <QDateTime>
+#include <QShowEvent>
 #include <QMessageBox>
 #include <QPointer>
+#include <QGuiApplication>
+#include <QScreen>
 #include "widgets/scrollbar.h"
 #include <functional>
 #include <cmath>
@@ -39,6 +51,36 @@
 namespace {
 QPointer<ScheduleSlot> g_scheduleSlotClipboard;
 bool g_scheduleSlotClipboardIsCut = false;
+
+void showPopupBelow(QWidget *anchor, QWidget *popup)
+{
+    QPoint position=anchor->mapToGlobal(QPoint(0,anchor->height()));
+    QScreen *screen=QGuiApplication::screenAt(position);
+    if (!screen)
+        screen=QGuiApplication::primaryScreen();
+    if (screen) {
+        const QRect available=screen->availableGeometry();
+        if (position.x()+popup->width()>available.right()+1)
+            position.setX(available.right()+1-popup->width());
+        if (position.x()<available.left())
+            position.setX(available.left());
+        if (position.y()+popup->height()>available.bottom()+1)
+            position.setY(anchor->mapToGlobal(QPoint(0,-popup->height())).y());
+        if (position.y()<available.top())
+            position.setY(available.top());
+    }
+    popup->move(position);
+    popup->show();
+    popup->raise();
+}
+
+struct PlannerSlotInterval {
+    int startSeconds = 0;
+    int endSeconds = 0;
+    bool priority = false;
+    bool durationKnown = true;
+    ScheduleSlot *slot = nullptr;
+};
 
 class PlannerTimeRuler final : public QWidget
 {
@@ -49,6 +91,7 @@ public:
         setFixedWidth(72);
         setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
         setMouseTracking(true);
+        setContextMenuPolicy(Qt::CustomContextMenu);
     }
 
     void setPixelsPerHour(int pixelsPerHour)
@@ -57,7 +100,7 @@ public:
         update();
     }
 
-    void setSlotIntervals(const QList<QPair<int,int>> &intervals)
+    void setSlotIntervals(const QList<PlannerSlotInterval> &intervals)
     {
         m_slotIntervals=intervals;
         update();
@@ -114,36 +157,37 @@ protected:
         }
 
         painter.save();
-        QPen durationPen(QColor("#80A4AE"));
-        durationPen.setWidth(2);
-        painter.setPen(durationPen);
         const int markerX=width()-5;
         QFont endTimeFont=painter.font();
         endTimeFont.setBold(true);
         painter.setFont(endTimeFont);
         for (const auto &interval : m_slotIntervals) {
-            const int startY=qBound(0,static_cast<int>(qint64(interval.first)*(height()-1)/(24*60*60)),rulerBottom);
-            const int endY=qBound(startY,static_cast<int>(qint64(interval.second)*(height()-1)/(24*60*60)),rulerBottom);
+            QPen durationPen(interval.priority ? QColor("#d13838") : QColor("#80A4AE"));
+            durationPen.setWidth(2);
+            painter.setPen(durationPen);
+            const int startY=qBound(0,static_cast<int>(qint64(interval.startSeconds)*(height()-1)/(24*60*60)),rulerBottom);
+            const int endY=qBound(startY,static_cast<int>(qint64(interval.endSeconds)*(height()-1)/(24*60*60)),rulerBottom);
             painter.drawLine(markerX,startY,markerX,endY);
             painter.drawLine(width()-11,startY,width()-2,startY);
             painter.drawLine(width()-11,endY,width()-2,endY);
 
-            const QString endLabel=interval.second>=24*60*60
-                ? QStringLiteral("24:00:00")
-                : QTime(0,0).addSecs(interval.second).toString("HH:mm:ss");
+            const QString endLabel=!interval.durationKnown
+                ? QStringLiteral("--:--:--")
+                : interval.endSeconds>=24*60*60
+                    ? QStringLiteral("24:00:00")
+                    : QTime(0,0).addSecs(interval.endSeconds).toString("HH:mm:ss");
             int textY=endY-metrics.height()/2;
             textY=qBound(0,textY,height()-metrics.height());
             const QRect labelRect(3,textY,labelRight-3,metrics.height());
             painter.fillRect(labelRect,QColor("#181e2c"));
-            painter.setPen(QColor("#80A4AE"));
+            painter.setPen(durationPen.color());
             painter.drawText(labelRect,Qt::AlignLeft|Qt::AlignVCenter,endLabel);
-            painter.setPen(durationPen);
         }
         painter.restore();
     }
 
 private:
-    QList<QPair<int,int>> m_slotIntervals;
+    QList<PlannerSlotInterval> m_slotIntervals;
 };
 
 class PlannerDayPage final : public QWidget
@@ -157,31 +201,36 @@ public:
         setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
         setContextMenuPolicy(Qt::CustomContextMenu);
         connect(this,&QWidget::customContextMenuRequested,this,[this](const QPoint &position) {
-            Menu menu(this);
-            menu.setFixedWidth(200);
-            QAction *addSlotAction=menu.addAction(QIcon(":/icons/Add.svg"),tr("Add schedule slot"));
-            menu.addSeparator();
-            QAction *pasteSlotAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),tr("Paste schedule slot"));
-            QAction *chosen=menu.exec(mapToGlobal(position));
-            if (chosen==pasteSlotAction) {
-                pasteScheduleSlot();
-                return;
-            }
-            if (chosen!=addSlotAction)
-                return;
-
-            const int clickedMinute=qBound(0,qRound(position.y()*60.0/m_pixelsPerHour),24*60-1);
-            const QTime suggestedTime(0,0);
-            ScheduleSlotOptionsDialog options(suggestedTime.addSecs(clickedMinute*60),window());
-            if (options.exec()!=QDialog::Accepted)
-                return;
-
-            const QTime time=options.entryTime();
-            const int minutesAfterMidnight=time.hour()*60+time.minute();
-            ScheduleSlot *slot=addSlot(time.toString("HH:mm"),minutesAfterMidnight);
-            m_dayContents.append(slot->contents());
-            m_scrollArea->ensureVisible(0,(minutesAfterMidnight*m_pixelsPerHour)/60,0,0);
+            showContextMenuAt(position,mapToGlobal(position));
         });
+    }
+
+    void showContextMenuAt(const QPoint &timelinePosition,const QPoint &globalPosition)
+    {
+        Menu menu(this);
+        menu.setFixedWidth(200);
+        QAction *addSlotAction=menu.addAction(QIcon(":/icons/Add.svg"),tr("Add schedule slot"));
+        menu.addSeparator();
+        QAction *pasteSlotAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),tr("Paste schedule slot"));
+        QAction *chosen=menu.exec(globalPosition);
+        if (chosen==pasteSlotAction) {
+            pasteScheduleSlot();
+            return;
+        }
+        if (chosen!=addSlotAction)
+            return;
+
+        const int clickedMinute=qBound(0,qRound(timelinePosition.y()*60.0/m_pixelsPerHour),24*60-1);
+        const QTime suggestedTime(0,0);
+        ScheduleSlotOptionsDialog options(suggestedTime.addSecs(clickedMinute*60),window());
+        if (options.exec()!=QDialog::Accepted)
+            return;
+
+        const QTime time=options.entryTime();
+        const int minutesAfterMidnight=time.hour()*60+time.minute();
+        ScheduleSlot *slot=addSlot(time.toString("HH:mm"),minutesAfterMidnight);
+        m_dayContents.append(slot->contents());
+        m_scrollArea->ensureVisible(0,(minutesAfterMidnight*m_pixelsPerHour)/60,0,0);
     }
 
     ScheduleSlot *addSlot(const QString &timeText, int minutesAfterMidnight)
@@ -209,6 +258,9 @@ private:
     {
         m_slots.append({slot});
         connect(slot,&ScheduleSlot::entryTimeChanged,this,[this]() {
+            updateSlotPositions();
+        });
+        connect(slot,&ScheduleSlot::disabledChanged,this,[this]() {
             updateSlotPositions();
         });
         connect(slot->contents(),&PlannerContents::contentDurationsChanged,this,[this]() {
@@ -256,10 +308,11 @@ private:
         });
         connect(slot,&ScheduleSlot::propertiesRequested,this,[this](ScheduleSlot *editedSlot) {
             const QTime currentTime(editedSlot->entryMinute()/60,editedSlot->entryMinute()%60);
-            ScheduleSlotOptionsDialog options(currentTime,window());
+            ScheduleSlotOptionsDialog options(currentTime,window(),editedSlot->isScheduleDisabled(),true);
             if (options.exec()==QDialog::Accepted) {
                 const QTime time=options.entryTime();
                 editedSlot->setEntryTime(time.hour()*60+time.minute());
+                editedSlot->setScheduleDisabled(options.isDisabled());
             }
         });
         connect(slot,&ScheduleSlot::focusRequested,this,[this](ScheduleSlot *focusedSlot) {
@@ -303,16 +356,40 @@ protected:
     };
 
 public:
-    QList<QPair<int,int>> slotIntervals() const
+    QList<PlannerSlotInterval> slotIntervals(bool updatePriorityIndicators = true)
     {
-        QList<QPair<int,int>> intervals;
+        QList<PlannerSlotInterval> intervals;
         for (const TimedSlot &entry : m_slots) {
+            if (updatePriorityIndicators)
+                entry.widget->setPriority(false);
+            if (entry.widget->isScheduleDisabled())
+                continue;
             const int startSeconds=entry.widget->entryMinute()*60;
-            const int durationSeconds=entry.widget->totalDurationKnown()
-                && entry.widget->totalDurationSeconds()>0.0
+            const bool durationKnown=entry.widget->totalDurationKnown()
+                && entry.widget->totalDurationSeconds()>0.0;
+            const int durationSeconds=durationKnown
                 ? qRound(entry.widget->totalDurationSeconds())
                 : qMax(1,qRound(entry.widget->height()*3600.0/m_pixelsPerHour));
-            intervals.append({startSeconds,qMin(24*60*60,startSeconds+durationSeconds)});
+            intervals.append({startSeconds,qMin(24*60*60,startSeconds+durationSeconds),
+                              false,durationKnown,entry.widget});
+        }
+
+        std::sort(intervals.begin(),intervals.end(),[](const PlannerSlotInterval &left,
+                                                       const PlannerSlotInterval &right) {
+            return left.startSeconds<right.startSeconds;
+        });
+        int activeIndex=-1;
+        for (int index=0; index<intervals.size(); ++index) {
+            PlannerSlotInterval &interval=intervals[index];
+            if (updatePriorityIndicators)
+                interval.slot->setPriority(false);
+            if (activeIndex>=0 && intervals.at(activeIndex).endSeconds>interval.startSeconds) {
+                interval.priority=true;
+                if (updatePriorityIndicators)
+                    interval.slot->setPriority(true);
+                intervals[activeIndex].endSeconds=interval.startSeconds;
+            }
+            activeIndex=index;
         }
         return intervals;
     }
@@ -323,6 +400,7 @@ private:
         auto *copy=new ScheduleSlot(parent);
         copy->setEntryTime(source->entryMinute());
         copy->setAccentColor(source->accentColor());
+        copy->setScheduleDisabled(source->isScheduleDisabled());
         QVBoxLayout *sourceLayout=source->contents()->layout;
         for (int index=0; index<sourceLayout->count(); ++index) {
             QWidget *widget=sourceLayout->itemAt(index)->widget();
@@ -405,20 +483,25 @@ private:
             bool durationIsKnown=hasContents;
             for (int index=0; durationIsKnown && index<entry.widget->contents()->layout->count(); ++index) {
                 QWidget *content=entry.widget->contents()->layout->itemAt(index)->widget();
-                auto *audio=qobject_cast<AudioItemFilePlanner*>(content);
-                if (!audio || !std::isfinite(audio->second()) || audio->second()<=0.0) {
+                double itemDuration=0.0;
+                if (auto *audio=qobject_cast<AudioItemFilePlanner*>(content))
+                    itemDuration=audio->second();
+                else if (auto *radio=qobject_cast<AudioItemNetPlanner*>(content))
+                    itemDuration=radio->connectionDurationSeconds();
+                if (!std::isfinite(itemDuration) || itemDuration<=0.0) {
                     durationIsKnown=false;
                     break;
                 }
-                durationSeconds+=audio->second();
+                durationSeconds+=itemDuration;
             }
-            entry.widget->setTotalDuration(durationSeconds,!hasContents || durationIsKnown);
+            entry.widget->setTotalDuration(durationSeconds,
+                                           hasContents && durationIsKnown && durationSeconds>0.0);
             if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
                 durationSeconds=3600.0;
             const int startSeconds=entry.widget->entryMinute()*60;
             durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
             const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
-            entry.widget->setFixedHeight(slotHeight);
+            entry.widget->setTimelineHeight(slotHeight);
             placements.append({entry.widget,startSeconds,
                                qMin(24*60*60,startSeconds+qMax(1,qRound(durationSeconds))),0});
         }
@@ -529,10 +612,15 @@ public:
         m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_scrollArea->setWidget(m_timelineCanvas);
+        connect(m_timeRuler,&QWidget::customContextMenuRequested,this,[this](const QPoint &position) {
+            auto *dayPage=static_cast<PlannerDayPage*>(m_pages->currentWidget());
+            if (!dayPage)
+                return;
+            dayPage->showContextMenuAt(position,m_timeRuler->mapToGlobal(position));
+        });
 
         const QStringList days={tr("Lunes"),tr("Martes"),tr("Miércoles"),tr("Jueves"),
                                 tr("Viernes"),tr("Sábado"),tr("Domingo")};
-        ScheduleSlot *exampleFocusSlot=nullptr;
         for (int index=0; index<days.size(); ++index) {
             auto *button=new Button(this);
             button->setObjectName("PlannerDayTab");
@@ -572,28 +660,6 @@ public:
                     m_scrollArea->verticalScrollBar()->setValue(desiredScroll);
                 });
             });
-            if (index==0) {
-                dayPage->setContentAutoFocusEnabled(false);
-                ScheduleSlot *firstExample=dayPage->addSlot("10:00",10*60);
-                ScheduleSlot *secondExample=dayPage->addSlot("10:05",10*60+5);
-                dayContents.append(firstExample->contents());
-                dayContents.append(secondExample->contents());
-
-                auto addExampleTrack=[](ScheduleSlot *slot,const QString &name,double duration) {
-                    auto *track=new AudioItemFilePlanner(slot->contents());
-                    track->setNameFile(name);
-                    track->setFilePath(QString());
-                    track->setSecond(duration);
-                    track->setTiempoFile(duration);
-                    track->setSecondStart(0.0);
-                    slot->contents()->createItem(track);
-                };
-                addExampleTrack(firstExample,tr("Example track A (8 min)"),8*60.0);
-                addExampleTrack(firstExample,tr("Example track B (7 min)"),7*60.0);
-                addExampleTrack(secondExample,tr("Example announcement (3 min)"),3*60.0);
-                dayPage->setContentAutoFocusEnabled(true);
-                exampleFocusSlot=firstExample;
-            }
             m_pages->addWidget(dayPage);
             connect(button,&QPushButton::clicked,m_pages,[this,index]() {
                 m_pages->setCurrentIndex(index);
@@ -605,11 +671,6 @@ public:
         }
         m_timeRuler->setSlotIntervals(
             static_cast<PlannerDayPage*>(m_pages->widget(0))->slotIntervals());
-        if (exampleFocusSlot) {
-            QTimer::singleShot(0,this,[exampleFocusSlot]() {
-                exampleFocusSlot->focusRequested(exampleFocusSlot);
-            });
-        }
 
         layout->addLayout(tabRow);
         layout->addWidget(m_scrollArea,1);
@@ -624,12 +685,85 @@ public:
         zoomBar->addWidget(m_zoomOut);
         zoomBar->addWidget(m_zoomIn);
         layout->addWidget(zoomBarWidget);
-        setZoom(100,false);
+        setZoom(150,false);
         connect(m_zoomIn,&QPushButton::clicked,this,[this]() {
             if (m_pixelsPerHour<1600) setZoom(m_pixelsPerHour*2,true);
         });
         connect(m_zoomOut,&QPushButton::clicked,this,[this]() {
             if (m_pixelsPerHour>25) setZoom(m_pixelsPerHour/2,true);
+        });
+    }
+
+    ScheduleSlot *slotAt(const QDateTime &dateTime)
+    {
+        const int dayIndex=qBound(0,dateTime.date().dayOfWeek()-1,6);
+        auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+        if (!day) return nullptr;
+        const int secondOfDay=dateTime.time().hour()*3600
+            +dateTime.time().minute()*60+dateTime.time().second();
+        const auto intervals=day->slotIntervals(false);
+        for (const PlannerSlotInterval &interval : intervals) {
+            if (secondOfDay>=interval.startSeconds && secondOfDay<interval.endSeconds)
+                return interval.slot;
+        }
+        return nullptr;
+    }
+
+    void updateUpcomingSlot(const QDateTime &now, bool playbackActive)
+    {
+        ScheduleSlot *nextSlot=nullptr;
+        int closestSeconds=301;
+        const int currentSecond=now.time().hour()*3600
+            +now.time().minute()*60+now.time().second();
+
+        for (int dayOffset=0; playbackActive && dayOffset<=1; ++dayOffset) {
+            const int dayIndex=qBound(0,now.date().addDays(dayOffset).dayOfWeek()-1,6);
+            auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+            if (!day)
+                continue;
+            const int secondsFromNow=dayOffset*24*60*60-currentSecond;
+            for (const PlannerSlotInterval &interval : day->slotIntervals(false)) {
+                if (!interval.slot || interval.slot->contents()->layout->count()==0)
+                    continue;
+                const int untilStart=secondsFromNow+interval.startSeconds;
+                if (untilStart<=0 || untilStart>300 || untilStart>=closestSeconds)
+                    continue;
+                closestSeconds=untilStart;
+                nextSlot=interval.slot;
+            }
+        }
+
+        if (m_upcomingSlot==nextSlot)
+            return;
+        if (m_upcomingSlot)
+            m_upcomingSlot->setUpcoming(false);
+        m_upcomingSlot=nextSlot;
+        if (m_upcomingSlot)
+            m_upcomingSlot->setUpcoming(true);
+    }
+
+protected:
+    void showEvent(QShowEvent *event) override
+    {
+        Frame::showEvent(event);
+        if (m_initialTimePositioned)
+            return;
+        m_initialTimePositioned=true;
+
+        const int currentDayIndex=qBound(0,QDate::currentDate().dayOfWeek()-1,6);
+        if (QAbstractButton *dayButton=m_dayGroup->button(currentDayIndex))
+            dayButton->setChecked(true);
+        m_pages->setCurrentIndex(currentDayIndex);
+        m_timeRuler->setSlotIntervals(
+            static_cast<PlannerDayPage*>(m_pages->widget(currentDayIndex))->slotIntervals());
+
+        const QTime localTime=QTime::currentTime();
+        const int currentMinute=localTime.hour()*60+localTime.minute();
+        QTimer::singleShot(0,this,[this,currentMinute]() {
+            const int currentY=(currentMinute*m_pixelsPerHour)/60;
+            const int targetScroll=currentY-m_scrollArea->viewport()->height()/2;
+            QScrollBar *scrollBar=m_scrollArea->verticalScrollBar();
+            scrollBar->setValue(qBound(0,targetScroll,scrollBar->maximum()));
         });
     }
 
@@ -664,7 +798,9 @@ private:
     QScrollArea *m_scrollArea = nullptr;
     Button *m_zoomIn = nullptr;
     Button *m_zoomOut = nullptr;
+    QPointer<ScheduleSlot> m_upcomingSlot;
     int m_pixelsPerHour = 100;
+    bool m_initialTimePositioned = false;
 };
 }
 
@@ -703,11 +839,81 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     auto *firstZone=new Frame(this);
     firstZone->setObjectName("PlannerZoneOne");
     firstZone->setFixedHeight(30);
+    auto *topControls=new QHBoxLayout(firstZone);
+    topControls->setContentsMargins(4,0,4,0);
+    topControls->setSpacing(5);
+
+    auto *vumeter=new VuMeter(firstZone);
+    m_vumeter= vumeter;
+    vumeter->setFixedWidth(180);
+    vumeter->setDecibelScale(false);
+    topControls->addWidget(vumeter,0,Qt::AlignVCenter);
+    topControls->addStretch(1);
+
+    auto *propertiesButton=new Button(firstZone);
+    propertiesButton->setObjectName("PlannerPropertiesButton");
+    propertiesButton->SetIcon("Tools.svg");
+    propertiesButton->setIconSize(QSize(20,20));
+    propertiesButton->setFixedSize(23,23);
+    propertiesButton->setToolTip(tr("Planner properties"));
+    topControls->addWidget(propertiesButton,0,Qt::AlignVCenter);
+    m_optionsPanel=new FrameOptionsPlayer(this);
+    connect(propertiesButton,&QPushButton::clicked,this,[this,propertiesButton]() {
+        emit propertiesRequested();
+        showPopupBelow(propertiesButton,m_optionsPanel);
+    });
     root->addWidget(firstZone);
 
     auto *secondZone=new Frame(this);
     secondZone->setObjectName("PlannerZoneTwo");
     secondZone->setFixedHeight(45);
+    auto *centerControls=new QHBoxLayout(secondZone);
+    centerControls->setContentsMargins(4,0,4,0);
+    centerControls->setSpacing(5);
+    auto *playButton=new Button(secondZone);
+    m_playButton=playButton;
+    playButton->setObjectName("PlannerPlayButton");
+    playButton->SetIcon("Play.svg");
+    playButton->setIconSize(QSize(30,30));
+    playButton->setFixedSize(50,30);
+    playButton->setToolTip(tr("Play Planner"));
+    centerControls->addWidget(playButton,0,Qt::AlignVCenter);
+
+    m_positionSlider=new Slider(secondZone);
+    m_positionSlider->setObjectName("PlannerPositionSlider");
+    m_positionSlider->setRange(0,1000);
+    m_positionSlider->setEnabled(false);
+    m_positionSlider->setFixedHeight(24);
+    m_positionSlider->setToolTip(tr("Seek the current Planner audio"));
+    m_positionSlider->setAccessibleName(m_positionSlider->toolTip());
+    centerControls->addWidget(m_positionSlider,1,Qt::AlignVCenter);
+    connect(m_positionSlider,&QSlider::sliderPressed,this,[this]() {
+        m_userIsSeeking=true;
+    });
+    connect(m_positionSlider,&QSlider::sliderReleased,this,[this]() {
+        m_userIsSeeking=false;
+        Player *engine=positionEngine();
+        if (engine && m_positionDuration>0.0)
+            engine->seekPlaybackPosition(m_positionDuration*m_positionSlider->value()/1000.0);
+    });
+    centerControls->addStretch(1);
+
+    m_timeLabel=new Label(secondZone);
+    m_timeLabel->setObjectName("PlannerTimeLabel");
+    m_timeLabel->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
+    m_timeLabel->setFixedWidth(125);
+    m_timeLabel->setFixedHeight(25);
+    QFont timeFont=m_timeLabel->font();
+    timeFont.setPointSize(16);
+    timeFont.setBold(true);
+    m_timeLabel->setFont(timeFont);
+    m_timeLabel->setText("00:00:00.00");
+    centerControls->addWidget(m_timeLabel,0,Qt::AlignVCenter);
+    connect(playButton,&QPushButton::clicked,this,[this]() {
+        if (m_running) stopPlayback();
+        else startPlayback();
+        emit playRequested();
+    });
     root->addWidget(secondZone);
 
     auto *contentZone=new Frame(this);
@@ -754,4 +960,299 @@ Planner::Planner(QWidget *parent) : Frame(parent)
 
     contentLayout->addWidget(listsSplitter);
     root->addWidget(contentZone,1);
+
+    // Dedicated playback engines keep Planner audio independent from the three visible players.
+    m_standbyEngine=new Player(this);
+    m_scheduleEngineA=new Player(this);
+    m_scheduleEngineB=new Player(this);
+    for (Player *engine : {m_standbyEngine,m_scheduleEngineA,m_scheduleEngineB}) {
+        engine->hide();
+        engine->setDevicePlay(m_devicePlay);
+        engine->setVolume(0.0f);
+        connect(engine,&Player::audioLevelsChanged,this,[this,engine](float left,float right) {
+            if (engine==m_standbyEngine) {
+                m_lastStandbyLeft=left; m_lastStandbyRight=right;
+            } else {
+                m_lastScheduleLeft=left; m_lastScheduleRight=right;
+            }
+            updatePlannerMeter();
+        });
+        connect(engine,&Player::playbackProgressChanged,this,
+                [this,engine](double position,double duration,bool seekable) {
+            if (engine!=positionEngine()) return;
+            m_positionDuration=duration;
+            m_positionSlider->setEnabled(m_running && seekable);
+            if (m_userIsSeeking)
+                return;
+            if (seekable && duration>0.0)
+                m_positionSlider->setValue(qBound(0,qRound(position*1000.0/duration),1000));
+            else
+                m_positionSlider->setValue(0);
+        });
+    }
+    connect(m_scheduleEngineA,&Player::sequentialPlaybackFinished,this,[this]() {
+        if (m_scheduleEngineA==m_activeScheduleEngine && m_fadeAction!=2) returnToStandby();
+    });
+    connect(m_scheduleEngineB,&Player::sequentialPlaybackFinished,this,[this]() {
+        if (m_scheduleEngineB==m_activeScheduleEngine && m_fadeAction!=2) returnToStandby();
+    });
+
+    m_clockTimer=new QTimer(this);
+    m_clockTimer->setInterval(250);
+    connect(m_clockTimer,&QTimer::timeout,this,[this]() {
+        m_timeLabel->setText(QTime::currentTime().toString("HH:mm:ss"));
+        if (m_running) checkSchedule();
+        static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
+            QDateTime::currentDateTime(),m_running);
+    });
+    m_clockTimer->start();
+    m_timeLabel->setText(QTime::currentTime().toString("HH:mm:ss"));
+
+    m_fadeTimer=new QTimer(this);
+    m_fadeTimer->setInterval(20);
+    m_fadeTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_fadeTimer,&QTimer::timeout,this,[this]() {
+        const float progress=qBound(0.0f,float(m_fadeClock.elapsed())/m_fadeDurationMs,1.0f);
+        const float angle=progress*1.57079632679f;
+        const float fadeIn=std::sin(angle);
+        const float fadeOut=std::cos(angle);
+        if (m_fadeFrom) m_fadeFrom->setVolume(m_volume*fadeOut);
+        if (m_fadeTo) m_fadeTo->setVolume(m_volume*fadeIn);
+        if (progress>=1.0f) finishCrossfade();
+    });
+}
+
+bool Planner::setVolume(float volume)
+{
+    if (!std::isfinite(volume))
+        return false;
+    m_volume=std::clamp(volume,0.0f,1.0f);
+    if (m_fadeTimer && m_fadeTimer->isActive())
+        return true;
+    if (m_running) {
+        if (m_activeScheduleEngine)
+            m_activeScheduleEngine->setVolume(m_volume);
+        else if (m_standbyEngine)
+            m_standbyEngine->setVolume(m_volume);
+    }
+    return true;
+}
+
+Player *Planner::positionEngine() const
+{
+    if (!m_running)
+        return nullptr;
+    if (m_fadeTo)
+        return m_fadeTo;
+    return m_activeScheduleEngine ? m_activeScheduleEngine : m_standbyEngine;
+}
+
+void Planner::setDevicePlay(int device)
+{
+    m_devicePlay=device;
+    for (Player *engine : {m_standbyEngine,m_scheduleEngineA,m_scheduleEngineB})
+        if (engine) engine->setDevicePlay(device);
+}
+
+void Planner::startPlayback()
+{
+    if (m_running) return;
+    m_running=true;
+    m_triggeredSlots.clear();
+    m_triggeredDate=QDate::currentDate().toString("yyyyMMdd");
+    m_clockTimer->start();
+    m_playButton->SetIcon("Stop.svg");
+    m_playButton->setToolTip(tr("Stop Planner"));
+    m_playButton->setAccessibleName(m_playButton->toolTip());
+    m_standbyEngine->setDevicePlay(m_devicePlay);
+    m_standbyEngine->setVolume(m_volume);
+    m_scheduleEngineA->setVolume(0.0f);
+    m_scheduleEngineB->setVolume(0.0f);
+    m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    checkSchedule();
+    static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
+        QDateTime::currentDateTime(),true);
+}
+
+void Planner::stopPlayback()
+{
+    if (!m_running) return;
+    m_fadeTimer->stop();
+    m_fadeFrom=nullptr;
+    m_fadeTo=nullptr;
+    m_fadeAction=0;
+    for (Player *engine : {m_standbyEngine,m_scheduleEngineA,m_scheduleEngineB}) {
+        engine->stopSequentialPlayback();
+        engine->setVolume(0.0f);
+    }
+    m_activeScheduleEngine=nullptr;
+    m_activeScheduleSlot.clear();
+    m_pendingScheduleSlot.clear();
+    m_running=false;
+    m_positionDuration=0.0;
+    m_userIsSeeking=false;
+    m_positionSlider->setValue(0);
+    m_positionSlider->setEnabled(false);
+    static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
+        QDateTime::currentDateTime(),false);
+    m_playButton->SetIcon("Play.svg");
+    m_playButton->setToolTip(tr("Play Planner"));
+    m_playButton->setAccessibleName(m_playButton->toolTip());
+    m_lastStandbyLeft=m_lastStandbyRight=m_lastScheduleLeft=m_lastScheduleRight=-120.0f;
+    updatePlannerMeter();
+}
+
+void Planner::checkSchedule()
+{
+    auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
+    if (!weekTabs || !m_running) return;
+    const QDateTime now=QDateTime::currentDateTime();
+    const QString dayKey=now.date().toString("yyyyMMdd");
+    if (m_triggeredDate!=dayKey) {
+        m_triggeredSlots.clear();
+        m_triggeredDate=dayKey;
+    }
+    ScheduleSlot *slot=weekTabs->slotAt(now);
+    if (slot) {
+        const QString key=QStringLiteral("%1-%2")
+            .arg(dayKey).arg(quintptr(slot),0,16);
+        if (!m_triggeredSlots.contains(key)) {
+            bool voicePackLoading=false;
+            for (int index=0; index<slot->contents()->layout->count(); ++index) {
+                auto *item=qobject_cast<AudioItemMeteoClockMaxi*>(
+                    slot->contents()->layout->itemAt(index)->widget());
+                if (!item)
+                    continue;
+                if (item->isLoading()) {
+                    voicePackLoading=true;
+                    break;
+                }
+                if (!MeteoClock::hasFreshReadings()
+                    && MeteoClock::requestCurrentReadings()) {
+                    voicePackLoading=true;
+                    break;
+                }
+            }
+            if (!voicePackLoading) {
+                m_triggeredSlots.insert(key);
+                startScheduleSlot(slot);
+            }
+        }
+    }
+
+    // Standby may have been empty when Play was pressed and filled while Planner is running.
+    if (!m_activeScheduleEngine && !m_fadeTimer->isActive()
+        && !m_standbyEngine->getCurrentItem()) {
+        m_standbyEngine->setVolume(m_volume);
+        m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    }
+}
+
+void Planner::startScheduleSlot(ScheduleSlot *slot)
+{
+    if (!slot || slot->contents()->layout->count()==0)
+        return;
+    if (m_fadeTimer->isActive()) {
+        m_fadeTimer->stop();
+        finishCrossfade();
+    }
+    if (slot==m_activeScheduleSlot || slot==m_pendingScheduleSlot) return;
+
+    Player *incoming = m_activeScheduleEngine==m_scheduleEngineA
+        ? m_scheduleEngineB : m_scheduleEngineA;
+    incoming->stopSequentialPlayback();
+    incoming->setDevicePlay(m_devicePlay);
+    incoming->setVolume(0.0f);
+    if (!incoming->startSequentialPlayback(slot->contents(),false))
+        return;
+
+    Player *outgoing=m_activeScheduleEngine;
+    if (!outgoing && m_standbyEngine->getCurrentItem())
+        outgoing=m_standbyEngine;
+    m_pendingScheduleSlot=slot;
+    beginCrossfade(outgoing,incoming,m_activeScheduleEngine ? 2 : 1);
+}
+
+void Planner::returnToStandby()
+{
+    if (!m_running || (m_fadeTimer->isActive() && (m_fadeAction==3 || m_fadeAction==4)))
+        return;
+    if (m_fadeTimer->isActive()) {
+        m_fadeTimer->stop();
+        finishCrossfade();
+    }
+    Player *outgoing=m_activeScheduleEngine;
+    m_activeScheduleEngine=nullptr;
+    m_activeScheduleSlot.clear();
+    m_pendingScheduleSlot.clear();
+
+    m_standbyEngine->setVolume(0.0f);
+    if (m_standbyEngine->getCurrentItem())
+        m_standbyEngine->stopSequentialPlayback();
+    m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    beginCrossfade(outgoing,m_standbyEngine,3);
+}
+
+void Planner::beginCrossfade(Player *from, Player *to, int action)
+{
+    if (m_fadeTimer->isActive()) {
+        m_fadeTimer->stop();
+        finishCrossfade();
+    }
+    m_fadeFrom=from;
+    m_fadeTo=to;
+    m_fadeAction=action;
+    m_fadeClock.restart();
+    m_fadeTimer->start();
+    if (!from && to) to->setVolume(0.0f);
+    updatePlannerMeter();
+}
+
+void Planner::finishCrossfade()
+{
+    m_fadeTimer->stop();
+    Player *from=m_fadeFrom;
+    Player *to=m_fadeTo;
+    const int action=m_fadeAction;
+    m_fadeFrom=nullptr;
+    m_fadeTo=nullptr;
+    m_fadeAction=0;
+
+    if (action==1 || action==2) {
+        if (from==m_standbyEngine && from->getCurrentItem())
+            from->stopSequentialPlayback();
+        else if (from && from!=to)
+            from->stopSequentialPlayback();
+        m_activeScheduleEngine=to;
+        m_activeScheduleSlot=m_pendingScheduleSlot;
+        m_pendingScheduleSlot.clear();
+        if (to) to->setVolume(m_volume);
+        if (to && !to->getCurrentItem())
+            QTimer::singleShot(0,this,[this,to]() {
+                if (m_running && m_activeScheduleEngine==to && !to->getCurrentItem())
+                    returnToStandby();
+            });
+    } else if (action==3) {
+        if (from && from!=m_standbyEngine)
+            from->stopSequentialPlayback();
+        m_activeScheduleEngine=nullptr;
+        m_activeScheduleSlot.clear();
+        if (to) to->setVolume(m_volume);
+    }
+    updatePlannerMeter();
+}
+
+void Planner::updatePlannerMeter()
+{
+    if (!m_vumeter) return;
+    if (m_fadeTimer && m_fadeTimer->isActive()) {
+        m_vumeter->setLevels(qMax(m_lastStandbyLeft,m_lastScheduleLeft),
+                             qMax(m_lastStandbyRight,m_lastScheduleRight));
+    } else if (m_activeScheduleEngine) {
+        m_vumeter->setLevels(m_lastScheduleLeft,m_lastScheduleRight);
+    } else if (m_running && m_standbyEngine->getCurrentItem()) {
+        m_vumeter->setLevels(m_lastStandbyLeft,m_lastStandbyRight);
+    } else {
+        m_vumeter->reset();
+    }
 }

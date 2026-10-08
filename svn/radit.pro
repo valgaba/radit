@@ -30,11 +30,13 @@ SOURCES += \
     widgets/AudioItem.cpp \
     widgets/AudioItemFileMaxi.cpp \
     widgets/AudioItemFilePlanner.cpp \
+    widgets/AudioItemFolderPlanner.cpp \
     widgets/AudioItemFolderMaxi.cpp \
-    widgets/AudioItemFileMini.cpp \
     widgets/AudioItemMaxi.cpp \
-    widgets/AudioItemMini.cpp \
     widgets/AudioItemNetMaxi.cpp \
+    widgets/AudioItemNetPlanner.cpp \
+    widgets/NetPropertiesDialog.cpp \
+    widgets/AudioItemMeteoClockPlanner.cpp \
     widgets/Capture.cpp \
     widgets/Cast.cpp \
     widgets/MeteoClock.cpp \
@@ -81,12 +83,15 @@ HEADERS += \
     widgets/AudioItem.h \
     widgets/AudioItemFileMaxi.h \
     widgets/AudioItemFilePlanner.h \
+    widgets/AudioItemFolderPlanner.h \
     widgets/AudioItemFolderMaxi.h \
     widgets/FolderPropertiesFrame.h \
-    widgets/AudioItemFileMini.h \
+    widgets/FilePropertiesFrame.h \
     widgets/AudioItemMaxi.h \
-    widgets/AudioItemMini.h \
     widgets/AudioItemNetMaxi.h \
+    widgets/AudioItemNetPlanner.h \
+    widgets/NetPropertiesDialog.h \
+    widgets/AudioItemMeteoClockPlanner.h \
     widgets/Capture.h \
     widgets/Cast.h \
     widgets/MeteoClock.h \

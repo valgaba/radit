@@ -3,6 +3,7 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPointer>
 
 #include "widgets/AudioItemMaxi.h"
 #include "widgets/button.h"
@@ -20,6 +21,7 @@ private:
      QHBoxLayout *layout;
      QLabel * duracion;
      Button *btnproperties;
+     QPointer<Frame> m_propertiesFrame;
 
 public:
 

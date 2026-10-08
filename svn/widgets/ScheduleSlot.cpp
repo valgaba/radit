@@ -20,7 +20,9 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QStyle>
 #include <QTime>
+#include <QTimer>
 #include <QWidgetAction>
 #include <QVBoxLayout>
 #include <cmath>
@@ -44,7 +46,6 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     setObjectName("ScheduleSlot");
     setFixedHeight(100);
     setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
-    setStyleSheet("QFrame#ScheduleSlot { background-color: #282020; }");
 
     auto *layout=new QVBoxLayout(this);
     layout->setContentsMargins(1,1,1,1);
@@ -60,11 +61,34 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     headerLayout->setContentsMargins(4,0,0,0);
     headerLayout->setSpacing(4);
 
+    m_toggleContents=new Button(header);
+    m_toggleContents->setObjectName("ScheduleSlotToggleContents");
+    m_toggleContents->setFixedSize(23,23);
+    m_toggleContents->setText(QStringLiteral("▼"));
+    m_toggleContents->setToolTip(tr("Hide schedule contents"));
+    m_toggleContents->setAccessibleName(m_toggleContents->toolTip());
+    headerLayout->addWidget(m_toggleContents);
+
     m_time=new Label(header);
     m_time->setObjectName("ScheduleSlotTime");
     m_time->setText("10:00");
     m_time->installEventFilter(this);
     headerLayout->addWidget(m_time);
+
+    m_priorityIndicator=new Label(header);
+    m_priorityIndicator->setObjectName("ScheduleSlotPriorityIndicator");
+    m_priorityIndicator->setText(tr("Priority"));
+    m_priorityIndicator->setToolTip(tr("This schedule slot has priority"));
+    m_priorityIndicator->setVisible(false);
+    headerLayout->addWidget(m_priorityIndicator);
+
+    m_upcomingBlinkTimer=new QTimer(this);
+    m_upcomingBlinkTimer->setInterval(500);
+    connect(m_upcomingBlinkTimer,&QTimer::timeout,this,[this]() {
+        m_blinkPhase=!m_blinkPhase;
+        updateHeaderAppearance();
+    });
+
     headerLayout->addStretch(1);
 
     m_duration=new Label(header);
@@ -93,7 +117,7 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
         menu.addSeparator();
         QAction *deleteAction=menu.addAction(QIcon(":/icons/Remove.svg"),tr("Delete"));
         menu.addSeparator();
-        QAction *propertiesAction=menu.addAction(QIcon(":/icons/properties.svg"),tr("Properties"));
+        QAction *propertiesAction=menu.addAction(QIcon(":/icons/settings.svg"),tr("Properties"));
         menu.addSeparator();
         auto *paletteAction=new QWidgetAction(&menu);
         auto *paletteWidget=new QWidget(&menu);
@@ -161,6 +185,17 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     m_contents->setAutoFillBackground(true);
     m_scrollArea->setWidget(m_contents);
 
+    connect(m_toggleContents,&QPushButton::clicked,this,[this]() {
+        m_contentsVisible=!m_contentsVisible;
+        m_scrollArea->setVisible(m_contentsVisible);
+        setFixedHeight(m_contentsVisible ? m_timelineHeight : m_header->height()+2);
+        m_toggleContents->setText(m_contentsVisible ? QStringLiteral("▼") : QStringLiteral("▶"));
+        m_toggleContents->setToolTip(m_contentsVisible
+                                         ? tr("Hide schedule contents")
+                                         : tr("Show schedule contents"));
+        m_toggleContents->setAccessibleName(m_toggleContents->toolTip());
+    });
+
     layout->addWidget(header);
     layout->addWidget(m_scrollArea,1);
 }
@@ -206,12 +241,75 @@ void ScheduleSlot::setTotalDuration(double seconds, bool known)
 void ScheduleSlot::setAccentColor(const QColor &color)
 {
     m_accentColor=color;
-    if (m_accentColor.isValid()) {
+    updateHeaderAppearance();
+}
+
+void ScheduleSlot::updateHeaderAppearance()
+{
+    if (m_disabled) {
+        m_header->setStyleSheet(QStringLiteral("QFrame#framebarra { background-color: #343846; }"));
+    } else if (m_upcoming && m_blinkPhase) {
+        m_header->setStyleSheet(QStringLiteral("QFrame#framebarra { background-color: #80A4AE; }"));
+    } else if (m_accentColor.isValid()) {
         m_header->setStyleSheet(QStringLiteral("QFrame#framebarra { background-color: %1; }")
                                     .arg(m_accentColor.name(QColor::HexRgb)));
     } else {
         m_header->setStyleSheet(QString());
     }
+}
+
+void ScheduleSlot::setTimelineHeight(int height)
+{
+    m_timelineHeight=qMax(m_header->height()+2,height);
+    setFixedHeight(m_contentsVisible ? m_timelineHeight : m_header->height()+2);
+}
+
+void ScheduleSlot::setScheduleDisabled(bool disabled)
+{
+    if (m_disabled==disabled)
+        return;
+
+    m_disabled=disabled;
+    setProperty("scheduleDisabled",m_disabled);
+    setAccentColor(m_accentColor);
+    QPalette slotPalette=m_scrollArea->palette();
+    const QColor bodyColor=m_disabled ? QColor("#20242e") : QColor("#282020");
+    slotPalette.setColor(QPalette::Window,bodyColor);
+    m_scrollArea->setPalette(slotPalette);
+    m_scrollArea->viewport()->setPalette(slotPalette);
+    m_contents->setPalette(slotPalette);
+    style()->unpolish(this);
+    style()->polish(this);
+    for (QWidget *child : findChildren<QWidget*>()) {
+        child->style()->unpolish(child);
+        child->style()->polish(child);
+        child->update();
+    }
+    update();
+    emit disabledChanged();
+}
+
+void ScheduleSlot::setPriority(bool priority)
+{
+    if (m_priority==priority)
+        return;
+    m_priority=priority;
+    m_priorityIndicator->setVisible(m_priority);
+}
+
+void ScheduleSlot::setUpcoming(bool upcoming)
+{
+    if (m_upcoming==upcoming)
+        return;
+
+    m_upcoming=upcoming;
+    m_blinkPhase=upcoming;
+    if (m_upcoming) {
+        m_upcomingBlinkTimer->start();
+    } else {
+        m_upcomingBlinkTimer->stop();
+    }
+    updateHeaderAppearance();
 }
 
 bool ScheduleSlot::eventFilter(QObject *watched, QEvent *event)

@@ -260,16 +260,17 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 // cargar configuracion de los player*******************
     QString loadError;
-    if (!Config::loadConfig("config.json", players, m_capture, &loadError))
+    if (!Config::loadConfig("config.json", players, m_capture, &loadError, m_planner))
         QMessageBox::warning(this, tr("Configuration"), loadError);
 
     const auto saveConfiguration = [this]() {
         QString error;
-        if (!Config::saveConfig("config.json", players, m_capture, &error))
+        if (!Config::saveConfig("config.json", players, m_capture, &error, m_planner))
             QMessageBox::warning(this, tr("Configuration was not saved"), error);
     };
     for (Player *player : players)
         connect(player, &Player::configurationChanged, this, saveConfiguration);
+    connect(m_planner, &Planner::configurationChanged, this, saveConfiguration);
 
     // Coalesce input-volume slider changes, then flush on normal exit.
     auto *captureSaveTimer = new QTimer(this);

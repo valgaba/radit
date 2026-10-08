@@ -58,8 +58,12 @@ bool AudioItemMeteoClockMaxi::preparePlayback()
 {
     if(!m_pack || !m_pack->isReady())return fail(m_pack && !m_pack->error().isEmpty()?m_pack->error():tr("Voice pack is not ready."));
     const auto readings=MeteoClock::currentReadings();
-    if(!readings.available || !readings.updated.isValid() || readings.updated.secsTo(QDateTime::currentDateTimeUtc())>1800)
-        return fail(tr("Weather readings are unavailable. Select a location in MeteoClock and wait for the weather update."));
+    if(!MeteoClock::hasFreshReadings()) {
+        const bool refreshRequested=MeteoClock::requestCurrentReadings();
+        return fail(refreshRequested
+            ? tr("Waiting for fresh weather readings.")
+            : tr("Weather readings are unavailable. Select a location in MeteoClock and wait for the weather update."));
+    }
     const QTime time=QTime::currentTime();
     const auto names=clipNames(time,readings.temperature,readings.humidity);
     if(names.isEmpty())return fail(tr("Weather readings are outside the supported range."));

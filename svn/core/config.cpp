@@ -2,6 +2,7 @@
 #include "core/MediaManager.h"
 #include "widgets/Player.h"
 #include "widgets/Capture.h"
+#include "widgets/Planner.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -61,7 +62,7 @@ float savedVolume(const QJsonObject &object)
 }
 
 bool Config::saveConfig(const QString &filename, const QList<Player *> &players,
-                        Capture *capture, QString *error)
+                        Capture *capture, QString *error, Planner *planner)
 {
     if (error) error->clear();
     const auto outputs = MediaManager::outputDevices();
@@ -84,6 +85,13 @@ bool Config::saveConfig(const QString &filename, const QList<Player *> &players,
             {"recordingMode", capture->recordingMode()}
         };
     }
+    if (planner) {
+        root["planner"] = QJsonObject{
+            {"playDevice", deviceSettings(planner->devicePlay(), outputs)},
+            {"cueDevice", deviceSettings(planner->deviceCue(), outputs)},
+            {"volume", planner->volume()}
+        };
+    }
     QSaveFile file(configPath(filename));
     const QByteArray json = QJsonDocument(root).toJson(QJsonDocument::Indented);
     if (!file.open(QIODevice::WriteOnly) || file.write(json) != json.size() || !file.commit()) {
@@ -95,7 +103,7 @@ bool Config::saveConfig(const QString &filename, const QList<Player *> &players,
 }
 
 bool Config::loadConfig(const QString &filename, const QList<Player *> &players,
-                        Capture *capture, QString *error)
+                        Capture *capture, QString *error, Planner *planner)
 {
     if (error) error->clear();
     QFile file(configPath(filename));
@@ -136,6 +144,17 @@ bool Config::loadConfig(const QString &filename, const QList<Player *> &players,
         capture->setInputVolume(savedVolume(saved));
         if (!capture->setRecordingMode(saved.value("recordingMode").toString("mp3-44100-stereo-192"))) {
             if (error) *error = QCoreApplication::translate("Config", "Invalid MP3 recording mode.");
+            return false;
+        }
+    }
+    if (planner && root.value("planner").isObject()) {
+        const QJsonObject saved = root.value("planner").toObject();
+        if (saved.value("playDevice").isObject())
+            planner->setDevicePlay(resolveDevice(saved.value("playDevice").toObject(), outputs));
+        if (saved.value("cueDevice").isObject())
+            planner->setDeviceCue(resolveDevice(saved.value("cueDevice").toObject(), outputs));
+        if (!planner->setVolume(savedVolume(saved))) {
+            if (error) *error = QCoreApplication::translate("Config", "Could not restore Planner volume.");
             return false;
         }
     }

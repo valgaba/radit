@@ -44,7 +44,6 @@
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
-//#include "widgets/AudioItemFileMini.h"
 #include "widgets/AudioItemFilemaxi.h"
 #include "core/io.h"
 //#include "bass.h"

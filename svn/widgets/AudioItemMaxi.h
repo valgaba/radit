@@ -107,6 +107,7 @@ public:
 
      virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
      virtual bool isLiveStream() const { return false; }
+     virtual double playbackLimitSeconds() const { return 0.0; }
      virtual bool advancesOnLoop() const { return false; }
      virtual bool preparePlayback() { return true; }
      virtual bool loadPreparedPlayback(MediaManager *manager) { return manager->loadFile(playbackPath()); }
@@ -219,7 +220,7 @@ public:
     protected:
     void setLiveStreamPresentation();
     void setFolderPresentation(const QString &status, bool ready);
-    void setCompactPresentation();
+    void setCompactPresentation(bool showProperties = false);
     Button *propertiesButton() const { return btnproperties; }
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;

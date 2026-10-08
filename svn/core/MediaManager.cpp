@@ -144,6 +144,96 @@ QString audioDeviceName(const char *name)
 #endif
     return QString::fromUtf8(name);
 }
+
+QString id3Text(const BYTE *data, int length)
+{
+    if (!data || length < 1) return {};
+    const BYTE encoding = data[0];
+    data++;
+    --length;
+    while (length > 0 && data[length - 1] == 0) --length;
+    if (encoding == 0) return QString::fromLatin1(reinterpret_cast<const char *>(data), length).trimmed();
+    if (encoding == 3) return QString::fromUtf8(reinterpret_cast<const char *>(data), length).trimmed();
+    if (encoding != 1 && encoding != 2) return {};
+    bool bigEndian = encoding == 2;
+    if (encoding == 1 && length >= 2) {
+        if (data[0] == 0xfe && data[1] == 0xff) { bigEndian = true; data += 2; length -= 2; }
+        else if (data[0] == 0xff && data[1] == 0xfe) { data += 2; length -= 2; }
+    }
+    QVector<char16_t> chars;
+    chars.reserve(length / 2);
+    for (int i = 0; i + 1 < length; i += 2) {
+        const ushort ch = bigEndian ? qFromBigEndian<ushort>(data + i)
+                                    : qFromLittleEndian<ushort>(data + i);
+        if (ch == 0) break;
+        chars.append(static_cast<char16_t>(ch));
+    }
+    return QString::fromUtf16(chars.constData(), chars.size()).trimmed();
+}
+
+QString id3Comment(const BYTE *data, int length)
+{
+    if (!data || length <= 4) return {};
+    const BYTE encoding = data[0];
+    int textOffset = 4; // encoding byte and three-letter language
+    if (encoding == 1 || encoding == 2) {
+        while (textOffset + 1 < length && (data[textOffset] != 0 || data[textOffset + 1] != 0))
+            textOffset += 2;
+        textOffset = qMin(textOffset + 2, length);
+    } else {
+        while (textOffset < length && data[textOffset] != 0) ++textOffset;
+        textOffset = qMin(textOffset + 1, length);
+    }
+    QByteArray text;
+    text.reserve(length - textOffset + 1);
+    text.append(char(encoding));
+    text.append(reinterpret_cast<const char *>(data + textOffset), length - textOffset);
+    return id3Text(reinterpret_cast<const BYTE *>(text.constData()), text.size());
+}
+
+size_t boundedLength(const char *text, size_t maximum)
+{
+    size_t length = 0;
+    while (length < maximum && text[length] != '\0') ++length;
+    return length;
+}
+
+void readId3v2Tags(const BYTE *tag, AudioFileMetadata &metadata)
+{
+    if (!tag || std::memcmp(tag, "ID3", 3) != 0) return;
+    const int version = tag[3];
+    if (version < 3 || version > 4) return;
+    const quint32 tagSize = (quint32(tag[6] & 0x7f) << 21) |
+                            (quint32(tag[7] & 0x7f) << 14) |
+                            (quint32(tag[8] & 0x7f) << 7) | quint32(tag[9] & 0x7f);
+    if (tagSize > 16 * 1024 * 1024) return;
+    const BYTE *cursor = tag + 10;
+    const BYTE *end = cursor + tagSize;
+    while (cursor + (version == 4 ? 10 : 10) <= end) {
+        if (cursor[0] == 0) break;
+        const QByteArray id(reinterpret_cast<const char *>(cursor), 4);
+        quint32 frameSize = 0;
+        if (version == 4) {
+            frameSize = (quint32(cursor[4] & 0x7f) << 21) | (quint32(cursor[5] & 0x7f) << 14) |
+                        (quint32(cursor[6] & 0x7f) << 7) | quint32(cursor[7] & 0x7f);
+        } else {
+            frameSize = (quint32(cursor[4]) << 24) | (quint32(cursor[5]) << 16) |
+                        (quint32(cursor[6]) << 8) | quint32(cursor[7]);
+        }
+        cursor += 10;
+        if (frameSize == 0 || frameSize > quint32(end - cursor)) break;
+        const QString value = id3Text(cursor, int(frameSize));
+        if (id == "TIT2" && metadata.title.isEmpty()) metadata.title = value;
+        else if (id == "TPE1" && metadata.artist.isEmpty()) metadata.artist = value;
+        else if (id == "TALB" && metadata.album.isEmpty()) metadata.album = value;
+        else if (id == "TYER" || id == "TDRC") { if (metadata.year.isEmpty()) metadata.year = value; }
+        else if (id == "COMM" && metadata.comment.isEmpty())
+            metadata.comment = id3Comment(cursor, int(frameSize));
+        else if (id == "TCON" && metadata.genre.isEmpty())
+            metadata.genre = value;
+        cursor += frameSize;
+    }
+}
 }
 
 QList<AudioDevice> MediaManager::inputDevices()
@@ -1190,6 +1280,43 @@ double MediaManager::readFileDuration(const QString &filePath)
     return std::isfinite(seconds) && seconds > 0 ? seconds : -1.0;
 }
 
+AudioFileMetadata MediaManager::readAudioFileMetadata(const QString &filePath)
+{
+    AudioFileMetadata metadata;
+    const QFileInfo fileInfo(filePath);
+    metadata.sizeBytes = fileInfo.exists() ? fileInfo.size() : 0;
+    metadata.duration = readFileDuration(filePath);
+    const DWORD previousDevice = BASS_GetDevice();
+    struct DeviceGuard {
+        DWORD device;
+        ~DeviceGuard() { if (device != DWORD(-1)) BASS_SetDevice(device); }
+    } deviceGuard{previousDevice};
+    if (!initializeDecoder()) return metadata;
+#ifdef Q_OS_WIN
+    const HSTREAM stream = BASS_StreamCreateFile(FALSE, filePath.utf16(), 0, 0,
+                                                 BASS_STREAM_DECODE | BASS_UNICODE);
+#else
+    const QByteArray path = filePath.toUtf8();
+    const HSTREAM stream = BASS_StreamCreateFile(FALSE, path.constData(), 0, 0, BASS_STREAM_DECODE);
+#endif
+    if (!stream) return metadata;
+    BASS_CHANNELINFO info = {};
+    if (BASS_ChannelGetInfo(stream, &info))
+        metadata.format = QStringLiteral("%1 Hz, %2 channel(s)").arg(info.freq).arg(info.chans);
+    readId3v2Tags(reinterpret_cast<const BYTE *>(BASS_ChannelGetTags(stream, BASS_TAG_ID3V2)), metadata);
+    if (const auto *tag = reinterpret_cast<const TAG_ID3 *>(BASS_ChannelGetTags(stream, BASS_TAG_ID3))) {
+        if (metadata.title.isEmpty()) metadata.title = QString::fromLocal8Bit(tag->title, int(boundedLength(tag->title, sizeof(tag->title)))).trimmed();
+        if (metadata.artist.isEmpty()) metadata.artist = QString::fromLocal8Bit(tag->artist, int(boundedLength(tag->artist, sizeof(tag->artist)))).trimmed();
+        if (metadata.album.isEmpty()) metadata.album = QString::fromLocal8Bit(tag->album, int(boundedLength(tag->album, sizeof(tag->album)))).trimmed();
+        if (metadata.year.isEmpty()) metadata.year = QString::fromLatin1(tag->year, int(boundedLength(tag->year, sizeof(tag->year)))).trimmed();
+        if (metadata.comment.isEmpty()) metadata.comment = QString::fromLocal8Bit(tag->comment, int(boundedLength(tag->comment, sizeof(tag->comment)))).trimmed();
+        if (tag->genre != 255) metadata.genre = QString::number(tag->genre);
+    }
+    if (metadata.title.isEmpty()) metadata.title = fileInfo.completeBaseName();
+    BASS_StreamFree(stream);
+    return metadata;
+}
+
 //****************************************************
 
 
@@ -1269,6 +1396,24 @@ void MediaManager::stop()
         }
 
         emit positionChanged(0.0);
+}
+
+void MediaManager::finishPlayback()
+{
+    cancelNetworkLoad();
+    m_timer->stop();
+    if (m_backend->stream) {
+        const HSTREAM stream=m_backend->stream;
+        const bool network=m_backend->network;
+        // Clear the active handle first to ignore a queued BASS end callback.
+        m_backend->stream=0;
+        m_backend->network=false;
+        BASS_ChannelStop(stream);
+        if (network)
+            BASS_StreamFree(stream);
+    }
+    emit positionChanged(0.0);
+    emit playbackFinished();
 }
 
 

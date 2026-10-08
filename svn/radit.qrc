@@ -67,5 +67,6 @@
         <file>icons/rename.svg</file>
         <file>icons/Undo.svg</file>
         <file>icons/Redo.svg</file>
+        <file>icons/settings.svg</file>
     </qresource>
 </RCC>

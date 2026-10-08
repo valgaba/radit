@@ -19,6 +19,7 @@
 #include "widgets/frameoptionsplayer.h"
 
 class VuMeter;
+class ContentsBase;
 
 
 
@@ -60,13 +61,19 @@ private:
     QPointer<AudioItemMaxi> m_pendingMixItem;
     QPointer<AudioItemMaxi> m_outgoingItem;
     QTimer *m_mixTimer = nullptr;
+    QTimer *m_playbackLimitTimer = nullptr;
     QElapsedTimer m_mixClock;
+    QElapsedTimer m_playbackLimitClock;
     int m_mixElapsedMs = 0;
     int m_mixDurationMs = 0;
+    qint64 m_playbackLimitRemainingMs = 0;
     float m_mixProgress = 1.0f;
     float m_playerVolume = 1.0f;
     bool m_purgeOutgoing = false;
     bool m_mixAttempted = false;
+    QPointer<ContentsBase> m_sequenceContents;
+    bool m_sequenceRepeat = false;
+    int m_sequenceIndex = -1;
     float m_outgoingLeft = -120.0f, m_outgoingRight = -120.0f;
     void bindMediaManager();
     bool tryFolderMix(double position);
@@ -75,6 +82,11 @@ private:
     void cancelPendingMix();
     void updateMix();
     void finishMix(bool purge);
+    void startPlaybackLimit(double seconds);
+    void pausePlaybackLimit();
+    void resumePlaybackLimit();
+    bool playSequenceFrom(int index);
+    void advanceSequence();
 
 
 
@@ -107,8 +119,11 @@ public:
     QString title() const;
 
     void playItem(AudioItemMaxi *item);
+    bool startSequentialPlayback(ContentsBase *contents, bool repeat);
+    void stopSequentialPlayback();
     void pauseMain();
     void stopMain();
+    bool seekPlaybackPosition(double seconds);
     bool setVolume(float volume);
     float volume() const;
     float committedVolume() const;
@@ -138,6 +153,9 @@ public:
 
     signals:
     void configurationChanged();
+    void sequentialPlaybackFinished();
+    void audioLevelsChanged(float left, float right);
+    void playbackProgressChanged(double position, double duration, bool seekable);
 
 
 };

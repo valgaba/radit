@@ -10,6 +10,7 @@
 
 class QSlider;
 class QLabel;
+class Label;
 
 
 
@@ -37,6 +38,7 @@ class FrameOptionsPlayer: public Frame
     QComboBox *combocue;
     QSlider *volumeSlider;
     QLabel *volumeValue;
+    Label *optionsTitle = nullptr;
     float m_previousVolume = 1.0f;
     bool m_volumeCommitted = false;
 

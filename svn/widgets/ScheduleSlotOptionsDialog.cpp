@@ -10,10 +10,12 @@
 
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QCheckBox>
 #include <QTimeEdit>
 #include <QVBoxLayout>
 
-ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent)
+ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent,
+                                                     bool disabled, bool editing)
     : QDialog(parent)
 {
     setObjectName("ScheduleSlotOptionsDialog");
@@ -21,7 +23,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     setWindowModality(Qt::WindowModal);
     setModal(true);
     setWindowTitle(tr("Schedule slot options"));
-    resize(340, 145);
+    resize(340, 160);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -61,6 +63,10 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     m_entryTime->setDisplayFormat("HH:mm");
     m_entryTime->setTimeRange(QTime(0, 0), QTime(23, 59));
     form->addRow(tr("Entry time"), m_entryTime);
+    m_disabled = new QCheckBox(tr("Disable this schedule slot"), content);
+    m_disabled->setObjectName("ScheduleSlotDisabledCheckBox");
+    m_disabled->setChecked(disabled);
+    form->addRow(QString(), m_disabled);
     contentLayout->addLayout(form);
 
     auto *buttons = new QHBoxLayout;
@@ -71,7 +77,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     cancel->setFixedSize(75, 24);
     auto *add = new Button(content);
     add->setObjectName("AddScheduleSlot");
-    add->setText(tr("Add"));
+    add->setText(editing ? tr("Apply") : tr("Add"));
     add->setFixedSize(75, 24);
     buttons->addWidget(cancel);
     buttons->addWidget(add);
@@ -85,4 +91,9 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
 QTime ScheduleSlotOptionsDialog::entryTime() const
 {
     return m_entryTime->time();
+}
+
+bool ScheduleSlotOptionsDialog::isDisabled() const
+{
+    return m_disabled->isChecked();
 }
