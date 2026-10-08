@@ -15,6 +15,9 @@ TARGET = radit
 SOURCES += \
     core/LocutionPack.cpp \
     widgets/AudioItemMeteoClockMaxi.cpp \
+    widgets/Planner.cpp \
+    widgets/PlannerContents.cpp \
+    widgets/ScheduleSlot.cpp \
     core/Clipboard.cpp \
     core/MediaManager.cpp \
     core/WeatherService.cpp \
@@ -25,6 +28,7 @@ SOURCES += \
     mainwindow.cpp \
     widgets/AudioItem.cpp \
     widgets/AudioItemFileMaxi.cpp \
+    widgets/AudioItemFilePlanner.cpp \
     widgets/AudioItemFolderMaxi.cpp \
     widgets/AudioItemFileMini.cpp \
     widgets/AudioItemMaxi.cpp \
@@ -62,6 +66,9 @@ SOURCES += \
 HEADERS += \
     core/LocutionPack.h \
     widgets/AudioItemMeteoClockMaxi.h \
+    widgets/Planner.h \
+    widgets/PlannerContents.h \
+    widgets/ScheduleSlot.h \
     core/Clipboard.h \
     core/MediaManager.h \
     core/WeatherService.h \
@@ -71,6 +78,7 @@ HEADERS += \
     mainwindow.h \
     widgets/AudioItem.h \
     widgets/AudioItemFileMaxi.h \
+    widgets/AudioItemFilePlanner.h \
     widgets/AudioItemFolderMaxi.h \
     widgets/FolderPropertiesFrame.h \
     widgets/AudioItemFileMini.h \

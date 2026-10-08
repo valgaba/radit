@@ -319,6 +319,37 @@ bool AudioItemMaxi::prepareCue()
 
 AudioItemMaxi::~AudioItemMaxi(){}
 
+void AudioItemMaxi::setCompactPresentation()
+{
+    frametop->hide();
+    setFixedHeight(31);
+    layout->setContentsMargins(2,1,2,1);
+    layout->setSpacing(0);
+
+    framecenter->setFixedHeight(28);
+    btnplay->setFixedSize(23,23);
+    btnplay->setIconSize(QSize(18,18));
+    labelnombre->setFixedHeight(26);
+    labeltiempo->setFixedHeight(26);
+    labeltiempo->setFixedWidth(78);
+
+    QFont compactNameFont=labelnombre->font();
+    compactNameFont.setPointSize(10);
+    compactNameFont.setBold(false);
+    labelnombre->setFont(compactNameFont);
+
+    QFont compactTimeFont=labeltiempo->font();
+    compactTimeFont.setPointSize(10);
+    compactTimeFont.setBold(false);
+    labeltiempo->setFont(compactTimeFont);
+
+    layouttop->removeWidget(btnproperties);
+    btnproperties->setParent(framecenterright);
+    btnproperties->setFixedSize(23,23);
+    btnproperties->setIconSize(QSize(18,18));
+    layoutcenterright->addWidget(btnproperties);
+}
+
 void AudioItemMaxi::setFolderPresentation(const QString &status, bool ready)
 {
     m_cueButton->hide();

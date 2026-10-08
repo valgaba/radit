@@ -325,21 +325,14 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     });
     bar->addWidget(locationsButton);
 
+    m_locationsMenu=locationsMenu;
     connect(locationsMenu, &QMenu::aboutToShow, this, [this, locationsMenu]() {
         locationsMenu->clear();
-        const auto addLocation = [this, locationsMenu](const QString &label,
-                                                       const QString &path) {
-            QAction *action = locationsMenu->addAction(label);
-            action->setEnabled(!path.isEmpty() && QFileInfo(path).isDir());
-            action->setToolTip(QDir::toNativeSeparators(path));
-            connect(action, &QAction::triggered, this, [this, path]() { setPath(path); });
-        };
-
-        addLocation(tr("Home Folder"), QDir::homePath());
-        addLocation(tr("Desktop"), QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
-        addLocation(tr("Documents"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
-        addLocation(tr("Downloads"), QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
-        addLocation(tr("Locution"), QDir(QCoreApplication::applicationDirPath()).filePath("locution"));
+        addLocationAction(locationsMenu,tr("Home Folder"),QDir::homePath());
+        addLocationAction(locationsMenu,tr("Desktop"),QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+        addLocationAction(locationsMenu,tr("Documents"),QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+        addLocationAction(locationsMenu,tr("Downloads"),QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+        addLocationAction(locationsMenu,tr("Locution"),QDir(QCoreApplication::applicationDirPath()).filePath("locution"));
         const QString capturePath = QDir(QCoreApplication::applicationDirPath()).filePath("capture");
         QAction *captureAction = locationsMenu->addAction(tr("Capture"));
         captureAction->setToolTip(QDir::toNativeSeparators(capturePath));
@@ -354,26 +347,49 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
         locationsMenu->addAction(tr("Favorites"))->setEnabled(false);
         for (const QString &path : m_favorites) {
             const QString name = QDir(path).dirName();
-            addLocation(name.isEmpty() ? QDir::toNativeSeparators(path) : name, path);
+            addLocationAction(locationsMenu,name.isEmpty()?QDir::toNativeSeparators(path):name,path);
         }
-        if (m_favorites.isEmpty())
+        if (m_favorites.isEmpty()) {
             locationsMenu->addAction(tr("No favorite folders"))->setEnabled(false);
+        } else {
+            QMenu *removeFavorites=locationsMenu->addMenu(tr("Remove favorite"));
+            for (const QString &path:m_favorites) {
+                const QString name=QDir(path).dirName();
+                QAction *removeAction=removeFavorites->addAction(name.isEmpty()?QDir::toNativeSeparators(path):name);
+                removeAction->setToolTip(tr("Remove this folder from favorites: %1").arg(QDir::toNativeSeparators(path)));
+                connect(removeAction,&QAction::triggered,this,[this,path]() {
+                    m_favorites.removeAll(path);savePreferences();updateFavoriteButton();
+                });
+            }
+        }
         locationsMenu->addSeparator();
         locationsMenu->addAction(tr("Drives"))->setEnabled(false);
-
-        QStringList roots;
-        for (const QStorageInfo &storage : QStorageInfo::mountedVolumes()) {
-            if (!storage.isValid() || !storage.isReady())
-                continue;
-            const QString root = storage.rootPath();
-            if (roots.contains(root))
-                continue;
-            roots.append(root);
-            QString label = QDir::toNativeSeparators(root);
-            if (!storage.name().isEmpty())
-                label += " [" + storage.name() + "]";
-            addLocation(label, root);
+        if (m_driveRootsLoaded) {
+            for (const QString &root:m_driveRoots) addLocationAction(locationsMenu,QDir::toNativeSeparators(root),root);
+            return;
         }
+        m_drivesPlaceholder=locationsMenu->addAction(m_driveScanStarted?tr("Scanning drives..."):tr("Loading drives..."));
+        m_drivesPlaceholder->setEnabled(false);
+        if (m_driveScanStarted) return;
+        m_driveScanStarted=true;
+        auto *watcher=new QFutureWatcher<QStringList>(this);m_driveWatcher=watcher;
+        connect(watcher,&QFutureWatcher<QStringList>::finished,this,[this,watcher]() {
+            m_driveRoots=watcher->result();m_driveRootsLoaded=true;m_driveScanStarted=false;m_driveWatcher=nullptr;
+            watcher->deleteLater();
+            if (!m_locationsMenu || !m_drivesPlaceholder || !m_locationsMenu->isVisible()) return;
+            QAction *placeholder=m_drivesPlaceholder;m_drivesPlaceholder.clear();
+            m_locationsMenu->removeAction(placeholder);placeholder->deleteLater();
+            for (const QString &root:m_driveRoots)
+                addLocationAction(m_locationsMenu,QDir::toNativeSeparators(root),root);
+        });
+        watcher->setFuture(QtConcurrent::run([]() {
+            QStringList roots;
+            for (const QStorageInfo &storage:QStorageInfo::mountedVolumes()) {
+                if (!storage.isValid() || !storage.isReady()) continue;
+                const QString root=storage.rootPath();if (!roots.contains(root))roots.append(root);
+            }
+            return roots;
+        }));
     });
 
     auto *favorites = new Button(toolbar);
@@ -556,6 +572,17 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
 
 
 FileExplore::~FileExplore() = default;
+
+QAction *FileExplore::addLocationAction(QMenu *menu,const QString &label,const QString &path)
+{
+    QAction *action=menu->addAction(label);
+    // Validate the destination after selection; checking stale or remote paths
+    // while opening the menu can block the GUI thread for several seconds.
+    action->setEnabled(!path.isEmpty());
+    action->setToolTip(QDir::toNativeSeparators(path));
+    connect(action,&QAction::triggered,this,[this,path]() {setPath(path);});
+    return action;
+}
 
 QString FileExplore::currentPath() const
 {

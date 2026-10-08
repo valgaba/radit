@@ -28,6 +28,14 @@
 #include <algorithm>
 
 namespace {
+struct MixGains { float incoming; float outgoing; };
+
+MixGains equalPowerGains(float progress)
+{
+    const float angle=std::clamp(progress,0.0f,1.0f)*1.57079632679f;
+    return {std::sin(angle),std::cos(angle)};
+}
+
 AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder)
 {
     if (folder->isLoop()) return folder;
@@ -630,8 +638,9 @@ void Player::updateMix()
     if (!m_outgoingManager) return;
     const int elapsed = m_mixElapsedMs + int(m_mixClock.elapsed());
     m_mixProgress = std::clamp(float(elapsed) / m_mixDurationMs, 0.0f, 1.0f);
-    mediamanager->setVolume(m_playerVolume * m_mixProgress);
-    m_outgoingManager->setVolume(m_playerVolume * (1.0f - m_mixProgress));
+    const MixGains gains=equalPowerGains(m_mixProgress);
+    mediamanager->setVolume(m_playerVolume * gains.incoming);
+    m_outgoingManager->setVolume(m_playerVolume * gains.outgoing);
     if (elapsed >= m_mixDurationMs) finishMix(true);
 }
 
@@ -720,9 +729,10 @@ bool Player::setVolume(float volume)
 {
     if (!std::isfinite(volume)) return false;
     m_playerVolume = std::clamp(volume, 0.0f, 1.0f);
-    bool result = mediamanager->setVolume(m_playerVolume * m_mixProgress);
+    const MixGains gains=equalPowerGains(m_mixProgress);
+    bool result = mediamanager->setVolume(m_playerVolume * gains.incoming);
     if (m_outgoingManager)
-        result = m_outgoingManager->setVolume(m_playerVolume * (1.0f - m_mixProgress)) && result;
+        result = m_outgoingManager->setVolume(m_playerVolume * gains.outgoing) && result;
     return result;
 }
 

@@ -13,6 +13,7 @@ class FileExplore;
 class Capture;
 class Cast;
 class MeteoClock;
+class Planner;
 
 class MainWindow : public QMainWindow
 {
@@ -34,7 +35,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
-    bool saveBeforeQuit();
+    void saveWindowInterface() const;
+    void restoreWindowInterface();
     bool m_quitDialogOpen = false;
     void restoreInterface();
 
@@ -49,6 +51,7 @@ private:
     Capture *m_capture = nullptr;
     Cast *m_cast = nullptr;
     MeteoClock *m_meteoClock = nullptr;
+    Planner *m_planner = nullptr;
 
 
 };

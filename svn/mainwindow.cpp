@@ -34,24 +34,23 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QCloseEvent>
-#include <QFileDialog>
 #include <QScopedValueRollback>
-#include <QStandardPaths>
 #include <QDir>
+#include <QSettings>
 #include <QKeySequence>
 #include "widgets/QuitDialog.h"
-#include "core/io.h"
 
 
 //#include "widgets/TabPlayer.h"
 //#include "widgets/container.h"
-#include "widgets/TabAuto.h"
+//#include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
 #include "core/config.h"
 #include "widgets/fileexplore.h"
 #include "widgets/Capture.h"
 #include "widgets/Cast.h"
 #include "widgets/MeteoClock.h"
+#include "widgets/Planner.h"
 #include "widgets/Player.h"
 
 
@@ -206,11 +205,14 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     m_capture = new Capture;
     m_cast = new Cast;
     m_meteoClock = new MeteoClock;
+    m_planner = new Planner;
+
     splittertop->addWidget(m_fileExplore);
     splittertop->addWidget(m_capture);
     splittertop->addWidget(m_cast);
     splittertop->addWidget(m_meteoClock);
-    splittertop->addWidget(new TabAuto);
+
+    splittertop->addWidget(m_planner);
 
     splitterdown->addWidget(player2);
     splitterdown->addWidget(player3);
@@ -223,8 +225,9 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splittertop->setStretchFactor(2, 2);
     splittertop->setStretchFactor(3, 2);
     splittertop->setStretchFactor(4, 3);
+    splittertop->setStretchFactor(5, 3);
     QList<int> sizesTop;
-    sizesTop << 400 << 400 << 400 << 400 << 600;
+    sizesTop << 400 << 400 << 400 << 400 << 600 << 600;
     splittertop->setSizes(sizesTop);
 
     QAction *resetInterface = vistasMenu->addAction(tr("Reset User Interface"));
@@ -252,6 +255,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     addPanelAction(tr("Show Capture"), m_capture);
     addPanelAction(tr("Show Cast"), m_cast);
     addPanelAction(tr("Show MeteoClock"), m_meteoClock);
+    addPanelAction(tr("Show Planner"), m_planner);
 
 
 // cargar configuracion de los player*******************
@@ -282,6 +286,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
         }
     });
 
+    restoreWindowInterface();
 
 }
 
@@ -295,45 +300,62 @@ void MainWindow::restoreInterface()
     splittertop->show();
     splitterdown->show();
 
-    splittertop->setSizes({400, 400, 400, 400, 600});
+    splittertop->setSizes({400, 400, 400, 400, 600, 600});
     splitterdown->setSizes({400, 400, 400});
     const int height = qMax(3, splitterprincipal->height() - splitterprincipal->handleWidth());
     splitterprincipal->setSizes({height / 3, height - height / 3});
 }
 
+void MainWindow::saveWindowInterface() const
+{
+    const QString filename = QDir(QCoreApplication::applicationDirPath()).filePath("interface.ini");
+    QSettings settings(filename, QSettings::IniFormat);
+    settings.beginGroup("Interface");
+    settings.setValue("splitterPrincipal", splitterprincipal->saveState());
+    settings.setValue("splitterTop", splittertop->saveState());
+    settings.setValue("splitterDown", splitterdown->saveState());
+
+    const auto saveVisibility = [&settings](const QSplitter *splitter) {
+        for (int index = 0; index < splitter->count(); ++index) {
+            const QWidget *panel = splitter->widget(index);
+            if (!panel->objectName().isEmpty())
+                settings.setValue("visible/" + panel->objectName(), !panel->isHidden());
+        }
+    };
+    saveVisibility(splittertop);
+    saveVisibility(splitterdown);
+    settings.endGroup();
+    settings.sync();
+}
+
+void MainWindow::restoreWindowInterface()
+{
+    const QString filename = QDir(QCoreApplication::applicationDirPath()).filePath("interface.ini");
+    QSettings settings(filename, QSettings::IniFormat);
+    settings.beginGroup("Interface");
+    if (settings.contains("splitterPrincipal"))
+        splitterprincipal->restoreState(settings.value("splitterPrincipal").toByteArray());
+    if (settings.contains("splitterTop"))
+        splittertop->restoreState(settings.value("splitterTop").toByteArray());
+    if (settings.contains("splitterDown"))
+        splitterdown->restoreState(settings.value("splitterDown").toByteArray());
+
+    const auto restoreVisibility = [&settings](QSplitter *splitter) {
+        for (int index = 0; index < splitter->count(); ++index) {
+            QWidget *panel = splitter->widget(index);
+            const QString key = "visible/" + panel->objectName();
+            if (!panel->objectName().isEmpty() && settings.contains(key))
+                panel->setVisible(settings.value(key).toBool());
+        }
+    };
+    restoreVisibility(splittertop);
+    restoreVisibility(splitterdown);
+    settings.endGroup();
+}
+
 MainWindow::~MainWindow(){
    mediamanager->shutdown();//libera recursos
 
-}
-
-bool MainWindow::saveBeforeQuit()
-{
-    Io io;
-    for (Player *player : players) {
-        if (!isAncestorOf(player)) continue;
-        auto *tabs = player->findChild<TabPlayer*>();
-        if (!tabs) continue;
-        QString filename = tabs->playerFileName();
-        if (filename.isEmpty()) {
-            const QString suggestion = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
-                .filePath(player->objectName() + ".player");
-            filename = QFileDialog::getSaveFileName(this, tr("Save player: %1").arg(player->title()),
-                                                   suggestion, tr("Radit Player (*.player)"));
-            if (filename.isEmpty()) return false;
-            if (!filename.endsWith(".player", Qt::CaseInsensitive)) filename += ".player";
-        }
-        QString error;
-        if (!io.SavePlayer(tabs, filename, &error)) {
-            QMessageBox::warning(this, tr("Player was not saved"), error);
-            return false;
-        }
-    }
-    QString error;
-    if (!Config::saveConfig("config.json", players, m_capture, &error)) {
-        QMessageBox::warning(this, tr("Configuration was not saved"), error);
-        return false;
-    }
-    return true;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -345,11 +367,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
     QScopedValueRollback<bool> showing(m_quitDialogOpen, true);
     QuitDialog dialog(this);
     const int choice = dialog.exec();
-    if (choice == QuitDialog::Cancel ||
-        (choice == QuitDialog::SaveAndQuit && !saveBeforeQuit())) {
+    if (choice == QuitDialog::Cancel) {
         event->ignore();
         return;
     }
+    if (choice == QuitDialog::SaveAndQuit)
+        saveWindowInterface();
     // Finalize recordings before the main audio context is released by the destructor.
     for (auto *manager : findChildren<MediaManager*>()) manager->stopInput();
     event->accept();

@@ -219,6 +219,7 @@ public:
     protected:
     void setLiveStreamPresentation();
     void setFolderPresentation(const QString &status, bool ready);
+    void setCompactPresentation();
     Button *propertiesButton() const { return btnproperties; }
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;

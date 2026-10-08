@@ -4,6 +4,8 @@
 #include "widgets/frame.h"
 #include <QStringList>
 #include <QSet>
+#include <QPointer>
+#include <QFutureWatcher>
 
 class Button;
 class FileExploreFilter;
@@ -13,6 +15,7 @@ class FileExploreModel;
 class LoadingProgress;
 class QLineEdit;
 class QMenu;
+class QAction;
 class QTreeView;
 
 class FileExplore : public Frame
@@ -42,6 +45,7 @@ signals:
 private:
     void updateFavoriteButton();
     void savePreferences();
+    QAction *addLocationAction(QMenu *menu, const QString &label, const QString &path);
     QString pasteDestination() const;
 
     FileExploreModel *m_model = nullptr;
@@ -55,6 +59,12 @@ private:
     Button *m_up = nullptr;
     Button *m_favoritesButton = nullptr;
     QStringList m_favorites;
+    QStringList m_driveRoots;
+    QPointer<QMenu> m_locationsMenu;
+    QPointer<QAction> m_drivesPlaceholder;
+    QFutureWatcher<QStringList> *m_driveWatcher = nullptr;
+    bool m_driveScanStarted = false;
+    bool m_driveRootsLoaded = false;
     QStringList m_history;
     QString m_currentPath;
     QSet<QString> m_restoreSelection;
