@@ -18,6 +18,7 @@ SOURCES += \
     widgets/Planner.cpp \
     widgets/PlannerContents.cpp \
     widgets/ScheduleSlot.cpp \
+    widgets/ScheduleSlotOptionsDialog.cpp \
     core/Clipboard.cpp \
     core/MediaManager.cpp \
     core/WeatherService.cpp \
@@ -69,6 +70,7 @@ HEADERS += \
     widgets/Planner.h \
     widgets/PlannerContents.h \
     widgets/ScheduleSlot.h \
+    widgets/ScheduleSlotOptionsDialog.h \
     core/Clipboard.h \
     core/MediaManager.h \
     core/WeatherService.h \

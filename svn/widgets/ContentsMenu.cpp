@@ -18,10 +18,7 @@
 // ContentsMenu.cpp
 #include "ContentsMenu.h"
 #include "ContentsPlayer.h"
-#include "widgets/AudioItemFileMaxi.h"
 #include "widgets/AudioItemNetMaxi.h"
-#include "widgets/AudioItemFolderMaxi.h"
-#include <QFileDialog>
 #include <QWidgetAction>
 #include <QPushButton>
 #include <QHBoxLayout>
@@ -173,39 +170,21 @@ QAction* ContentsMenu::createAddAction() {
 
     Menu *submenu = new Menu(this);
 
-    QAction *addAudiofile = new QAction("Audio File", submenu);
-    QAction *addAudioFolder = new QAction("Audio Folder", submenu);
     QAction *addNeturl = new QAction("Net Url", submenu);
-    QAction *addGroup = new QAction("Group", submenu);
 
-    addAudiofile->setIcon(QIcon(":/icons/audiofile.svg"));
-    addAudioFolder->setIcon(QIcon(":/icons/folder.svg"));
     addNeturl->setIcon(QIcon(":/icons/net.svg"));
 
-    submenu->addAction(addAudiofile);
-    submenu->addAction(addAudioFolder);
     submenu->addAction(addNeturl);
-    submenu->addAction(addGroup);
 
     action->setMenu(submenu);
 
 
     // conectar acciones del submenu************************
 
-    connect(addAudiofile, &QAction::triggered, player, [this]{
-        player->createItem(new AudioItemFileMaxi(player));
-    });
     connect(addNeturl, &QAction::triggered, player, [this]() {
         auto *item = new AudioItemNetMaxi(player);
         if (item->editStation()) player->createItem(item);
         else delete item;
-    });
-    connect(addAudioFolder, &QAction::triggered, player, [this]() {
-        const QString path = QFileDialog::getExistingDirectory(player, tr("Select audio folder"));
-        if (path.isEmpty()) return;
-        auto *item = new AudioItemFolderMaxi(player);
-        item->setFolderPath(path);
-        player->createItem(item);
     });
 
     return action;

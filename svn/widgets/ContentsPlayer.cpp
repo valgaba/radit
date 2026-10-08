@@ -206,6 +206,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 
         // Si no hay widget, ocultar acciones específicas
         if (!widget) {
+            const bool showListOptions=supportsListOptionsInContextMenu();
             contentsMenu->setColorVisible(false);
             contentsMenu->setSelectAllVisible(false);
             contentsMenu->setUnselectAllVisible(false);
@@ -221,26 +222,27 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 
             contentsMenu->setPasteVisible(!this->clipboard.lista.isEmpty());
 
-          //  contentsMenu->setLoadVisible(false);
-            contentsMenu->setSaveVisible(true);
-            contentsMenu->setSaveAsVisible(true);
+            contentsMenu->setLoadVisible(showListOptions);
+            contentsMenu->setSaveVisible(showListOptions);
+            contentsMenu->setSaveAsVisible(showListOptions);
 
             contentsMenu->exec(mapToGlobal(mousePos));
             return;
         }
 
         // Mostrar acciones por defecto
-        contentsMenu->setColorVisible(true);
+        const bool showPlaybackOptions=supportsPlaybackOptionsInContextMenu();
+        contentsMenu->setColorVisible(showPlaybackOptions);
         contentsMenu->setSelectAllVisible(true);
         contentsMenu->setUnselectAllVisible(true);
         contentsMenu->setCopyVisible(true);
         contentsMenu->setCutVisible(true);
         contentsMenu->setDeleteVisible(true);
-        contentsMenu->setPropertiesVisible(true);
+        contentsMenu->setPropertiesVisible(showPlaybackOptions);
 
-        contentsMenu->setnextVisible(true);
-        contentsMenu->setpurgeVisible(true);
-        contentsMenu->setloopVisible(true);
+        contentsMenu->setnextVisible(showPlaybackOptions);
+        contentsMenu->setpurgeVisible(showPlaybackOptions);
+        contentsMenu->setloopVisible(showPlaybackOptions);
         contentsMenu->setselectVisible(true);
 
         bool hasSelection = false;
@@ -257,11 +259,12 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             if (auto *item = qobject_cast<AudioItemMaxi*>(target))
                 canPurge = !item->isLiveStream();
         }
-        contentsMenu->setpurgeVisible(canPurge);
+        contentsMenu->setpurgeVisible(showPlaybackOptions && canPurge);
 
-      //  contentsMenu->setLoadVisible(true);
-        contentsMenu->setSaveVisible(true);
-        contentsMenu->setSaveAsVisible(true);
+        const bool showListOptions=supportsListOptionsInContextMenu();
+        contentsMenu->setLoadVisible(showListOptions);
+        contentsMenu->setSaveVisible(showListOptions);
+        contentsMenu->setSaveAsVisible(showListOptions);
 
 
 

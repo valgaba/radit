@@ -70,6 +70,9 @@ protected:
 
     void contextMenuEvent(QContextMenuEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    void setContextMenuPosition(const QPoint &position) { mousePos=position; }
+    virtual bool supportsPlaybackOptionsInContextMenu() const { return true; }
+    virtual bool supportsListOptionsInContextMenu() const { return true; }
 
 private slots:
 

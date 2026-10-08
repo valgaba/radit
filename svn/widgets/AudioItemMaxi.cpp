@@ -344,10 +344,14 @@ void AudioItemMaxi::setCompactPresentation()
     labeltiempo->setFont(compactTimeFont);
 
     layouttop->removeWidget(btnproperties);
-    btnproperties->setParent(framecenterright);
-    btnproperties->setFixedSize(23,23);
-    btnproperties->setIconSize(QSize(18,18));
-    layoutcenterright->addWidget(btnproperties);
+    btnproperties->hide();
+
+    layouttop->removeWidget(btnselect);
+    btnselect->setParent(framecenterright);
+    btnselect->setFixedSize(23,23);
+    btnselect->setToolTip(tr("Select item"));
+    layoutcenterright->addWidget(btnselect);
+    setIsSelect(isSelect());
 }
 
 void AudioItemMaxi::setFolderPresentation(const QString &status, bool ready)
