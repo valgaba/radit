@@ -14,6 +14,7 @@ public:
 
 signals:
     void contentDurationsChanged();
+    void contentAdded();
 
 protected:
     bool supportsPlaybackOptionsInContextMenu() const override { return false; }

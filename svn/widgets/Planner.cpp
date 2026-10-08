@@ -34,6 +34,7 @@
 #include "widgets/scrollbar.h"
 #include <functional>
 #include <cmath>
+#include <algorithm>
 
 namespace {
 QPointer<ScheduleSlot> g_scheduleSlotClipboard;
@@ -45,7 +46,7 @@ public:
     explicit PlannerTimeRuler(QWidget *parent = nullptr) : QWidget(parent)
     {
         setObjectName("PlannerTimeRuler");
-        setFixedWidth(58);
+        setFixedWidth(72);
         setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
         setMouseTracking(true);
     }
@@ -121,15 +122,15 @@ protected:
         endTimeFont.setBold(true);
         painter.setFont(endTimeFont);
         for (const auto &interval : m_slotIntervals) {
-            const int startY=qBound(0,interval.first*(height()-1)/(24*60),rulerBottom);
-            const int endY=qBound(startY,interval.second*(height()-1)/(24*60),rulerBottom);
+            const int startY=qBound(0,static_cast<int>(qint64(interval.first)*(height()-1)/(24*60*60)),rulerBottom);
+            const int endY=qBound(startY,static_cast<int>(qint64(interval.second)*(height()-1)/(24*60*60)),rulerBottom);
             painter.drawLine(markerX,startY,markerX,endY);
             painter.drawLine(width()-11,startY,width()-2,startY);
             painter.drawLine(width()-11,endY,width()-2,endY);
 
-            const QString endLabel=interval.second>=24*60
-                ? QStringLiteral("24:00")
-                : QTime(0,0).addSecs(interval.second*60).toString("HH:mm");
+            const QString endLabel=interval.second>=24*60*60
+                ? QStringLiteral("24:00:00")
+                : QTime(0,0).addSecs(interval.second).toString("HH:mm:ss");
             int textY=endY-metrics.height()/2;
             textY=qBound(0,textY,height()-metrics.height());
             const QRect labelRect(3,textY,labelRight-3,metrics.height());
@@ -213,6 +214,15 @@ private:
         connect(slot->contents(),&PlannerContents::contentDurationsChanged,this,[this]() {
             updateSlotPositions();
         });
+        connect(slot->contents(),&PlannerContents::contentAdded,this,[this,slot]() {
+            if (!m_contentAutoFocusEnabled)
+                return;
+            QPointer<ScheduleSlot> pendingFocus=slot;
+            QTimer::singleShot(0,this,[this,pendingFocus]() {
+                if (pendingFocus && m_focusSlot)
+                    m_focusSlot(pendingFocus);
+            });
+        });
         connect(slot,&ScheduleSlot::closeRequested,this,[this](ScheduleSlot *closingSlot) {
             const auto answer=QMessageBox::question(
                 this,
@@ -269,6 +279,11 @@ public:
         m_focusSlot=std::move(callback);
     }
 
+    void setContentAutoFocusEnabled(bool enabled)
+    {
+        m_contentAutoFocusEnabled=enabled;
+    }
+
     void setPixelsPerHour(int pixelsPerHour)
     {
         m_pixelsPerHour=pixelsPerHour;
@@ -292,9 +307,12 @@ public:
     {
         QList<QPair<int,int>> intervals;
         for (const TimedSlot &entry : m_slots) {
-            const int durationMinutes=qMax(1,qRound(entry.widget->height()*60.0/m_pixelsPerHour));
-            const int startMinute=entry.widget->entryMinute();
-            intervals.append({startMinute,qMin(24*60,startMinute+durationMinutes)});
+            const int startSeconds=entry.widget->entryMinute()*60;
+            const int durationSeconds=entry.widget->totalDurationKnown()
+                && entry.widget->totalDurationSeconds()>0.0
+                ? qRound(entry.widget->totalDurationSeconds())
+                : qMax(1,qRound(entry.widget->height()*3600.0/m_pixelsPerHour));
+            intervals.append({startSeconds,qMin(24*60*60,startSeconds+durationSeconds)});
         }
         return intervals;
     }
@@ -340,6 +358,8 @@ private:
             copy->show();
             m_dayContents.append(copy->contents());
             m_scrollArea->ensureVisible(0,(minute*m_pixelsPerHour)/60,0,0);
+            if (m_focusSlot)
+                m_focusSlot(copy);
             return;
         }
 
@@ -363,16 +383,26 @@ private:
         updateSlotPositions();
         movingSlot->show();
         m_scrollArea->ensureVisible(0,(minute*m_pixelsPerHour)/60,0,0);
+        if (m_focusSlot)
+            m_focusSlot(movingSlot);
         g_scheduleSlotClipboard.clear();
         g_scheduleSlotClipboardIsCut=false;
     }
 
     void updateSlotPositions()
     {
+        struct Placement {
+            ScheduleSlot *widget = nullptr;
+            int startSeconds = 0;
+            int endSeconds = 0;
+            int lane = 0;
+        };
+        QList<Placement> placements;
+
         for (const TimedSlot &entry : m_slots) {
-            const int y=(entry.widget->entryMinute()*m_pixelsPerHour)/60;
             double durationSeconds=0.0;
-            bool durationIsKnown=entry.widget->contents()->layout->count()>0;
+            const bool hasContents=entry.widget->contents()->layout->count()>0;
+            bool durationIsKnown=hasContents;
             for (int index=0; durationIsKnown && index<entry.widget->contents()->layout->count(); ++index) {
                 QWidget *content=entry.widget->contents()->layout->itemAt(index)->widget();
                 auto *audio=qobject_cast<AudioItemFilePlanner*>(content);
@@ -382,11 +412,55 @@ private:
                 }
                 durationSeconds+=audio->second();
             }
-            const int slotHeight=durationIsKnown
-                ? qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0))
-                : m_pixelsPerHour;
+            entry.widget->setTotalDuration(durationSeconds,!hasContents || durationIsKnown);
+            if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
+                durationSeconds=3600.0;
+            const int startSeconds=entry.widget->entryMinute()*60;
+            durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
+            const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
             entry.widget->setFixedHeight(slotHeight);
-            entry.widget->setGeometry(0,y,width(),entry.widget->height());
+            placements.append({entry.widget,startSeconds,
+                               qMin(24*60*60,startSeconds+qMax(1,qRound(durationSeconds))),0});
+        }
+
+        std::sort(placements.begin(),placements.end(),[](const Placement &left,const Placement &right) {
+            if (left.startSeconds!=right.startSeconds)
+                return left.startSeconds<right.startSeconds;
+            return left.endSeconds<right.endSeconds;
+        });
+
+        int groupStart=0;
+        while (groupStart<placements.size()) {
+            int groupEnd=groupStart+1;
+            int groupEndSeconds=placements.at(groupStart).endSeconds;
+            while (groupEnd<placements.size()
+                   && placements.at(groupEnd).startSeconds<groupEndSeconds) {
+                groupEndSeconds=qMax(groupEndSeconds,placements.at(groupEnd).endSeconds);
+                ++groupEnd;
+            }
+
+            QList<int> laneEndSeconds;
+            for (int index=groupStart; index<groupEnd; ++index) {
+                int lane=0;
+                while (lane<laneEndSeconds.size()
+                       && laneEndSeconds.at(lane)>placements.at(index).startSeconds)
+                    ++lane;
+                if (lane==laneEndSeconds.size())
+                    laneEndSeconds.append(placements.at(index).endSeconds);
+                else
+                    laneEndSeconds[lane]=placements.at(index).endSeconds;
+                placements[index].lane=lane;
+            }
+
+            const int laneCount=laneEndSeconds.size();
+            for (int index=groupStart; index<groupEnd; ++index) {
+                const Placement &placement=placements.at(index);
+                const int left=width()*placement.lane/laneCount;
+                const int right=width()*(placement.lane+1)/laneCount;
+                const int top=(placement.startSeconds*m_pixelsPerHour)/3600;
+                placement.widget->setGeometry(left,top,qMax(1,right-left),placement.widget->height());
+            }
+            groupStart=groupEnd;
         }
         if (m_intervalsChanged)
             m_intervalsChanged();
@@ -398,6 +472,7 @@ private:
     QList<ContentsPlayer *> &m_dayContents;
     std::function<void()> m_intervalsChanged;
     std::function<void(ScheduleSlot *)> m_focusSlot;
+    bool m_contentAutoFocusEnabled = true;
 };
 
 class PlannerWeekTabs final : public Frame
@@ -457,6 +532,7 @@ public:
 
         const QStringList days={tr("Lunes"),tr("Martes"),tr("Miércoles"),tr("Jueves"),
                                 tr("Viernes"),tr("Sábado"),tr("Domingo")};
+        ScheduleSlot *exampleFocusSlot=nullptr;
         for (int index=0; index<days.size(); ++index) {
             auto *button=new Button(this);
             button->setObjectName("PlannerDayTab");
@@ -496,6 +572,28 @@ public:
                     m_scrollArea->verticalScrollBar()->setValue(desiredScroll);
                 });
             });
+            if (index==0) {
+                dayPage->setContentAutoFocusEnabled(false);
+                ScheduleSlot *firstExample=dayPage->addSlot("10:00",10*60);
+                ScheduleSlot *secondExample=dayPage->addSlot("10:05",10*60+5);
+                dayContents.append(firstExample->contents());
+                dayContents.append(secondExample->contents());
+
+                auto addExampleTrack=[](ScheduleSlot *slot,const QString &name,double duration) {
+                    auto *track=new AudioItemFilePlanner(slot->contents());
+                    track->setNameFile(name);
+                    track->setFilePath(QString());
+                    track->setSecond(duration);
+                    track->setTiempoFile(duration);
+                    track->setSecondStart(0.0);
+                    slot->contents()->createItem(track);
+                };
+                addExampleTrack(firstExample,tr("Example track A (8 min)"),8*60.0);
+                addExampleTrack(firstExample,tr("Example track B (7 min)"),7*60.0);
+                addExampleTrack(secondExample,tr("Example announcement (3 min)"),3*60.0);
+                dayPage->setContentAutoFocusEnabled(true);
+                exampleFocusSlot=firstExample;
+            }
             m_pages->addWidget(dayPage);
             connect(button,&QPushButton::clicked,m_pages,[this,index]() {
                 m_pages->setCurrentIndex(index);
@@ -507,6 +605,11 @@ public:
         }
         m_timeRuler->setSlotIntervals(
             static_cast<PlannerDayPage*>(m_pages->widget(0))->slotIntervals());
+        if (exampleFocusSlot) {
+            QTimer::singleShot(0,this,[exampleFocusSlot]() {
+                exampleFocusSlot->focusRequested(exampleFocusSlot);
+            });
+        }
 
         layout->addLayout(tabRow);
         layout->addWidget(m_scrollArea,1);

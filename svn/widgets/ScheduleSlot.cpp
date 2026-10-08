@@ -23,6 +23,7 @@
 #include <QTime>
 #include <QWidgetAction>
 #include <QVBoxLayout>
+#include <cmath>
 
 namespace {
 QIcon createColorIcon(const QColor &color)
@@ -66,6 +67,13 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     headerLayout->addWidget(m_time);
     headerLayout->addStretch(1);
 
+    m_duration=new Label(header);
+    m_duration->setObjectName("ScheduleSlotDuration");
+    m_duration->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
+    m_duration->setFixedWidth(72);
+    m_duration->setText("00:00:00");
+    headerLayout->addWidget(m_duration);
+
     auto *closeButton=new Button(header);
     closeButton->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
     closeButton->setFixedSize(15,15);
@@ -82,6 +90,10 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
         menu.setFixedWidth(190);
         QAction *copyAction=menu.addAction(QIcon(":/icons/ActionCopy.svg"),tr("Copy"));
         QAction *cutAction=menu.addAction(QIcon(":/icons/ActionCut.svg"),tr("Cut"));
+        menu.addSeparator();
+        QAction *deleteAction=menu.addAction(QIcon(":/icons/Remove.svg"),tr("Delete"));
+        menu.addSeparator();
+        QAction *propertiesAction=menu.addAction(QIcon(":/icons/properties.svg"),tr("Properties"));
         menu.addSeparator();
         auto *paletteAction=new QWidgetAction(&menu);
         auto *paletteWidget=new QWidget(&menu);
@@ -101,12 +113,12 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
         });
 
         const QVector<QPair<QString,QColor>> colors={
-            {tr("Red"),QColor(231,76,60)},
-            {tr("Orange"),QColor(230,126,34)},
-            {tr("Green"),QColor(124,179,66)},
-            {tr("Blue"),QColor(0,172,193)},
-            {tr("Cyan"),QColor(52,152,219)},
-            {tr("Pink"),QColor(216,27,96)}
+            {tr("Red"),QColor("#8F3545")},
+            {tr("Orange"),QColor("#9A5A2E")},
+            {tr("Green"),QColor("#4A714A")},
+            {tr("Blue"),QColor("#3C5C8A")},
+            {tr("Cyan"),QColor("#286F78")},
+            {tr("Pink"),QColor("#813E67")}
         };
         for (const auto &color : colors) {
             auto *button=new QPushButton(paletteWidget);
@@ -122,11 +134,10 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
         }
         paletteAction->setDefaultWidget(paletteWidget);
         menu.addAction(paletteAction);
-        menu.addSeparator();
-        QAction *propertiesAction=menu.addAction(QIcon(":/icons/properties.svg"),tr("Properties"));
         QAction *chosen=menu.exec(header->mapToGlobal(position));
         if (chosen==copyAction) emit copyRequested(this);
         else if (chosen==cutAction) emit cutRequested(this);
+        else if (chosen==deleteAction) emit closeRequested(this);
         else if (chosen==propertiesAction) emit propertiesRequested(this);
     });
 
@@ -171,6 +182,25 @@ void ScheduleSlot::setEntryTime(int minutesAfterMidnight)
         return;
     m_entryMinute=updatedMinute;
     emit entryTimeChanged();
+}
+
+void ScheduleSlot::setTotalDuration(double seconds, bool known)
+{
+    m_totalDurationSeconds=seconds;
+    m_totalDurationKnown=known && std::isfinite(seconds) && seconds>=0.0;
+    if (!m_totalDurationKnown) {
+        m_duration->setText(QStringLiteral("--:--:--"));
+        return;
+    }
+
+    const qint64 totalSeconds=static_cast<qint64>(std::floor(seconds));
+    const qint64 hours=totalSeconds/3600;
+    const qint64 minutes=(totalSeconds%3600)/60;
+    const qint64 remainingSeconds=totalSeconds%60;
+    m_duration->setText(QStringLiteral("%1:%2:%3")
+        .arg(hours,2,10,QLatin1Char('0'))
+        .arg(minutes,2,10,QLatin1Char('0'))
+        .arg(remainingSeconds,2,10,QLatin1Char('0')));
 }
 
 void ScheduleSlot::setAccentColor(const QColor &color)

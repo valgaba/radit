@@ -35,6 +35,8 @@ AudioItemMaxi *PlannerContents::createItem(AudioItemMaxi *item)
     }
     AudioItemMaxi *created=ContentsPlayer::createItem(item);
     emit contentDurationsChanged();
+    if (created)
+        emit contentAdded();
     return created;
 }
 
@@ -68,6 +70,8 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     QAction *pasteAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),tr("Paste"));
     menu.addSeparator();
     QAction *deleteAction=menu.addAction(QIcon(":/icons/Remove.svg"),tr("Delete"));
+    menu.addSeparator();
+    QAction *propertiesAction=menu.addAction(QIcon(":/icons/properties.svg"),tr("Properties"));
 
     const bool hasTarget=target!=nullptr;
     selectAllAction->setEnabled(!findChildren<AudioItemMaxi*>().isEmpty());
@@ -93,6 +97,9 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
         pasteClipboard();
     else if (chosen==deleteAction)
         deleteSelected();
+    else if (chosen==propertiesAction) {
+        // Reserved for future ScheduleSlot content properties.
+    }
     event->accept();
 }
 
