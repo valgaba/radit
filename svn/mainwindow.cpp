@@ -78,9 +78,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
        quitAction->setShortcut(QKeySequence::Quit);
        quitAction->setMenuRole(QAction::QuitRole);
        connect(quitAction, &QAction::triggered, this, &QWidget::close);
-       menubar->addMenu(tr("&Edit"));
        QMenu *vistasMenu = menubar->addMenu(tr("&View"));
-       menubar->addMenu(tr("&Tools"));
 
 
        // Crear submenús

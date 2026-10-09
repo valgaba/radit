@@ -921,7 +921,17 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     m_positionSlider->setAccessibleName(m_positionSlider->toolTip());
     centerControls->addWidget(m_positionSlider,1,Qt::AlignVCenter);
     m_playbackNameLabel=new Label(secondZone);
+    m_playbackNameLabel->setObjectName("PlannerCurrentAudioLabel");
+    m_playbackNameLabel->setAlignment(Qt::AlignCenter);
     centerControls->addWidget(m_playbackNameLabel,0,Qt::AlignVCenter);
+    m_playbackNameBlinkTimer=new QTimer(this);
+    m_playbackNameBlinkTimer->setInterval(500);
+    connect(m_playbackNameBlinkTimer,&QTimer::timeout,this,[this]() {
+        m_playbackNameBlinkPhase=!m_playbackNameBlinkPhase;
+        m_playbackNameLabel->setStyleSheet(m_playbackNameBlinkPhase
+            ? QStringLiteral("border: 1px solid #ef6d6d;")
+            : QStringLiteral("border: 1px solid transparent;"));
+    });
     connect(m_positionSlider,&QSlider::sliderPressed,this,[this]() {
         m_userIsSeeking=true;
     });
@@ -1361,6 +1371,16 @@ void Planner::updatePlaybackNameLabel()
     const QString name=engine ? m_enginePlaybackNames.value(engine) : QString();
     if (m_playbackNameLabel->text()!=name)
         m_playbackNameLabel->setText(name);
+
+    if (name.isEmpty()) {
+        m_playbackNameBlinkTimer->stop();
+        m_playbackNameBlinkPhase=false;
+        m_playbackNameLabel->setStyleSheet("border: 1px solid transparent;");
+    } else if (!m_playbackNameBlinkTimer->isActive()) {
+        m_playbackNameBlinkPhase=true;
+        m_playbackNameLabel->setStyleSheet("border: 1px solid #ef6d6d;");
+        m_playbackNameBlinkTimer->start();
+    }
 }
 
 void Planner::updateRemainingTimeLabel()
