@@ -567,6 +567,11 @@ bool Player::startSequentialPlayback(ContentsBase *contents, bool repeat)
     return false;
 }
 
+ContentsBase *Player::sequentialContents() const
+{
+    return m_sequenceContents.data();
+}
+
 void Player::stopSequentialPlayback()
 {
     m_sequenceContents.clear();

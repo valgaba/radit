@@ -138,6 +138,8 @@ public:
     AudioItemMaxi* getCurrentItem() const {
         return currentItem;
     }
+    ContentsBase *sequentialContents() const;
+    int sequentialIndex() const { return m_sequenceIndex; }
 
 
     protected:
