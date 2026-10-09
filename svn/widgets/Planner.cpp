@@ -110,10 +110,10 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override
     {
         const int usableHeight=qMax(1,height()-1);
-        const int minute=qBound(0,qRound(event->position().y()*24.0*60/usableHeight),24*60-1);
+        const int second=qBound(0,qRound(event->position().y()*24.0*60*60/usableHeight),24*60*60-1);
         const QTime time(0,0);
         QToolTip::showText(mapToGlobal(event->position().toPoint()),
-                           time.addSecs(minute*60).toString("HH:mm"),this);
+                           time.addSecs(second).toString("HH:mm:ss"),this);
         QWidget::mouseMoveEvent(event);
     }
 
@@ -220,34 +220,35 @@ public:
         if (chosen!=addSlotAction)
             return;
 
-        const int clickedMinute=qBound(0,qRound(timelinePosition.y()*60.0/m_pixelsPerHour),24*60-1);
+        const int clickedSecond=qBound(0,qRound(timelinePosition.y()*3600.0/m_pixelsPerHour),24*60*60-1);
         const QTime suggestedTime(0,0);
-        ScheduleSlotOptionsDialog options(suggestedTime.addSecs(clickedMinute*60),window());
+        ScheduleSlotOptionsDialog options(suggestedTime.addSecs(clickedSecond),window());
         if (options.exec()!=QDialog::Accepted)
             return;
 
         const QTime time=options.entryTime();
-        const int minutesAfterMidnight=time.hour()*60+time.minute();
-        ScheduleSlot *slot=addSlot(time.toString("HH:mm"),minutesAfterMidnight);
+        const int secondsAfterMidnight=time.hour()*3600+time.minute()*60+time.second();
+        ScheduleSlot *slot=addSlot(time.toString("HH:mm:ss"),secondsAfterMidnight);
+        slot->setName(options.name());
         m_dayContents.append(slot->contents());
-        m_scrollArea->ensureVisible(0,(minutesAfterMidnight*m_pixelsPerHour)/60,0,0);
+        m_scrollArea->ensureVisible(0,(secondsAfterMidnight*m_pixelsPerHour)/3600,0,0);
     }
 
-    ScheduleSlot *addSlot(const QString &timeText, int minutesAfterMidnight)
+    ScheduleSlot *addSlot(const QString &timeText, int secondsAfterMidnight)
     {
         auto *slot=new ScheduleSlot(this);
         slot->setTimeText(timeText);
-        slot->setEntryTime(minutesAfterMidnight);
+        slot->setEntryTime(secondsAfterMidnight);
         attachSlot(slot);
         updateSlotPositions();
         slot->show();
         return slot;
     }
 
-    bool hasSlotAtMinute(int minute, const ScheduleSlot *except = nullptr) const
+    bool hasSlotAtTime(int second, const ScheduleSlot *except = nullptr) const
     {
         for (const TimedSlot &entry : m_slots) {
-            if (entry.widget!=except && entry.widget->entryMinute()==minute)
+            if (entry.widget!=except && entry.widget->entrySecond()==second)
                 return true;
         }
         return false;
@@ -307,11 +308,14 @@ private:
             g_scheduleSlotClipboardIsCut=true;
         });
         connect(slot,&ScheduleSlot::propertiesRequested,this,[this](ScheduleSlot *editedSlot) {
-            const QTime currentTime(editedSlot->entryMinute()/60,editedSlot->entryMinute()%60);
-            ScheduleSlotOptionsDialog options(currentTime,window(),editedSlot->isScheduleDisabled(),true);
+            const QTime currentTime=QTime(0,0).addSecs(editedSlot->entrySecond());
+            ScheduleSlotOptionsDialog options(currentTime,window(),
+                                               editedSlot->isScheduleDisabled(),true,
+                                               editedSlot->name());
             if (options.exec()==QDialog::Accepted) {
                 const QTime time=options.entryTime();
-                editedSlot->setEntryTime(time.hour()*60+time.minute());
+                editedSlot->setEntryTime(time.hour()*3600+time.minute()*60+time.second());
+                editedSlot->setName(options.name());
                 editedSlot->setScheduleDisabled(options.isDisabled());
             }
         });
@@ -364,7 +368,7 @@ public:
                 entry.widget->setPriority(false);
             if (entry.widget->isScheduleDisabled())
                 continue;
-            const int startSeconds=entry.widget->entryMinute()*60;
+            const int startSeconds=entry.widget->entrySecond();
             const bool durationKnown=entry.widget->totalDurationKnown()
                 && entry.widget->totalDurationSeconds()>0.0;
             const int durationSeconds=durationKnown
@@ -398,7 +402,8 @@ private:
     ScheduleSlot *cloneSlot(const ScheduleSlot *source, QWidget *parent)
     {
         auto *copy=new ScheduleSlot(parent);
-        copy->setEntryTime(source->entryMinute());
+        copy->setEntryTime(source->entrySecond());
+        copy->setName(source->name());
         copy->setAccentColor(source->accentColor());
         copy->setScheduleDisabled(source->isScheduleDisabled());
         QVBoxLayout *sourceLayout=source->contents()->layout;
@@ -422,8 +427,8 @@ private:
             return;
         }
 
-        const int minute=g_scheduleSlotClipboard->entryMinute();
-        if (hasSlotAtMinute(minute)) {
+        const int second=g_scheduleSlotClipboard->entrySecond();
+        if (hasSlotAtTime(second)) {
             QMessageBox::information(this,tr("Paste schedule slot"),
                                      tr("This day already has a schedule slot at that time."));
             return;
@@ -435,7 +440,7 @@ private:
             updateSlotPositions();
             copy->show();
             m_dayContents.append(copy->contents());
-            m_scrollArea->ensureVisible(0,(minute*m_pixelsPerHour)/60,0,0);
+            m_scrollArea->ensureVisible(0,(second*m_pixelsPerHour)/3600,0,0);
             if (m_focusSlot)
                 m_focusSlot(copy);
             return;
@@ -460,7 +465,7 @@ private:
         sourcePage->updateSlotPositions();
         updateSlotPositions();
         movingSlot->show();
-        m_scrollArea->ensureVisible(0,(minute*m_pixelsPerHour)/60,0,0);
+        m_scrollArea->ensureVisible(0,(second*m_pixelsPerHour)/3600,0,0);
         if (m_focusSlot)
             m_focusSlot(movingSlot);
         g_scheduleSlotClipboard.clear();
@@ -498,7 +503,7 @@ private:
                                            hasContents && durationIsKnown && durationSeconds>0.0);
             if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
                 durationSeconds=3600.0;
-            const int startSeconds=entry.widget->entryMinute()*60;
+            const int startSeconds=entry.widget->entrySecond();
             durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
             const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
             entry.widget->setTimelineHeight(slotHeight);
@@ -654,7 +659,7 @@ public:
                     setZoom(targetScale,false);
 
                 QTimer::singleShot(0,this,[this,slot]() {
-                    const int top=(slot->entryMinute()*m_pixelsPerHour)/60;
+                const int top=(slot->entrySecond()*m_pixelsPerHour)/3600;
                     const int center=top+slot->height()/2;
                     const int desiredScroll=qMax(0,center-m_scrollArea->viewport()->height()/2);
                     m_scrollArea->verticalScrollBar()->setValue(desiredScroll);
@@ -694,19 +699,47 @@ public:
         });
     }
 
-    ScheduleSlot *slotAt(const QDateTime &dateTime)
+    ScheduleSlot *slotStartingAt(const QDateTime &dateTime)
     {
         const int dayIndex=qBound(0,dateTime.date().dayOfWeek()-1,6);
         auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
         if (!day) return nullptr;
-        const int secondOfDay=dateTime.time().hour()*3600
+        const int currentSecond=dateTime.time().hour()*3600
             +dateTime.time().minute()*60+dateTime.time().second();
         const auto intervals=day->slotIntervals(false);
         for (const PlannerSlotInterval &interval : intervals) {
-            if (secondOfDay>=interval.startSeconds && secondOfDay<interval.endSeconds)
+            // Trigger only in the exact scheduled second; late Play never catches
+            // up a schedule whose start time has already passed.
+            if (interval.startSeconds==currentSecond)
                 return interval.slot;
         }
         return nullptr;
+    }
+
+    ScheduleSlot *slotContaining(const QDateTime &dateTime)
+    {
+        const int dayIndex=qBound(0,dateTime.date().dayOfWeek()-1,6);
+        auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+        if (!day) return nullptr;
+        const int currentSecond=dateTime.time().hour()*3600
+            +dateTime.time().minute()*60+dateTime.time().second();
+        for (const PlannerSlotInterval &interval : day->slotIntervals(false)) {
+            if (currentSecond>=interval.startSeconds && currentSecond<interval.endSeconds)
+                return interval.slot;
+        }
+        return nullptr;
+    }
+
+    void showDate(const QDate &date)
+    {
+        const int dayIndex=qBound(0,date.dayOfWeek()-1,6);
+        if (m_pages->currentIndex()==dayIndex)
+            return;
+        if (QAbstractButton *dayButton=m_dayGroup->button(dayIndex))
+            dayButton->setChecked(true);
+        m_pages->setCurrentIndex(dayIndex);
+        m_timeRuler->setSlotIntervals(
+            static_cast<PlannerDayPage*>(m_pages->widget(dayIndex))->slotIntervals());
     }
 
     void updateUpcomingSlot(const QDateTime &now, bool playbackActive)
@@ -758,9 +791,9 @@ protected:
             static_cast<PlannerDayPage*>(m_pages->widget(currentDayIndex))->slotIntervals());
 
         const QTime localTime=QTime::currentTime();
-        const int currentMinute=localTime.hour()*60+localTime.minute();
-        QTimer::singleShot(0,this,[this,currentMinute]() {
-            const int currentY=(currentMinute*m_pixelsPerHour)/60;
+        const int currentSecond=localTime.hour()*3600+localTime.minute()*60+localTime.second();
+        QTimer::singleShot(0,this,[this,currentSecond]() {
+            const int currentY=(currentSecond*m_pixelsPerHour)/3600;
             const int targetScroll=currentY-m_scrollArea->viewport()->height()/2;
             QScrollBar *scrollBar=m_scrollArea->verticalScrollBar();
             scrollBar->setValue(qBound(0,targetScroll,scrollBar->maximum()));
@@ -896,8 +929,6 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         if (engine && m_positionDuration>0.0)
             engine->seekPlaybackPosition(m_positionDuration*m_positionSlider->value()/1000.0);
     });
-    centerControls->addStretch(1);
-
     m_timeLabel=new Label(secondZone);
     m_timeLabel->setObjectName("PlannerTimeLabel");
     m_timeLabel->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
@@ -907,7 +938,7 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     timeFont.setPointSize(16);
     timeFont.setBold(true);
     m_timeLabel->setFont(timeFont);
-    m_timeLabel->setText("00:00:00.00");
+    m_timeLabel->setText("00:00:00");
     centerControls->addWidget(m_timeLabel,0,Qt::AlignVCenter);
     connect(playButton,&QPushButton::clicked,this,[this]() {
         if (m_running) stopPlayback();
@@ -945,7 +976,9 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     fallbackBarLayout->addWidget(fallbackTitle);
     fallbackLayout->addWidget(fallbackBar);
 
-    m_fallbackContents=new PlannerContents(fallbackPanel);
+    auto *fallbackContents=new PlannerContents(fallbackPanel);
+    fallbackContents->setListFileActionsEnabled(true);
+    m_fallbackContents=fallbackContents;
     m_fallbackContents->setObjectName("PlannerFallbackContents");
     fallbackLayout->addWidget(m_fallbackContents,1);
     listsSplitter->addWidget(fallbackPanel);
@@ -980,14 +1013,19 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
             if (engine!=positionEngine()) return;
+            m_currentPlaybackPosition=position;
+            m_currentPlaybackDuration=duration;
             m_positionDuration=duration;
             m_positionSlider->setEnabled(m_running && seekable);
-            if (m_userIsSeeking)
+            if (m_userIsSeeking) {
+                updateRemainingTimeLabel();
                 return;
+            }
             if (seekable && duration>0.0)
                 m_positionSlider->setValue(qBound(0,qRound(position*1000.0/duration),1000));
             else
                 m_positionSlider->setValue(0);
+            updateRemainingTimeLabel();
         });
     }
     connect(m_scheduleEngineA,&Player::sequentialPlaybackFinished,this,[this]() {
@@ -999,14 +1037,20 @@ Planner::Planner(QWidget *parent) : Frame(parent)
 
     m_clockTimer=new QTimer(this);
     m_clockTimer->setInterval(250);
+    m_lastObservedDate=QDate::currentDate();
     connect(m_clockTimer,&QTimer::timeout,this,[this]() {
-        m_timeLabel->setText(QTime::currentTime().toString("HH:mm:ss"));
+        const QDateTime now=QDateTime::currentDateTime();
+        updateRemainingTimeLabel();
+        if (now.date()!=m_lastObservedDate) {
+            m_lastObservedDate=now.date();
+            static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(now.date());
+        }
         if (m_running) checkSchedule();
         static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
-            QDateTime::currentDateTime(),m_running);
+            now,m_running);
     });
     m_clockTimer->start();
-    m_timeLabel->setText(QTime::currentTime().toString("HH:mm:ss"));
+    updateRemainingTimeLabel();
 
     m_fadeTimer=new QTimer(this);
     m_fadeTimer->setInterval(20);
@@ -1057,8 +1101,14 @@ void Planner::setDevicePlay(int device)
 void Planner::startPlayback()
 {
     if (m_running) return;
+    const QDate today=QDate::currentDate();
+    m_lastObservedDate=today;
+    static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(today);
     m_running=true;
     m_triggeredSlots.clear();
+    m_pendingStartSlot.clear();
+    m_currentPlaybackPosition=0.0;
+    m_currentPlaybackDuration=0.0;
     m_triggeredDate=QDate::currentDate().toString("yyyyMMdd");
     m_clockTimer->start();
     m_playButton->SetIcon("Stop.svg");
@@ -1077,6 +1127,10 @@ void Planner::startPlayback()
 void Planner::stopPlayback()
 {
     if (!m_running) return;
+    if (m_activeScheduleSlot)
+        m_activeScheduleSlot->setPlaying(false);
+    if (m_pendingScheduleSlot)
+        m_pendingScheduleSlot->setPlaying(false);
     m_fadeTimer->stop();
     m_fadeFrom=nullptr;
     m_fadeTo=nullptr;
@@ -1088,8 +1142,11 @@ void Planner::stopPlayback()
     m_activeScheduleEngine=nullptr;
     m_activeScheduleSlot.clear();
     m_pendingScheduleSlot.clear();
+    m_pendingStartSlot.clear();
     m_running=false;
     m_positionDuration=0.0;
+    m_currentPlaybackPosition=0.0;
+    m_currentPlaybackDuration=0.0;
     m_userIsSeeking=false;
     m_positionSlider->setValue(0);
     m_positionSlider->setEnabled(false);
@@ -1098,6 +1155,7 @@ void Planner::stopPlayback()
     m_playButton->SetIcon("Play.svg");
     m_playButton->setToolTip(tr("Play Planner"));
     m_playButton->setAccessibleName(m_playButton->toolTip());
+    updateRemainingTimeLabel();
     m_lastStandbyLeft=m_lastStandbyRight=m_lastScheduleLeft=m_lastScheduleRight=-120.0f;
     updatePlannerMeter();
 }
@@ -1108,14 +1166,25 @@ void Planner::checkSchedule()
     if (!weekTabs || !m_running) return;
     const QDateTime now=QDateTime::currentDateTime();
     const QString dayKey=now.date().toString("yyyyMMdd");
-    if (m_triggeredDate!=dayKey) {
+    const bool dateChanged=m_triggeredDate!=dayKey;
+    if (dateChanged) {
         m_triggeredSlots.clear();
         m_triggeredDate=dayKey;
+        m_pendingStartSlot.clear();
     }
-    ScheduleSlot *slot=weekTabs->slotAt(now);
-    if (slot) {
-        const QString key=QStringLiteral("%1-%2")
-            .arg(dayKey).arg(quintptr(slot),0,16);
+    if (ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now))
+        m_pendingStartSlot=dueSlot;
+    if (m_pendingStartSlot && weekTabs->slotContaining(now)!=m_pendingStartSlot)
+        m_pendingStartSlot.clear();
+
+    if (m_pendingStartSlot) {
+        ScheduleSlot *slot=m_pendingStartSlot;
+        // A slot can be edited after it has played. Treat each start time as a
+        // separate daily occurrence so moving it later re-arms it for today.
+        const QString key=QStringLiteral("%1-%2-%3")
+            .arg(dayKey)
+            .arg(quintptr(slot),0,16)
+            .arg(slot->entrySecond());
         if (!m_triggeredSlots.contains(key)) {
             bool voicePackLoading=false;
             for (int index=0; index<slot->contents()->layout->count(); ++index) {
@@ -1135,6 +1204,7 @@ void Planner::checkSchedule()
             }
             if (!voicePackLoading) {
                 m_triggeredSlots.insert(key);
+                m_pendingStartSlot.clear();
                 startScheduleSlot(slot);
             }
         }
@@ -1170,6 +1240,8 @@ void Planner::startScheduleSlot(ScheduleSlot *slot)
     if (!outgoing && m_standbyEngine->getCurrentItem())
         outgoing=m_standbyEngine;
     m_pendingScheduleSlot=slot;
+    slot->setUpcoming(false);
+    slot->setPlaying(true);
     beginCrossfade(outgoing,incoming,m_activeScheduleEngine ? 2 : 1);
 }
 
@@ -1182,6 +1254,10 @@ void Planner::returnToStandby()
         finishCrossfade();
     }
     Player *outgoing=m_activeScheduleEngine;
+    if (m_activeScheduleSlot)
+        m_activeScheduleSlot->setPlaying(false);
+    if (m_pendingScheduleSlot)
+        m_pendingScheduleSlot->setPlaying(false);
     m_activeScheduleEngine=nullptr;
     m_activeScheduleSlot.clear();
     m_pendingScheduleSlot.clear();
@@ -1219,6 +1295,12 @@ void Planner::finishCrossfade()
     m_fadeAction=0;
 
     if (action==1 || action==2) {
+        if (m_activeScheduleSlot && m_activeScheduleSlot!=m_pendingScheduleSlot)
+            m_activeScheduleSlot->setPlaying(false);
+        if (m_pendingScheduleSlot) {
+            m_pendingScheduleSlot->setUpcoming(false);
+            m_pendingScheduleSlot->setPlaying(true);
+        }
         if (from==m_standbyEngine && from->getCurrentItem())
             from->stopSequentialPlayback();
         else if (from && from!=to)
@@ -1233,6 +1315,8 @@ void Planner::finishCrossfade()
                     returnToStandby();
             });
     } else if (action==3) {
+        if (m_activeScheduleSlot)
+            m_activeScheduleSlot->setPlaying(false);
         if (from && from!=m_standbyEngine)
             from->stopSequentialPlayback();
         m_activeScheduleEngine=nullptr;
@@ -1254,5 +1338,72 @@ void Planner::updatePlannerMeter()
         m_vumeter->setLevels(m_lastStandbyLeft,m_lastStandbyRight);
     } else {
         m_vumeter->reset();
+    }
+}
+
+void Planner::updateRemainingTimeLabel()
+{
+    if (!m_timeLabel)
+        return;
+
+    const auto formatTime=[](double seconds) {
+        const qint64 total=qMax<qint64>(0,static_cast<qint64>(std::ceil(seconds)));
+        const qint64 hours=total/3600;
+        const qint64 minutes=(total%3600)/60;
+        const qint64 remainingSeconds=total%60;
+        return QStringLiteral("%1:%2:%3")
+            .arg(hours,2,10,QLatin1Char('0'))
+            .arg(minutes,2,10,QLatin1Char('0'))
+            .arg(remainingSeconds,2,10,QLatin1Char('0'));
+    };
+
+    Player *engine=positionEngine();
+    AudioItemMaxi *current=engine ? engine->getCurrentItem() : nullptr;
+    if (!m_running || !engine || !current) {
+        m_timeLabel->setText("00:00:00");
+        return;
+    }
+
+    double currentDuration=m_currentPlaybackDuration;
+    const double playbackLimit=current->playbackLimitSeconds();
+    if ((!std::isfinite(currentDuration) || currentDuration<=0.0)
+        && std::isfinite(playbackLimit) && playbackLimit>0.0)
+        currentDuration=playbackLimit;
+
+    bool currentRemainingKnown=std::isfinite(currentDuration) && currentDuration>0.0
+        && std::isfinite(m_currentPlaybackPosition) && m_currentPlaybackPosition>=0.0;
+    double remaining=currentRemainingKnown
+        ? qMax(0.0,currentDuration-m_currentPlaybackPosition) : 0.0;
+    bool sequenceRemainingKnown=currentRemainingKnown;
+
+    ContentsBase *contents=engine->sequentialContents();
+    const int currentIndex=engine->sequentialIndex();
+    if (sequenceRemainingKnown && contents && contents->layout
+        && currentIndex>=0 && currentIndex<contents->layout->count()) {
+        for (int index=currentIndex+1; index<contents->layout->count(); ++index) {
+            auto *item=qobject_cast<AudioItemMaxi*>(contents->layout->itemAt(index)->widget());
+            if (!item)
+                continue;
+            double itemDuration=item->playbackLimitSeconds();
+            if (!std::isfinite(itemDuration) || itemDuration<=0.0)
+                itemDuration=item->second();
+            if (!std::isfinite(itemDuration) || itemDuration<=0.0) {
+                sequenceRemainingKnown=false;
+                break;
+            }
+            remaining+=itemDuration;
+        }
+    } else {
+        sequenceRemainingKnown=false;
+    }
+
+    if (sequenceRemainingKnown) {
+        m_timeLabel->setText(formatTime(remaining));
+    } else if (currentRemainingKnown) {
+        m_timeLabel->setText(formatTime(qMax(0.0,currentDuration-m_currentPlaybackPosition)));
+    } else if (current->isLiveStream() && std::isfinite(m_currentPlaybackPosition)) {
+        m_timeLabel->setText(formatTime(m_currentPlaybackPosition));
+    } else {
+        m_timeLabel->setText("--:--:--");
     }
 }

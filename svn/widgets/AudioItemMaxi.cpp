@@ -511,20 +511,6 @@ void AudioItemMaxi::playColor(bool playing){
       this->style()->unpolish(this);
       this->style()->polish(this);
       this->update();
-
-
-    if (playing) {
-           btnplay->SetIcon("Play.svg");
-           btnplay->setIconSize(QSize(30, 30));
-
-       } else {
-           btnplay->SetIcon("Play.svg");
-           btnplay->setIconSize(QSize(30, 30));
-
-
-       }
-
-
 }
 
 

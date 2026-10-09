@@ -11,10 +11,14 @@ public:
     explicit PlannerContents(QWidget *parent = nullptr);
     AudioItemMaxi *createItem(AudioItemMaxi *item) override;
     void deleteItem(AudioItemMaxi *item) override;
+    void setListFileActionsEnabled(bool enabled) { m_listFileActionsEnabled=enabled; }
 
 signals:
     void contentDurationsChanged();
     void contentAdded();
+
+private:
+    bool m_listFileActionsEnabled = false;
 
 protected:
     bool supportsPlaybackOptionsInContextMenu() const override { return false; }

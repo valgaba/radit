@@ -37,9 +37,30 @@ MixGains equalPowerGains(float progress)
     return {std::sin(angle),std::cos(angle)};
 }
 
-AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder)
+AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
+                                      ContentsBase *sequenceContents,
+                                      int sequenceIndex,
+                                      bool sequenceRepeat)
 {
     if (folder->isLoop()) return folder;
+    if (sequenceContents && sequenceContents->layout) {
+        const int count=sequenceContents->layout->count();
+        if (sequenceIndex>=0 && sequenceIndex<count) {
+            for (int offset=1; offset<=count; ++offset) {
+                int candidate=sequenceIndex+offset;
+                if (candidate>=count) {
+                    if (!sequenceRepeat)
+                        return nullptr;
+                    candidate%=count;
+                }
+                auto *item=qobject_cast<AudioItemMaxi*>(
+                    sequenceContents->layout->itemAt(candidate)->widget());
+                if (item)
+                    return item;
+            }
+            return nullptr;
+        }
+    }
     QWidget *owner = folder->parentWidget();
     while (owner && !qobject_cast<ContentsBase*>(owner)) owner = owner->parentWidget();
     auto *contents = qobject_cast<ContentsBase*>(owner);
@@ -645,7 +666,8 @@ bool Player::tryFolderMix(double position)
         || m_userIsSeeking || !mediamanager->isPlaying()) return false;
     const double remaining = m_duration - position;
     if (remaining <= 0.02 || remaining > folder->mixSeconds()) return false;
-    AudioItemMaxi *next = folderTransitionTarget(folder);
+    AudioItemMaxi *next = folderTransitionTarget(
+        folder,m_sequenceContents.data(),m_sequenceIndex,m_sequenceRepeat);
     if (!next) return false;
     m_mixAttempted = true;
     auto *nextFolder = qobject_cast<AudioItemFolderMaxi*>(next);
@@ -703,6 +725,11 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
     if (next != currentItem) {
         currentItem->setPlaying(false); currentItem->playColor(false);
     }
+    if (m_sequenceContents && m_sequenceContents->layout && next!=currentItem) {
+        const int nextIndex=m_sequenceContents->layout->indexOf(next);
+        if (nextIndex>=0)
+            m_sequenceIndex=nextIndex;
+    }
     mediamanager = incoming;
     bindMediaManager();
     connect(m_outgoingManager, &MediaManager::playbackFinished, this, [this, outgoing = m_outgoingManager]() {
@@ -731,7 +758,11 @@ void Player::finishPendingMix()
 {
     auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
     if (!folder || !m_pendingMixItem || !folder->mixEnabled()
-        || folderTransitionTarget(folder) != m_pendingMixItem) { cancelPendingMix(); return; }
+        || folderTransitionTarget(folder,m_sequenceContents.data(),m_sequenceIndex,
+                                  m_sequenceRepeat) != m_pendingMixItem) {
+        cancelPendingMix();
+        return;
+    }
     if (!mediamanager->isPlaying()) return; // Pause also holds a connection that becomes ready.
     MediaManager *incoming = m_pendingMixManager;
     if (!incoming || incoming->isLoading()) return;

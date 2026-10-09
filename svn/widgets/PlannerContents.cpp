@@ -112,6 +112,13 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     QAction *deleteAction=menu.addAction(QIcon(":/icons/Remove.svg"),tr("Delete"));
     menu.addSeparator();
     QAction *propertiesAction=menu.addAction(QIcon(":/icons/settings.svg"),tr("Properties"));
+    QAction *loadListAction=nullptr;
+    QAction *saveListAction=nullptr;
+    if (m_listFileActionsEnabled) {
+        menu.addSeparator();
+        loadListAction=menu.addAction(tr("Load list"));
+        saveListAction=menu.addAction(tr("Save list"));
+    }
 
     const bool hasTarget=target!=nullptr;
     selectAllAction->setEnabled(!findChildren<AudioItemMaxi*>().isEmpty());
@@ -147,6 +154,10 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     else if (chosen==propertiesAction) {
         // Reserved for future ScheduleSlot content properties.
     }
+    else if (chosen==loadListAction)
+        loadItems();
+    else if (chosen==saveListAction)
+        saveItems();
     event->accept();
 }
 

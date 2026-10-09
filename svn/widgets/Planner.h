@@ -2,6 +2,7 @@
 #define PLANNER_H
 
 #include <QList>
+#include <QDate>
 #include <QPointer>
 #include <QSet>
 #include <QElapsedTimer>
@@ -57,14 +58,18 @@ private:
     Player *m_fadeTo = nullptr;
     QPointer<ScheduleSlot> m_activeScheduleSlot;
     QPointer<ScheduleSlot> m_pendingScheduleSlot;
+    QPointer<ScheduleSlot> m_pendingStartSlot;
     QTimer *m_clockTimer = nullptr;
     QTimer *m_fadeTimer = nullptr;
     QElapsedTimer m_fadeClock;
     QSet<QString> m_triggeredSlots;
     QString m_triggeredDate;
+    QDate m_lastObservedDate;
     bool m_running = false;
     bool m_userIsSeeking = false;
     double m_positionDuration = 0.0;
+    double m_currentPlaybackPosition = 0.0;
+    double m_currentPlaybackDuration = 0.0;
     int m_fadeAction = 0;
     int m_fadeDurationMs = 1800;
     float m_lastStandbyLeft = -120.0f;
@@ -79,6 +84,7 @@ private:
     void beginCrossfade(Player *from, Player *to, int action);
     void finishCrossfade();
     void updatePlannerMeter();
+    void updateRemainingTimeLabel();
     Player *positionEngine() const;
 };
 

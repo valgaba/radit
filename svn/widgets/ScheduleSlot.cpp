@@ -71,9 +71,15 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
 
     m_time=new Label(header);
     m_time->setObjectName("ScheduleSlotTime");
-    m_time->setText("10:00");
+    m_time->setText("10:00:00");
     m_time->installEventFilter(this);
     headerLayout->addWidget(m_time);
+
+    m_nameLabel=new Label(header);
+    m_nameLabel->setObjectName("ScheduleSlotNameLabel");
+    headerLayout->addWidget(m_nameLabel,1);
+    m_name=defaultName();
+    m_nameLabel->setText(m_name);
 
     m_priorityIndicator=new Label(header);
     m_priorityIndicator->setObjectName("ScheduleSlotPriorityIndicator");
@@ -97,6 +103,19 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     m_duration->setFixedWidth(72);
     m_duration->setText("00:00:00");
     headerLayout->addWidget(m_duration);
+
+    auto *propertiesButton=new Button(header);
+    propertiesButton->setObjectName("ScheduleSlotPropertiesButton");
+    propertiesButton->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
+    propertiesButton->setFixedSize(20,20);
+    propertiesButton->SetIcon("settings.svg");
+    propertiesButton->setIconSize(QSize(16,16));
+    propertiesButton->setToolTip(tr("Schedule slot properties"));
+    propertiesButton->setAccessibleName(propertiesButton->toolTip());
+    headerLayout->addWidget(propertiesButton);
+    connect(propertiesButton,&QPushButton::clicked,this,[this]() {
+        emit propertiesRequested(this);
+    });
 
     auto *closeButton=new Button(header);
     closeButton->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
@@ -202,21 +221,41 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
 
 void ScheduleSlot::setTimeText(const QString &time)
 {
-    const QTime parsed=QTime::fromString(time,"HH:mm");
+    QTime parsed=QTime::fromString(time,"HH:mm:ss");
+    if (!parsed.isValid())
+        parsed=QTime::fromString(time,"HH:mm");
     if (parsed.isValid())
-        setEntryTime(parsed.hour()*60+parsed.minute());
+        setEntryTime(parsed.hour()*3600+parsed.minute()*60+parsed.second());
     else
         m_time->setText(time);
 }
 
-void ScheduleSlot::setEntryTime(int minutesAfterMidnight)
+void ScheduleSlot::setEntryTime(int secondsAfterMidnight)
 {
-    const int updatedMinute=qBound(0,minutesAfterMidnight,24*60-1);
-    m_time->setText(QTime(0,0).addSecs(updatedMinute*60).toString("HH:mm"));
-    if (updatedMinute==m_entryMinute)
+    const int updatedSecond=qBound(0,secondsAfterMidnight,24*60*60-1);
+    m_time->setText(QTime(0,0).addSecs(updatedSecond).toString("HH:mm:ss"));
+    if (updatedSecond==m_entrySecond)
         return;
-    m_entryMinute=updatedMinute;
+    m_entrySecond=updatedSecond;
+    if (!m_nameCustomized) {
+        m_name=defaultName();
+        m_nameLabel->setText(m_name);
+    }
     emit entryTimeChanged();
+}
+
+QString ScheduleSlot::defaultName() const
+{
+    return tr("Pauta de las %1")
+        .arg(QTime(0,0).addSecs(m_entrySecond).toString("HH:mm"));
+}
+
+void ScheduleSlot::setName(const QString &name)
+{
+    const QString cleaned=name.trimmed();
+    m_nameCustomized=!cleaned.isEmpty() && cleaned!=defaultName();
+    m_name=m_nameCustomized ? cleaned : defaultName();
+    m_nameLabel->setText(m_name);
 }
 
 void ScheduleSlot::setTotalDuration(double seconds, bool known)
@@ -246,16 +285,22 @@ void ScheduleSlot::setAccentColor(const QColor &color)
 
 void ScheduleSlot::updateHeaderAppearance()
 {
+    QString backgroundColor=QStringLiteral("#4e4d7a");
     if (m_disabled) {
-        m_header->setStyleSheet(QStringLiteral("QFrame#framebarra { background-color: #343846; }"));
-    } else if (m_upcoming && m_blinkPhase) {
-        m_header->setStyleSheet(QStringLiteral("QFrame#framebarra { background-color: #80A4AE; }"));
+        backgroundColor=QStringLiteral("#343846");
     } else if (m_accentColor.isValid()) {
-        m_header->setStyleSheet(QStringLiteral("QFrame#framebarra { background-color: %1; }")
-                                    .arg(m_accentColor.name(QColor::HexRgb)));
-    } else {
-        m_header->setStyleSheet(QString());
+        backgroundColor=m_accentColor.name(QColor::HexRgb);
     }
+
+    const bool alert=m_playing || (m_upcoming && m_blinkPhase);
+    if (alert && !m_disabled)
+        backgroundColor=QStringLiteral("#e5484d");
+    const QString alertTextStyle=alert && !m_disabled
+        ? QStringLiteral(" QFrame#framebarra QLabel { color: #ffffff; }")
+        : QString();
+    m_header->setStyleSheet(QStringLiteral(
+        "QFrame#framebarra { background-color: %1; border: none; }%2")
+        .arg(backgroundColor,alertTextStyle));
 }
 
 void ScheduleSlot::setTimelineHeight(int height)
@@ -309,6 +354,16 @@ void ScheduleSlot::setUpcoming(bool upcoming)
     } else {
         m_upcomingBlinkTimer->stop();
     }
+    updateHeaderAppearance();
+}
+
+void ScheduleSlot::setPlaying(bool playing)
+{
+    if (m_playing==playing)
+        return;
+    m_playing=playing;
+    if (m_playing)
+        setUpcoming(false);
     updateHeaderAppearance();
 }
 

@@ -1269,6 +1269,7 @@ QMenu::separator{
 #Capture Frame#framebarra,
 #Cast Frame#framebarra,
 #MeteoClock Frame#framebarra,
+#Planner Frame#framebarra,
 #FolderPropertiesFrame Frame#framebarra {
     background-color: #4e4d7a;
     border: none;
@@ -1278,12 +1279,19 @@ QMenu::separator{
 #Capture QLabel#PanelTitle,
 #Cast QLabel#PanelTitle,
 #MeteoClock QLabel#PanelTitle,
+#Planner QLabel#PanelTitle,
 #FolderPropertiesFrame QLabel#PanelTitle {
     font-size: 14px;
     color: #8a8d96;
     background: transparent;
     border: none;
     padding: 2px;
+}
+
+#FilePropertiesFrame Frame#framebarra { background-color: #4e4d7a; border: none; }
+#FilePropertiesFrame QLabel#PanelTitle {
+    font-size: 14px; font-weight: bold; color: #e3e5ed;
+    background: transparent; border: none; padding: 2px 7px;
 }
 
 #Capture {
@@ -1580,6 +1588,81 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
 
 /* Cast: audio input and Icecast transmitter. */
 #Cast { background-color: #181e2c; border: 1px solid #333b4f; }
+#Planner { background-color: #181e2c; border: 1px solid #333b4f; }
+#Planner Frame#PlannerZoneOne, #Planner Frame#PlannerZoneTwo {
+    background-color: #181e2c; border: none; border-bottom: 1px solid #333b4f;
+}
+#Planner Frame#PlannerZoneThree, #Planner Frame#PlannerDayContents {
+    background-color: #181e2c; border: none;
+}
+#Planner Label#PlannerTimeLabel { color: #8a8d96; background: transparent; border: none; }
+#Planner Label#PlannerCurrentAudioLabel { color: #8a8d96; background: transparent; border: none; padding: 0 4px; }
+#Planner Button#PlannerDayTab {
+    color: #8a8d96; border: 1px solid #686b74; background-color: #262c3b;
+    padding: 3px; text-align: center;
+}
+#Planner Button#PlannerDayTab:checked { background-color: #39385b; }
+#Planner Button#PlannerDayTab:hover { border-color: #7885a6; }
+#Planner QStackedWidget#PlannerDayPages { background-color: #181e2c; border: 1px solid #333b4f; }
+#Planner Frame#ScheduleSlot { background-color: #282020; border: 1px solid #333b4f; }
+#Planner Frame#ScheduleSlot Frame#framebarra { background-color: #4e4d7a; border: none; }
+#Planner Frame#ScheduleSlot[scheduleDisabled="true"] { background-color: #20242e; border-color: #454955; }
+#Planner Frame#ScheduleSlot[scheduleDisabled="true"] QLabel { color: #686b74; }
+#Planner Frame#ScheduleSlot[scheduleDisabled="true"] QScrollArea#ScheduleSlotContainer,
+#Planner Frame#ScheduleSlot[scheduleDisabled="true"] QWidget#ScheduleSlotContents { background-color: #20242e; }
+#Planner Frame#ScheduleSlot[scheduleDisabled="true"] AudioItemFilePlanner { background-color: #20242e; border-color: #454955; }
+#Planner Frame#ScheduleSlot[scheduleDisabled="true"] AudioItemFilePlanner Label { color: #686b74; }
+#Planner Button#ScheduleSlotToggleContents {
+    background-color: #262c3b; color: #80A4AE; border: 1px solid #686b74;
+    padding: 0px; font-family: "Segoe UI", sans-serif; font-size: 17px;
+}
+#Planner Button#ScheduleSlotToggleContents:hover { border-color: #7885a6; }
+#Planner Button#ScheduleSlotToggleContents:pressed { background-color: #1d2230; }
+#Planner QLabel#ScheduleSlotTime { color: #c5c7d0; background: transparent; border: none; }
+#Planner QLabel#ScheduleSlotPriorityIndicator {
+    color: #80A4AE; background: transparent; border: none; font-size: 14px; font-weight: bold; padding: 0 6px;
+}
+#Planner QScrollArea#ScheduleSlotContainer { background-color: #282020; border: none; }
+#Planner QWidget#ScheduleSlotContents { background-color: #282020; border: none; }
+#Planner AudioItemFilePlanner {
+    background-color: #262c3b; border: 1px solid #333b4f;
+}
+#Planner AudioItemFilePlanner Label {
+    color: #8a8d96; background: transparent; border: none; padding: 0 4px;
+}
+#Planner AudioItemFilePlanner[playing="true"],
+#Planner AudioItemFolderPlanner[playing="true"],
+#Planner AudioItemNetPlanner[playing="true"],
+#Planner AudioItemMeteoClockPlanner[playing="true"] {
+    border: 2px solid #3ad5ff;
+}
+#Planner QWidget#PlannerFallbackContents { background-color: #181e2c; border: none; }
+#ScheduleSlotOptionsDialog {
+    background-color: #181e2c; color: #8a8d96; border: 1px solid #333b4f;
+}
+#ScheduleSlotOptionsDialog Frame#framebarra { background-color: #4e4d7a; border: none; }
+#ScheduleSlotOptionsDialog QLabel { color: #8a8d96; background: transparent; border: none; }
+#ScheduleSlotOptionsDialog QLineEdit {
+    background-color: #252b39; color: #80A4AE; border: 1px solid #535b6a;
+    min-height: 20px; padding: 2px 5px; font-size: 12px;
+}
+#ScheduleSlotOptionsDialog QLineEdit:focus { border-color: #80A4AE; }
+#ScheduleSlotOptionsDialog QTimeEdit {
+    background-color: #252b39; color: #80A4AE; border: 1px solid #535b6a;
+    min-height: 20px; padding: 2px 5px; font-size: 12px;
+}
+#ScheduleSlotOptionsDialog QTimeEdit:focus { border-color: #80A4AE; }
+#ScheduleSlotOptionsDialog QCheckBox { color: #8a8d96; spacing: 6px; }
+#ScheduleSlotOptionsDialog QCheckBox::indicator {
+    width: 14px; height: 14px; border: 1px solid #686b74; background-color: #262c3b;
+}
+#ScheduleSlotOptionsDialog QCheckBox::indicator:checked { background-color: #80A4AE; border-color: #80A4AE; }
+#ScheduleSlotOptionsDialog QPushButton {
+    background-color: #262c3b; color: #80A4AE; border: 1px solid #535b6a;
+    font-size: 12px; padding: 2px 6px;
+}
+#ScheduleSlotOptionsDialog QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
+#ScheduleSlotOptionsDialog QPushButton:pressed { background-color: #1d2230; }
 #Cast QLabel, #Cast QCheckBox {
     color: #8a8d96; background: transparent; border: none; font-size: 12px;
 }
@@ -1595,40 +1678,46 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
 
 /* Online radio item properties. */
 QDialog#OnlineRadioDialog {
-    background-color: #262c3b;
-    border: 1px solid #686b74;
+    background-color: #181e2c;
+    border: 1px solid #333b4f;
+}
+#OnlineRadioDialog Frame#framebarra {
+    background-color: #4e4d7a;
+    border: none;
+}
+#OnlineRadioDialog QLabel#PanelTitle {
+    color: #8a8d96;
+    font-size: 12px;
+    font-weight: bold;
 }
 #OnlineRadioDialog QLabel {
     background: transparent;
     border: none;
     color: #8a8d96;
-    font-size: 14px;
+    font-size: 12px;
 }
-#OnlineRadioDialog QLineEdit {
-    background-color: #181e2c;
-    border: 1px solid #686b74;
+#OnlineRadioDialog QLineEdit, #OnlineRadioDialog QTimeEdit {
+    background-color: #252b39;
+    border: 1px solid #535b6a;
     border-radius: 3px;
-    padding: 5px 6px;
+    padding: 2px 6px;
     color: #80A4AE;
-    font-size: 14px;
+    font-size: 12px;
     selection-background-color: #4e4d7a;
     selection-color: #ffffff;
 }
-#OnlineRadioDialog QLineEdit:focus { border-color: #80A4AE; }
-#OnlineRadioDialog QDialogButtonBox { background: transparent; border: none; }
-#OnlineRadioDialog QPushButton {
-    min-width: 80px;
-    padding: 5px 12px;
+#OnlineRadioDialog QLineEdit:focus, #OnlineRadioDialog QTimeEdit:focus { border-color: #80A4AE; }
+#OnlineRadioDialog Button {
+    padding: 2px 6px;
     border: 1px solid #686b74;
     border-radius: 3px;
     background-color: #262c3b;
     color: #80A4AE;
-    font-size: 14px;
+    font-size: 12px;
 }
-#OnlineRadioDialog QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
-#OnlineRadioDialog QPushButton:pressed { background-color: #1d2230; }
-#OnlineRadioDialog QPushButton:default { border-color: #80A4AE; }
-#OnlineRadioDialog QPushButton:disabled { color: #686b74; border-color: #333b4f; }
+#OnlineRadioDialog Button:hover { border-color: #80A4AE; background-color: #30384b; }
+#OnlineRadioDialog Button:pressed { background-color: #1d2230; }
+#OnlineRadioDialog Button:disabled { color: #686b74; border-color: #333b4f; }
 
 /* Audio folder properties. */
 Frame#FolderPropertiesFrame { background-color: #181e2c; border: 1px solid #333b4f; }
@@ -1650,6 +1739,18 @@ Frame#FolderPropertiesFrame { background-color: #181e2c; border: 1px solid #333b
 #FolderPropertiesFrame QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
 #FolderPropertiesFrame QPushButton:pressed { background-color: #1d2230; }
 #FolderPropertiesFrame QPushButton:disabled, #FolderPropertiesFrame QLineEdit:disabled { color: #686b74; border-color: #333b4f; }
+
+/* Audio file properties. */
+Frame#FilePropertiesFrame { background-color: #181e2c; border: 1px solid #333b4f; }
+#FilePropertiesFrame QLabel#FilePropertyName {
+    background: transparent; border: none; color: #c2c8d4; font-size: 13px; font-weight: bold;
+}
+#FilePropertiesFrame QLabel#FilePropertyValue, #FilePropertiesFrame QLabel#FilePropertyPath {
+    background-color: #252b39; border: 1px solid #535b6a; padding: 4px 7px;
+    color: #d4e1e4; font-size: 13px; font-weight: normal;
+    selection-background-color: #4e4d7a; selection-color: white;
+}
+#FilePropertiesFrame QLabel#FilePropertyPath { min-height: 42px; }
 
 /* MeteoClock: local clock and weather. */
 #MeteoClock { background-color: #181e2c; border: 1px solid #333b4f; }

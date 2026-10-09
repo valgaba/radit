@@ -11,11 +11,13 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QCheckBox>
+#include <QLineEdit>
 #include <QTimeEdit>
 #include <QVBoxLayout>
 
 ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent,
-                                                     bool disabled, bool editing)
+                                                     bool disabled, bool editing,
+                                                     const QString &name)
     : QDialog(parent)
 {
     setObjectName("ScheduleSlotOptionsDialog");
@@ -23,7 +25,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     setWindowModality(Qt::WindowModal);
     setModal(true);
     setWindowTitle(tr("Schedule slot options"));
-    resize(340, 160);
+    resize(360, 195);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -58,10 +60,16 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     form->setContentsMargins(0, 0, 0, 0);
     form->setHorizontalSpacing(12);
     form->setVerticalSpacing(8);
+    m_name=new QLineEdit(content);
+    m_name->setObjectName("ScheduleSlotName");
+    m_name->setText(name.isEmpty()
+                        ? tr("Pauta de las %1").arg(initialTime.toString("HH:mm"))
+                        : name);
+    form->addRow(tr("Name"),m_name);
     m_entryTime = new QTimeEdit(initialTime, content);
     m_entryTime->setObjectName("ScheduleSlotEntryTime");
-    m_entryTime->setDisplayFormat("HH:mm");
-    m_entryTime->setTimeRange(QTime(0, 0), QTime(23, 59));
+    m_entryTime->setDisplayFormat("HH:mm:ss");
+    m_entryTime->setTimeRange(QTime(0, 0, 0), QTime(23, 59, 59));
     form->addRow(tr("Entry time"), m_entryTime);
     m_disabled = new QCheckBox(tr("Disable this schedule slot"), content);
     m_disabled->setObjectName("ScheduleSlotDisabledCheckBox");
@@ -91,6 +99,11 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
 QTime ScheduleSlotOptionsDialog::entryTime() const
 {
     return m_entryTime->time();
+}
+
+QString ScheduleSlotOptionsDialog::name() const
+{
+    return m_name->text().trimmed();
 }
 
 bool ScheduleSlotOptionsDialog::isDisabled() const
