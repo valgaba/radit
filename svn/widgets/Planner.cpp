@@ -27,6 +27,8 @@
 #include <QFontMetrics>
 #include <QPainter>
 #include <QPaintEvent>
+#include <QFrame>
+#include <QEvent>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -80,6 +82,77 @@ struct PlannerSlotInterval {
     bool priority = false;
     bool durationKnown = true;
     ScheduleSlot *slot = nullptr;
+};
+
+class PlannerCurrentTimeLine final : public QFrame
+{
+public:
+    explicit PlannerCurrentTimeLine(QWidget *timelineCanvas)
+        : QFrame(timelineCanvas)
+    {
+        setObjectName("PlannerCurrentTimeLine");
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_AlwaysStackOnTop);
+        setAttribute(Qt::WA_StyledBackground);
+        setFixedHeight(2);
+        setAutoFillBackground(true);
+        QPalette linePalette=palette();
+        linePalette.setColor(QPalette::Window,Qt::white);
+        setPalette(linePalette);
+        setStyleSheet(QStringLiteral(
+            "QFrame#PlannerCurrentTimeLine { background-color: white; border: none; }"));
+        timelineCanvas->installEventFilter(this);
+        updateLineGeometry();
+        hide();
+    }
+
+    void setTimePosition(qreal y)
+    {
+        if (qFuzzyCompare(m_y + 1.0, y + 1.0))
+            return;
+        m_y=y;
+        updateLineGeometry();
+    }
+
+    void setLineActive(bool active)
+    {
+        if (m_active==active) {
+            if (active) {
+                if (!isVisible())
+                    show();
+                raise();
+            }
+            return;
+        }
+        m_active=active;
+        if (active) {
+            show();
+            raise();
+        } else {
+            hide();
+        }
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (watched==parentWidget() && event->type()==QEvent::Resize)
+            updateLineGeometry();
+        return QFrame::eventFilter(watched,event);
+    }
+
+private:
+    void updateLineGeometry()
+    {
+        QWidget *canvas=parentWidget();
+        if (!canvas)
+            return;
+        const int y=qBound(0,qRound(m_y),qMax(0,canvas->height()-height()));
+        setGeometry(0,y,canvas->width(),height());
+    }
+
+    qreal m_y = 0.0;
+    bool m_active = false;
 };
 
 class PlannerTimeRuler final : public QWidget
@@ -231,7 +304,8 @@ public:
         ScheduleSlot *slot=addSlot(time.toString("HH:mm:ss"),secondsAfterMidnight);
         slot->setName(options.name());
         m_dayContents.append(slot->contents());
-        m_scrollArea->ensureVisible(0,(secondsAfterMidnight*m_pixelsPerHour)/3600,0,0);
+        if (m_focusSlot)
+            m_focusSlot(slot);
     }
 
     ScheduleSlot *addSlot(const QString &timeText, int secondsAfterMidnight)
@@ -285,6 +359,12 @@ private:
                 QMessageBox::No);
             if (answer!=QMessageBox::Yes)
                 return;
+
+            QWidget *owner=this;
+            while (owner && !qobject_cast<Planner*>(owner))
+                owner=owner->parentWidget();
+            if (auto *planner=qobject_cast<Planner*>(owner))
+                planner->prepareForScheduleSlotRemoval(closingSlot);
 
             m_dayContents.removeAll(closingSlot->contents());
             for (qsizetype index=m_slots.size()-1; index>=0; --index) {
@@ -502,7 +582,7 @@ private:
             entry.widget->setTotalDuration(durationSeconds,
                                            hasContents && durationIsKnown && durationSeconds>0.0);
             if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
-                durationSeconds=3600.0;
+                durationSeconds=15.0*60.0;
             const int startSeconds=entry.widget->entrySecond();
             durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
             const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
@@ -658,9 +738,12 @@ public:
                 if (targetScale!=m_pixelsPerHour)
                     setZoom(targetScale,false);
 
-                QTimer::singleShot(0,this,[this,slot]() {
-                const int top=(slot->entrySecond()*m_pixelsPerHour)/3600;
-                    const int center=top+slot->height()/2;
+                QPointer<ScheduleSlot> pendingSlot=slot;
+                QTimer::singleShot(0,this,[this,pendingSlot]() {
+                    if (!pendingSlot)
+                        return;
+                    const int top=(pendingSlot->entrySecond()*m_pixelsPerHour)/3600;
+                    const int center=top+pendingSlot->height()/2;
                     const int desiredScroll=qMax(0,center-m_scrollArea->viewport()->height()/2);
                     m_scrollArea->verticalScrollBar()->setValue(desiredScroll);
                 });
@@ -691,6 +774,7 @@ public:
         zoomBar->addWidget(m_zoomIn);
         layout->addWidget(zoomBarWidget);
         setZoom(150,false);
+        m_currentTimeLine=new PlannerCurrentTimeLine(m_timelineCanvas);
         connect(m_zoomIn,&QPushButton::clicked,this,[this]() {
             if (m_pixelsPerHour<1600) setZoom(m_pixelsPerHour*2,true);
         });
@@ -775,6 +859,24 @@ public:
             m_upcomingSlot->setUpcoming(true);
     }
 
+    void updateCurrentTime(const QDateTime &now, bool playbackActive,
+                           bool centerInViewport = false)
+    {
+        if (!m_currentTimeLine)
+            return;
+        const qint64 elapsedMilliseconds=now.time().msecsSinceStartOfDay();
+        const qreal y=static_cast<qreal>(elapsedMilliseconds)*m_pixelsPerHour/3600000.0;
+        m_currentTimeLine->setTimePosition(y);
+        m_currentTimeLine->setLineActive(playbackActive);
+        if (playbackActive && centerInViewport) {
+            const int target=qRound(y)-m_scrollArea->viewport()->height()/2;
+            QTimer::singleShot(0,this,[this,target]() {
+                QScrollBar *scrollBar=m_scrollArea->verticalScrollBar();
+                scrollBar->setValue(qBound(0,target,scrollBar->maximum()));
+            });
+        }
+    }
+
 protected:
     void showEvent(QShowEvent *event) override
     {
@@ -828,6 +930,7 @@ private:
     QWidget *m_timelineCanvas = nullptr;
     QHBoxLayout *m_timelineLayout = nullptr;
     PlannerTimeRuler *m_timeRuler = nullptr;
+    PlannerCurrentTimeLine *m_currentTimeLine = nullptr;
     QScrollArea *m_scrollArea = nullptr;
     Button *m_zoomIn = nullptr;
     Button *m_zoomOut = nullptr;
@@ -1064,6 +1167,7 @@ Planner::Planner(QWidget *parent) : Frame(parent)
             static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(now.date());
         }
         if (m_running) checkSchedule();
+        static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(now,m_running);
         static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
             now,m_running);
     });
@@ -1100,6 +1204,30 @@ bool Planner::setVolume(float volume)
     return true;
 }
 
+void Planner::prepareForScheduleSlotRemoval(ScheduleSlot *slot)
+{
+    if (!slot)
+        return;
+    if (m_pendingStartSlot==slot)
+        m_pendingStartSlot.clear();
+    if (m_activeScheduleSlot==slot || m_pendingScheduleSlot==slot)
+        stopPlayback();
+}
+
+void Planner::prepareForContentRemoval(ContentsBase *contents, AudioItemMaxi *item)
+{
+    if (!contents || !item || !m_running)
+        return;
+    for (Player *engine : {m_standbyEngine,m_scheduleEngineA,m_scheduleEngineB}) {
+        if (engine && engine->sequentialContents()==contents
+            && engine->getCurrentItem()==item) {
+            // Stop all Planner engines before the current widget is destroyed.
+            stopPlayback();
+            return;
+        }
+    }
+}
+
 Player *Planner::positionEngine() const
 {
     if (!m_running)
@@ -1123,6 +1251,8 @@ void Planner::startPlayback()
     m_lastObservedDate=today;
     static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(today);
     m_running=true;
+    static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(
+        QDateTime::currentDateTime(),true,true);
     m_triggeredSlots.clear();
     m_pendingStartSlot.clear();
     m_currentPlaybackPosition=0.0;
@@ -1162,6 +1292,8 @@ void Planner::stopPlayback()
     m_pendingScheduleSlot.clear();
     m_pendingStartSlot.clear();
     m_running=false;
+    static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(
+        QDateTime::currentDateTime(),false);
     updatePlaybackNameLabel();
     m_positionDuration=0.0;
     m_currentPlaybackPosition=0.0;
@@ -1209,7 +1341,7 @@ void Planner::checkSchedule()
             for (int index=0; index<slot->contents()->layout->count(); ++index) {
                 auto *item=qobject_cast<AudioItemMeteoClockMaxi*>(
                     slot->contents()->layout->itemAt(index)->widget());
-                if (!item)
+                if (!item || !item->announcesWeather())
                     continue;
                 if (item->isLoading()) {
                     voicePackLoading=true;

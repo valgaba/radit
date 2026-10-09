@@ -639,6 +639,9 @@ void Player::advanceSequence()
         return;
     }
     const int count=contents->layout->count();
+    const int currentLayoutIndex=contents->layout->indexOf(currentItem);
+    if (currentLayoutIndex>=0)
+        m_sequenceIndex=currentLayoutIndex;
     const int next=m_sequenceIndex+1;
     if (count<=0 || (next>=count && !m_sequenceRepeat)) {
         stopMain();

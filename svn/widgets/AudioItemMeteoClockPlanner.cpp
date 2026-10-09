@@ -8,7 +8,7 @@ AudioItemMeteoClockPlanner::AudioItemMeteoClockPlanner(QWidget *parent)
     : AudioItemMeteoClockMaxi(parent)
 {
     setObjectName("AudioItemMeteoClockPlanner");
-    setCompactPresentation();
+    setCompactPresentation(true);
 }
 
 AudioItemMeteoClockPlanner::AudioItemMeteoClockPlanner(const AudioItemMeteoClockMaxi &source,
@@ -24,6 +24,7 @@ AudioItemMeteoClockPlanner::AudioItemMeteoClockPlanner(const AudioItemMeteoClock
     setIsSelect(source.isSelect());
     setColor(source.color());
     setToolTip(source.toolTip());
+    setAnnouncementOptions(source.announcesTime(),source.announcesWeather());
 }
 
 AudioItemMaxi *AudioItemMeteoClockPlanner::copy(QWidget *newParent) const

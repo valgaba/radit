@@ -18,6 +18,8 @@ class Button;
 class Slider;
 class QTimer;
 class ScheduleSlot;
+class AudioItemMaxi;
+class ContentsBase;
 
 class Planner : public Frame
 {
@@ -33,6 +35,8 @@ public:
     void setDevicePlay(int device);
     void setDeviceCue(int device) { m_deviceCue=device; }
     bool setVolume(float volume);
+    void prepareForScheduleSlotRemoval(ScheduleSlot *slot);
+    void prepareForContentRemoval(ContentsBase *contents, AudioItemMaxi *item);
 
 signals:
     void propertiesRequested();

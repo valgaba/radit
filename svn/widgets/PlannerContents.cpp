@@ -3,6 +3,7 @@
    SPDX-License-Identifier: GPL-3.0-or-later
 */
 #include "widgets/PlannerContents.h"
+#include "widgets/Planner.h"
 #include "widgets/AudioItem.h"
 #include "widgets/AudioItemFilePlanner.h"
 #include "widgets/AudioItemFileMaxi.h"
@@ -82,6 +83,11 @@ void PlannerContents::deleteItem(AudioItemMaxi *item)
 {
     if (!item)
         return;
+    QWidget *owner=parentWidget();
+    while (owner && !qobject_cast<Planner*>(owner))
+        owner=owner->parentWidget();
+    if (auto *planner=qobject_cast<Planner*>(owner))
+        planner->prepareForContentRemoval(this,item);
     ContentsPlayer::deleteItem(item);
     emit contentDurationsChanged();
 }

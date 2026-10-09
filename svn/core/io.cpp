@@ -69,6 +69,10 @@ QJsonArray saveItems(QLayout *layout)
             object["mixEnabled"] = folder->mixEnabled();
             object["mixSeconds"] = folder->mixSeconds();
         }
+        if (auto *meteo = qobject_cast<AudioItemMeteoClockMaxi*>(item)) {
+            object["announceTime"] = meteo->announcesTime();
+            object["announceWeather"] = meteo->announcesWeather();
+        }
         items.append(object);
     }
     return items;
@@ -94,7 +98,12 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
             folderItem->setFolderPath(path);
             folderItem->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
         }
-        if (meteo) static_cast<AudioItemMeteoClockMaxi*>(item)->setVoicePackPath(path);
+        if (meteo) {
+            auto *meteoItem=static_cast<AudioItemMeteoClockMaxi*>(item);
+            meteoItem->setVoicePackPath(path);
+            meteoItem->setAnnouncementOptions(object["announceTime"].toBool(true),
+                                              object["announceWeather"].toBool(true));
+        }
         item->setFilePath(path);
         item->setToolTip(path);
         item->setNameFile(object["name"].toString());

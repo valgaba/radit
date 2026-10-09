@@ -1613,11 +1613,13 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
 #Planner Frame#ScheduleSlot[scheduleDisabled="true"] AudioItemFilePlanner { background-color: #20242e; border-color: #454955; }
 #Planner Frame#ScheduleSlot[scheduleDisabled="true"] AudioItemFilePlanner Label { color: #686b74; }
 #Planner Button#ScheduleSlotToggleContents {
-    background-color: #262c3b; color: #80A4AE; border: 1px solid #686b74;
+    background-color: transparent; color: #80A4AE; border: none;
     padding: 0px; font-family: "Segoe UI", sans-serif; font-size: 17px;
 }
-#Planner Button#ScheduleSlotToggleContents:hover { border-color: #7885a6; }
-#Planner Button#ScheduleSlotToggleContents:pressed { background-color: #1d2230; }
+#Planner Button#ScheduleSlotToggleContents:hover { background-color: transparent; }
+#Planner Button#ScheduleSlotToggleContents:pressed {
+    background-color: transparent; border: none; font-size: 13px;
+}
 #Planner QLabel#ScheduleSlotTime { color: #c5c7d0; background: transparent; border: none; }
 #Planner QLabel#ScheduleSlotPriorityIndicator {
     color: #80A4AE; background: transparent; border: none; font-size: 14px; font-weight: bold; padding: 0 6px;
@@ -1652,6 +1654,14 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
     min-height: 20px; padding: 2px 5px; font-size: 12px;
 }
 #ScheduleSlotOptionsDialog QTimeEdit:focus { border-color: #80A4AE; }
+#ScheduleSlotOptionsDialog QTimeEdit::up-button,
+#ScheduleSlotOptionsDialog QTimeEdit::down-button {
+    width: 0px; height: 0px; padding: 0px; border: none; image: none;
+}
+#ScheduleSlotOptionsDialog QTimeEdit::up-arrow,
+#ScheduleSlotOptionsDialog QTimeEdit::down-arrow {
+    width: 0px; height: 0px; image: none;
+}
 #ScheduleSlotOptionsDialog QCheckBox { color: #8a8d96; spacing: 6px; }
 #ScheduleSlotOptionsDialog QCheckBox::indicator {
     width: 14px; height: 14px; border: 1px solid #686b74; background-color: #262c3b;
@@ -1707,6 +1717,14 @@ QDialog#OnlineRadioDialog {
     selection-color: #ffffff;
 }
 #OnlineRadioDialog QLineEdit:focus, #OnlineRadioDialog QTimeEdit:focus { border-color: #80A4AE; }
+#OnlineRadioDialog QTimeEdit::up-button,
+#OnlineRadioDialog QTimeEdit::down-button {
+    width: 0px; height: 0px; padding: 0px; border: none; image: none;
+}
+#OnlineRadioDialog QTimeEdit::up-arrow,
+#OnlineRadioDialog QTimeEdit::down-arrow {
+    width: 0px; height: 0px; image: none;
+}
 #OnlineRadioDialog Button {
     padding: 2px 6px;
     border: 1px solid #686b74;
@@ -1764,3 +1782,26 @@ Frame#FilePropertiesFrame { background-color: #181e2c; border: 1px solid #333b4f
 #MeteoClock Button:disabled { color: #686b74; border-color: #333b4f; }
 #MeteoClock QLineEdit { background-color: #252b39; color: #80A4AE; border: 1px solid #535b6a; min-height: 20px; padding: 2px 5px; font-size: 12px; }
 #MeteoClock QLineEdit:focus { border-color: #80A4AE; }
+
+/* MeteoClock item properties. */
+Frame#MeteoClockPropertiesFrame { background-color: #181e2c; border: 1px solid #333b4f; }
+#MeteoClockPropertiesFrame QLabel, #MeteoClockPropertiesFrame QCheckBox {
+    background: transparent; border: none; color: #8a8d96; font-size: 12px;
+}
+#MeteoClockPropertiesFrame QLineEdit {
+    background-color: #252b39; border: 1px solid #535b6a;
+    padding: 2px 6px; min-height: 20px; color: #80A4AE; font-size: 12px;
+    selection-background-color: #4e4d7a; selection-color: white;
+}
+#MeteoClockPropertiesFrame QLineEdit:focus { border-color: #80A4AE; }
+#MeteoClockPropertiesFrame QCheckBox::indicator {
+    width: 13px; height: 13px; border: 1px solid #686b74;
+    border-radius: 2px; background: #181e2c;
+}
+#MeteoClockPropertiesFrame QCheckBox::indicator:checked { background: #80A4AE; border-color: #80A4AE; }
+#MeteoClockPropertiesFrame QPushButton {
+    padding: 2px 6px; border: 1px solid #686b74;
+    background-color: #262c3b; color: #80A4AE; font-size: 12px;
+}
+#MeteoClockPropertiesFrame QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
+#MeteoClockPropertiesFrame QPushButton:pressed { background-color: #1d2230; }
