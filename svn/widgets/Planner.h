@@ -2,6 +2,7 @@
 #define PLANNER_H
 
 #include <QList>
+#include <QHash>
 #include <QDate>
 #include <QPointer>
 #include <QSet>
@@ -43,6 +44,7 @@ private:
     ContentsPlayer *m_fallbackContents = nullptr;
     QList<ContentsPlayer *> m_dayContents;
     FrameOptionsPlayer *m_optionsPanel = nullptr;
+    Label *m_playbackNameLabel = nullptr;
     Label *m_timeLabel = nullptr;
     int m_devicePlay = 0;
     int m_deviceCue = 0;
@@ -56,6 +58,7 @@ private:
     Player *m_activeScheduleEngine = nullptr;
     Player *m_fadeFrom = nullptr;
     Player *m_fadeTo = nullptr;
+    QHash<Player *, QString> m_enginePlaybackNames;
     QPointer<ScheduleSlot> m_activeScheduleSlot;
     QPointer<ScheduleSlot> m_pendingScheduleSlot;
     QPointer<ScheduleSlot> m_pendingStartSlot;
@@ -84,6 +87,7 @@ private:
     void beginCrossfade(Player *from, Player *to, int action);
     void finishCrossfade();
     void updatePlannerMeter();
+    void updatePlaybackNameLabel();
     void updateRemainingTimeLabel();
     Player *positionEngine() const;
 };

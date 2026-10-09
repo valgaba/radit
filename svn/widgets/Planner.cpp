@@ -920,6 +920,8 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     m_positionSlider->setToolTip(tr("Seek the current Planner audio"));
     m_positionSlider->setAccessibleName(m_positionSlider->toolTip());
     centerControls->addWidget(m_positionSlider,1,Qt::AlignVCenter);
+    m_playbackNameLabel=new Label(secondZone);
+    centerControls->addWidget(m_playbackNameLabel,0,Qt::AlignVCenter);
     connect(m_positionSlider,&QSlider::sliderPressed,this,[this]() {
         m_userIsSeeking=true;
     });
@@ -1009,6 +1011,12 @@ Planner::Planner(QWidget *parent) : Frame(parent)
                 m_lastScheduleLeft=left; m_lastScheduleRight=right;
             }
             updatePlannerMeter();
+        });
+        connect(engine,&Player::currentPlaybackNameChanged,this,
+                [this,engine](const QString &name) {
+            m_enginePlaybackNames.insert(engine,name);
+            if (engine==positionEngine())
+                updatePlaybackNameLabel();
         });
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
@@ -1144,6 +1152,7 @@ void Planner::stopPlayback()
     m_pendingScheduleSlot.clear();
     m_pendingStartSlot.clear();
     m_running=false;
+    updatePlaybackNameLabel();
     m_positionDuration=0.0;
     m_currentPlaybackPosition=0.0;
     m_currentPlaybackDuration=0.0;
@@ -1281,6 +1290,7 @@ void Planner::beginCrossfade(Player *from, Player *to, int action)
     m_fadeClock.restart();
     m_fadeTimer->start();
     if (!from && to) to->setVolume(0.0f);
+    updatePlaybackNameLabel();
     updatePlannerMeter();
 }
 
@@ -1323,6 +1333,7 @@ void Planner::finishCrossfade()
         m_activeScheduleSlot.clear();
         if (to) to->setVolume(m_volume);
     }
+    updatePlaybackNameLabel();
     updatePlannerMeter();
 }
 
@@ -1339,6 +1350,17 @@ void Planner::updatePlannerMeter()
     } else {
         m_vumeter->reset();
     }
+}
+
+void Planner::updatePlaybackNameLabel()
+{
+    if (!m_playbackNameLabel)
+        return;
+
+    Player *engine=positionEngine();
+    const QString name=engine ? m_enginePlaybackNames.value(engine) : QString();
+    if (m_playbackNameLabel->text()!=name)
+        m_playbackNameLabel->setText(name);
 }
 
 void Planner::updateRemainingTimeLabel()

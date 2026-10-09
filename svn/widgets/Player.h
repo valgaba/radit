@@ -158,6 +158,7 @@ public:
     void sequentialPlaybackFinished();
     void audioLevelsChanged(float left, float right);
     void playbackProgressChanged(double position, double duration, bool seekable);
+    void currentPlaybackNameChanged(const QString &name);
 
 
 };

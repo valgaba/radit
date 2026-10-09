@@ -569,6 +569,7 @@ void Player::playItem(AudioItemMaxi *item)
        startPlaybackLimit(item->playbackLimitSeconds());
        slider->setEnabled(!mediamanager->isNetworkSource());
        labelnombre->setText(item->playbackName());
+       emit currentPlaybackNameChanged(labelnombre->text());
        btnpause->SetIcon("Pausemini.svg");
 }
 
@@ -746,6 +747,7 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
     m_duration = incoming->getDuration();
     slider->setEnabled(!incoming->isNetworkSource());
     labelnombre->setText(next->playbackName());
+    emit currentPlaybackNameChanged(labelnombre->text());
     btnpause->SetIcon("Pausemini.svg");
     m_mixDurationMs = std::max(1, qRound(1000.0 * std::min({folder->mixSeconds(), remaining, available / 2.0})));
     m_mixElapsedMs = 0; m_mixProgress = 0.0f; m_mixAttempted = false;
@@ -874,6 +876,7 @@ void Player::stopMain()
         currentItem = nullptr;
 
         labelnombre->setText("");
+        emit currentPlaybackNameChanged(QString());
         labeltiempo->setText("00:00:00.00");
         emit playbackProgressChanged(0.0,0.0,false);
 
