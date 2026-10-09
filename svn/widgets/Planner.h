@@ -52,6 +52,7 @@ private:
     Button *m_playButton = nullptr;
     Slider *m_positionSlider = nullptr;
     VuMeter *m_vumeter = nullptr;
+    QTimer *m_playbackNameBlinkTimer = nullptr;
     Player *m_standbyEngine = nullptr;
     Player *m_scheduleEngineA = nullptr;
     Player *m_scheduleEngineB = nullptr;
@@ -70,6 +71,7 @@ private:
     QDate m_lastObservedDate;
     bool m_running = false;
     bool m_userIsSeeking = false;
+    bool m_playbackNameBlinkPhase = false;
     double m_positionDuration = 0.0;
     double m_currentPlaybackPosition = 0.0;
     double m_currentPlaybackDuration = 0.0;

@@ -8,7 +8,7 @@ AudioItemFilePlanner::AudioItemFilePlanner(QWidget *parent)
     : AudioItemFileMaxi(parent)
 {
     setObjectName("AudioItemFilePlanner");
-    setCompactPresentation();
+    setCompactPresentation(true);
 }
 
 AudioItemMaxi *AudioItemFilePlanner::copy(QWidget *newParent) const

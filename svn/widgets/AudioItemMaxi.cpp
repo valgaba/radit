@@ -327,8 +327,11 @@ void AudioItemMaxi::setCompactPresentation(bool showProperties)
     layout->setSpacing(0);
 
     framecenter->setFixedHeight(28);
-    btnplay->setFixedSize(23,23);
-    btnplay->setIconSize(QSize(18,18));
+    // Planner entries are scheduled items, not transport controls. Keep the
+    // play button out of their compact presentation so the name has room.
+    layoutcenterleft->removeWidget(btnplay);
+    btnplay->hide();
+    framecenterleft->hide();
     labelnombre->setFixedHeight(26);
     labeltiempo->setFixedHeight(26);
     labeltiempo->setFixedWidth(78);

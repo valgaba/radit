@@ -114,6 +114,7 @@ public:
      virtual QString playbackPath() const { return filePath(); }
      virtual QString playbackName() const { return nameFile(); }
      void setIsSelect(bool value) override;
+    void triggerProperties() { if (btnproperties) btnproperties->click(); }
 
 
     void setIsPlayNext(bool isPlayNext) {

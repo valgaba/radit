@@ -93,9 +93,16 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     QWidget *target=childAt(event->pos());
     while (target && !qobject_cast<AudioItemMaxi*>(target))
         target=target->parentWidget();
-    bool hasSelection=false;
-    for (AudioItemMaxi *item : findChildren<AudioItemMaxi*>())
-        hasSelection|=item->isSelect();
+    auto *contextItem=qobject_cast<AudioItemMaxi*>(target);
+    const auto items=findChildren<AudioItemMaxi*>();
+    QList<AudioItemMaxi*> selectedItems;
+    for (AudioItemMaxi *item : items) {
+        if (item->isSelect())
+            selectedItems.append(item);
+    }
+    const bool hasContent=!items.isEmpty();
+    const bool hasSelection=!selectedItems.isEmpty();
+    const bool hasActionTarget=contextItem!=nullptr;
 
     Menu menu(this);
     menu.setFixedWidth(190);
@@ -120,13 +127,19 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
         saveListAction=menu.addAction(tr("Save list"));
     }
 
-    const bool hasTarget=target!=nullptr;
-    selectAllAction->setEnabled(!findChildren<AudioItemMaxi*>().isEmpty());
+    const bool hasTarget=contextItem!=nullptr;
+    selectAllAction->setEnabled(hasContent);
     unselectAllAction->setEnabled(hasSelection);
+    selectAction->setVisible(hasTarget);
     selectAction->setEnabled(hasTarget);
-    copyAction->setEnabled(hasSelection||hasTarget);
-    cutAction->setEnabled(hasSelection||hasTarget);
-    deleteAction->setEnabled(hasSelection||hasTarget);
+    copyAction->setVisible(hasTarget);
+    cutAction->setVisible(hasTarget);
+    deleteAction->setVisible(hasActionTarget);
+    propertiesAction->setVisible(hasTarget);
+    copyAction->setEnabled(hasActionTarget);
+    cutAction->setEnabled(hasActionTarget);
+    deleteAction->setEnabled(hasActionTarget);
+    propertiesAction->setEnabled(hasActionTarget);
     pasteAction->setEnabled(!clipboard.lista.isEmpty());
 
     QAction *chosen=menu.exec(mapToGlobal(event->pos()));
@@ -152,11 +165,15 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     else if (chosen==deleteAction)
         deleteSelected();
     else if (chosen==propertiesAction) {
-        // Reserved for future ScheduleSlot content properties.
+        AudioItemMaxi *item=contextItem;
+        if (!item && !selectedItems.isEmpty())
+            item=selectedItems.constFirst();
+        if (item)
+            item->triggerProperties();
     }
-    else if (chosen==loadListAction)
+    else if (loadListAction && chosen==loadListAction)
         loadItems();
-    else if (chosen==saveListAction)
+    else if (saveListAction && chosen==saveListAction)
         saveItems();
     event->accept();
 }

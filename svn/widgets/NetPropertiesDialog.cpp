@@ -10,6 +10,7 @@
 #include "core/MediaManager.h"
 
 #include <QDialogButtonBox>
+#include <QAbstractSpinBox>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -77,6 +78,7 @@ NetPropertiesDialog::NetPropertiesDialog(const QString &name, const QString &url
     form->addRow(tr("Stream URL"),m_url);
     if (connectionDurationSeconds>=0) {
         m_connectionDuration=new QTimeEdit(QTime(0,0).addSecs(connectionDurationSeconds),content);
+        m_connectionDuration->setButtonSymbols(QAbstractSpinBox::NoButtons);
         m_connectionDuration->setDisplayFormat("HH:mm:ss");
         m_connectionDuration->setMinimumTime(QTime(0,0,1));
         m_connectionDuration->setMaximumTime(QTime(23,59,59));

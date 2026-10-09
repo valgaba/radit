@@ -12,6 +12,7 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLineEdit>
+#include <QAbstractSpinBox>
 #include <QTimeEdit>
 #include <QVBoxLayout>
 
@@ -68,6 +69,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     form->addRow(tr("Name"),m_name);
     m_entryTime = new QTimeEdit(initialTime, content);
     m_entryTime->setObjectName("ScheduleSlotEntryTime");
+    m_entryTime->setButtonSymbols(QAbstractSpinBox::NoButtons);
     m_entryTime->setDisplayFormat("HH:mm:ss");
     m_entryTime->setTimeRange(QTime(0, 0, 0), QTime(23, 59, 59));
     form->addRow(tr("Entry time"), m_entryTime);
