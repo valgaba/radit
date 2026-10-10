@@ -19,6 +19,7 @@
 #include "widgets/menu.h"
 #include "widgets/vumeter.h"
 #include "widgets/slider.h"
+#include "core/io.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QSplitter>
@@ -33,6 +34,7 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QToolTip>
 #include <QTimer>
 #include <QAction>
@@ -49,6 +51,11 @@
 #include <QRadioButton>
 #include <QGridLayout>
 #include <QDialog>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QLineEdit>
+#include <QTimeEdit>
+#include <QAbstractSpinBox>
 #include "widgets/scrollbar.h"
 #include <functional>
 #include <cmath>
@@ -70,6 +77,18 @@ public:
         setModal(true);
         setWindowTitle(tr("Paste schedule slot special"));
         resize(390,285);
+        setStyleSheet(QStringLiteral(
+            "QDialog#ScheduleSlotPasteDialog { background:#181e2c; border:1px solid #77859a; }"
+            "QDialog#ScheduleSlotPasteDialog QLabel, QRadioButton, QCheckBox { color:#8a8d96; }"
+            "QDialog#ScheduleSlotPasteDialog QRadioButton, QCheckBox { spacing:6px; }"
+            "QDialog#ScheduleSlotPasteDialog QRadioButton::indicator, QCheckBox::indicator {"
+            " width:13px; height:13px; border:1px solid #626b7e; background:#202838; }"
+            "QDialog#ScheduleSlotPasteDialog QRadioButton::indicator:checked,"
+            "QDialog#ScheduleSlotPasteDialog QCheckBox::indicator:checked { background:#80A4AE; }"
+            "QDialog#ScheduleSlotPasteDialog Frame#framebarra { background:#4e4d7a; border:none; }"
+            "QDialog#ScheduleSlotPasteDialog QPushButton { color:#8a8d96; background:#282f40;"
+            " border:1px solid #626b7e; padding:2px 7px; }"
+            "QDialog#ScheduleSlotPasteDialog QPushButton:hover { border-color:#80A4AE; background:#30384b; }"));
 
         auto *root=new QVBoxLayout(this);
         root->setContentsMargins(0,0,0,0);
@@ -176,6 +195,107 @@ private:
     QRadioButton *m_specificDays = nullptr;
     Button *m_pasteButton = nullptr;
     QList<QCheckBox*> m_days;
+};
+
+class StandbyListEventDialog final : public QDialog
+{
+public:
+    StandbyListEventDialog(const QTime &time, const QString &path, QWidget *parent = nullptr)
+        : QDialog(parent)
+    {
+        setObjectName("StandbyListEventDialog");
+        setWindowFlags(Qt::Dialog|Qt::FramelessWindowHint);
+        setWindowModality(Qt::WindowModal);
+        setModal(true);
+        setWindowTitle(tr("Standby list event"));
+        resize(410,160);
+        setStyleSheet(QStringLiteral(
+            "QDialog#StandbyListEventDialog { background:#181e2c; border:1px solid #77859a; }"
+            "QDialog#StandbyListEventDialog QLabel { color:#8a8d96; background:transparent; }"
+            "QDialog#StandbyListEventDialog QLineEdit, QTimeEdit { color:#80A4AE; background:#282f40;"
+            " border:1px solid #3c4558; padding:3px; }"
+            "QDialog#StandbyListEventDialog QTimeEdit::up-button, QTimeEdit::down-button { width:0; }"
+            "QDialog#StandbyListEventDialog QPushButton { color:#8a8d96; background:#282f40;"
+            " border:1px solid #626b7e; padding:2px 7px; }"
+            "QDialog#StandbyListEventDialog QPushButton:hover { border-color:#80A4AE; background:#30384b; }"
+            "QDialog#StandbyListEventDialog Frame#framebarra { background:#4e4d7a; border:none; }"));
+
+        auto *root=new QVBoxLayout(this);
+        root->setContentsMargins(0,0,0,0);
+        root->setSpacing(0);
+        auto *titleBar=new Frame(this);
+        titleBar->setObjectName("framebarra");
+        titleBar->setFixedHeight(25);
+        auto *titleLayout=new QHBoxLayout(titleBar);
+        titleLayout->setContentsMargins(5,0,3,0);
+        auto *title=new Label(titleBar);
+        title->setText(windowTitle());
+        titleLayout->addWidget(title);
+        titleLayout->addStretch(1);
+        auto *close=new Button(titleBar);
+        close->setStyleSheet("QPushButton { border:none; background:transparent; padding:0; }");
+        close->setFixedSize(15,15);
+        close->SetIcon("Close-hover.svg");
+        close->setIconSize(QSize(15,15));
+        titleLayout->addWidget(close);
+        connect(close,&QPushButton::clicked,this,&QDialog::reject);
+        root->addWidget(titleBar);
+
+        auto *body=new QWidget(this);
+        auto *form=new QGridLayout(body);
+        form->setContentsMargins(12,12,12,8);
+        form->setHorizontalSpacing(10);
+        form->setVerticalSpacing(9);
+        auto *timeLabel=new Label(body);
+        timeLabel->setText(tr("Entry time"));
+        m_time=new QTimeEdit(body);
+        m_time->setDisplayFormat("HH:mm:ss");
+        m_time->setButtonSymbols(QAbstractSpinBox::NoButtons);
+        m_time->setTime(time.isValid() ? time : QTime::currentTime());
+        form->addWidget(timeLabel,0,0);
+        form->addWidget(m_time,0,1,1,2);
+        auto *listLabel=new Label(body);
+        listLabel->setText(tr("Standby list"));
+        m_path=new QLineEdit(path,body);
+        m_path->setReadOnly(true);
+        auto *browse=new Button(body);
+        browse->setText(tr("Browse…"));
+        browse->setFixedSize(80,25);
+        form->addWidget(listLabel,1,0);
+        form->addWidget(m_path,1,1);
+        form->addWidget(browse,1,2);
+        connect(browse,&QPushButton::clicked,this,[this]() {
+            const QString selected=QFileDialog::getOpenFileName(
+                this,tr("Choose standby list"),m_path->text(),tr("Radit List (*.list);;All files (*)"));
+            if (!selected.isEmpty()) m_path->setText(QFileInfo(selected).absoluteFilePath());
+        });
+        root->addWidget(body,1);
+
+        auto *buttons=new QHBoxLayout;
+        buttons->setContentsMargins(12,0,12,10);
+        buttons->addStretch(1);
+        auto *cancel=new Button(this);
+        cancel->setText(tr("Cancel"));
+        cancel->setFixedSize(75,24);
+        auto *accept=new Button(this);
+        accept->setText(tr("Save"));
+        accept->setFixedSize(75,24);
+        buttons->addWidget(cancel);
+        buttons->addWidget(accept);
+        root->addLayout(buttons);
+        connect(cancel,&QPushButton::clicked,this,&QDialog::reject);
+        connect(accept,&QPushButton::clicked,this,[this]() {
+            if (m_path->text().isEmpty()) return;
+            QDialog::accept();
+        });
+    }
+
+    QTime entryTime() const { return m_time->time(); }
+    QString listPath() const { return m_path->text(); }
+
+private:
+    QTimeEdit *m_time = nullptr;
+    QLineEdit *m_path = nullptr;
 };
 
 void showPopupBelow(QWidget *anchor, QWidget *popup)
@@ -411,6 +531,8 @@ public:
         Menu menu(this);
         menu.setFixedWidth(200);
         QAction *addSlotAction=menu.addAction(QIcon(":/icons/Add.svg"),tr("Add schedule slot"));
+        QAction *addStandbyEventAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),
+                                                       tr("Add standby list event"));
         QAction *pasteSlotAction=nullptr;
         QAction *pasteSpecialAction=nullptr;
         if (g_scheduleSlotClipboard) {
@@ -427,6 +549,24 @@ public:
         }
         if (chosen==pasteSpecialAction) {
             pasteScheduleSlotSpecial();
+            return;
+        }
+        if (chosen==addStandbyEventAction) {
+            const int clickedSecond=qBound(0,qRound(timelinePosition.y()*3600.0/m_pixelsPerHour),24*60*60-1);
+            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(clickedSecond),QString(),window());
+            if (eventOptions.exec()!=QDialog::Accepted)
+                return;
+            const QTime time=eventOptions.entryTime();
+            const int second=time.hour()*3600+time.minute()*60+time.second();
+            if (hasSlotAtTime(second)) {
+                QMessageBox::information(this,tr("Standby list event"),
+                                         tr("This day already has a schedule slot at that time."));
+                return;
+            }
+            ScheduleSlot *event=addSlot(time.toString("HH:mm:ss"),second);
+            event->setStandbyListPath(eventOptions.listPath());
+            event->setAccentColor(QColor("#3C5C8A"));
+            if (m_focusSlot) m_focusSlot(event);
             return;
         }
         if (chosen!=addSlotAction)
@@ -471,7 +611,8 @@ public:
     {
         for (const TimedSlot &entry : m_slots) {
             ScheduleSlot *slot=entry.widget;
-            if (!slot || slot->isScheduleDisabled() || slot->contents()->layout->count()==0)
+            if (!slot || slot->isScheduleDisabled()
+                || (slot->contents()->layout->count()==0 && !slot->isStandbyListChangeEvent()))
                 continue;
             const int delay=slot->entrySecond()*1000-nowMilliseconds;
             if (delay>=-250 && delay<=windowMilliseconds)
@@ -550,6 +691,21 @@ private:
         });
         connect(slot,&ScheduleSlot::propertiesRequested,this,[this](ScheduleSlot *editedSlot) {
             const QTime currentTime=QTime(0,0).addSecs(editedSlot->entrySecond());
+            if (editedSlot->isStandbyListChangeEvent()) {
+                StandbyListEventDialog options(currentTime,editedSlot->standbyListPath(),window());
+                if (options.exec()==QDialog::Accepted) {
+                    const QTime time=options.entryTime();
+                    const int second=time.hour()*3600+time.minute()*60+time.second();
+                    if (hasSlotAtTime(second,editedSlot)) {
+                        QMessageBox::information(this,tr("Standby list event"),
+                                                 tr("This day already has a schedule slot at that time."));
+                        return;
+                    }
+                    editedSlot->setEntryTime(second);
+                    editedSlot->setStandbyListPath(options.listPath());
+                }
+                return;
+            }
             ScheduleSlotOptionsDialog options(currentTime,window(),
                                                editedSlot->isScheduleDisabled(),true,
                                                editedSlot->name());
@@ -612,6 +768,12 @@ public:
             const int startSeconds=entry.widget->entrySecond();
             const bool durationKnown=entry.widget->totalDurationKnown()
                 && entry.widget->totalDurationSeconds()>0.0;
+            if (entry.widget->isStandbyListChangeEvent()) {
+                intervals.append({entry.widget->entrySecond(),
+                                  qMin(24*60*60,entry.widget->entrySecond()+1),
+                                  false,true,entry.widget});
+                continue;
+            }
             const int durationSeconds=durationKnown
                 ? qRound(entry.widget->totalDurationSeconds())
                 : qMax(1,qRound(entry.widget->height()*3600.0/m_pixelsPerHour));
@@ -628,6 +790,10 @@ public:
             PlannerSlotInterval &interval=intervals[index];
             if (updatePriorityIndicators)
                 interval.slot->setPriority(false);
+            // A standby-list change only updates the fallback playlist. It
+            // neither interrupts scheduled audio nor participates in priority.
+            if (interval.slot->isStandbyListChangeEvent())
+                continue;
             if (activeIndex>=0 && intervals.at(activeIndex).endSeconds>interval.startSeconds) {
                 interval.priority=true;
                 if (updatePriorityIndicators)
@@ -647,6 +813,7 @@ private:
         copy->setName(source->name());
         copy->setAccentColor(source->accentColor());
         copy->setScheduleDisabled(source->isScheduleDisabled());
+        copy->setStandbyListPath(source->standbyListPath());
         QVBoxLayout *sourceLayout=source->contents()->layout;
         for (int index=0; index<sourceLayout->count(); ++index) {
             QWidget *widget=sourceLayout->itemAt(index)->widget();
@@ -839,6 +1006,13 @@ private:
         QList<Placement> placements;
 
         for (const TimedSlot &entry : m_slots) {
+            if (entry.widget->isStandbyListChangeEvent()) {
+                entry.widget->setTotalDuration(0.0,true);
+                entry.widget->setTimelineHeight(27);
+                const int second=entry.widget->entrySecond();
+                placements.append({entry.widget,second,second+1,0});
+                continue;
+            }
             double durationSeconds=0.0;
             const bool hasContents=entry.widget->contents()->layout->count()>0;
             bool durationIsKnown=hasContents;
@@ -857,7 +1031,9 @@ private:
             }
             entry.widget->setTotalDuration(durationSeconds,
                                            hasContents && durationIsKnown && durationSeconds>0.0);
-            if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
+            if (entry.widget->isStandbyListChangeEvent())
+                durationSeconds=1.0;
+            else if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
                 durationSeconds=15.0*60.0;
             const int startSeconds=entry.widget->entrySecond();
             durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
@@ -976,6 +1152,9 @@ public:
         m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_scrollArea->setWidget(m_timelineCanvas);
+        m_scrollArea->viewport()->installEventFilter(this);
+        m_timelineCanvas->installEventFilter(this);
+        m_timeRuler->installEventFilter(this);
         connect(m_timeRuler,&QWidget::customContextMenuRequested,this,[this](const QPoint &position) {
             auto *dayPage=static_cast<PlannerDayPage*>(m_pages->currentWidget());
             if (!dayPage)
@@ -1138,7 +1317,10 @@ public:
                 continue;
             const int secondsFromNow=dayOffset*24*60*60-currentSecond;
             for (const PlannerSlotInterval &interval : day->slotIntervals(false)) {
-                if (!interval.slot || interval.slot->contents()->layout->count()==0)
+                if (!interval.slot || (interval.slot->contents()->layout->count()==0
+                                       && !interval.slot->isStandbyListChangeEvent()))
+                    continue;
+                if (interval.slot->isStandbyListChangeEvent())
                     continue;
                 const int untilStart=secondsFromNow+interval.startSeconds;
                 if (untilStart<=0 || untilStart>300 || untilStart>=closestSeconds)
@@ -1176,6 +1358,29 @@ public:
     }
 
 protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type()==QEvent::Wheel
+            && (watched==m_scrollArea->viewport() || watched==m_timelineCanvas
+                || watched==m_timeRuler)) {
+            auto *wheel=static_cast<QWheelEvent*>(event);
+            if (wheel->modifiers().testFlag(Qt::ControlModifier)) {
+                const int delta=wheel->angleDelta().y()!=0
+                    ? wheel->angleDelta().y() : wheel->pixelDelta().y()*6;
+                if (delta!=0) {
+                    const double steps=double(delta)/120.0;
+                    const int targetScale=qRound(m_pixelsPerHour*std::pow(1.25,steps));
+                    const int anchorY=m_scrollArea->viewport()->mapFromGlobal(
+                        wheel->globalPosition().toPoint()).y();
+                    setZoom(targetScale,true,anchorY);
+                }
+                wheel->accept();
+                return true;
+            }
+        }
+        return Frame::eventFilter(watched,event);
+    }
+
     void showEvent(QShowEvent *event) override
     {
         Frame::showEvent(event);
@@ -1201,7 +1406,7 @@ protected:
     }
 
 private:
-    void setZoom(int pixelsPerHour, bool preserveScrollPosition)
+    void setZoom(int pixelsPerHour, bool preserveScrollPosition, int anchorViewportY = -1)
     {
         const int oldScale=m_pixelsPerHour;
         const int oldScroll=m_scrollArea->verticalScrollBar()->value();
@@ -1216,7 +1421,9 @@ private:
         m_zoomIn->setEnabled(m_pixelsPerHour<6400);
 
         if (preserveScrollPosition && oldScale>0) {
-            const int target=(oldScroll*m_pixelsPerHour)/oldScale;
+            const int target=anchorViewportY>=0
+                ? qRound((oldScroll+anchorViewportY)*double(m_pixelsPerHour)/oldScale)-anchorViewportY
+                : (oldScroll*m_pixelsPerHour)/oldScale;
             QTimer::singleShot(0,this,[this,target]() {
                 m_scrollArea->verticalScrollBar()->setValue(target);
             });
@@ -1325,14 +1532,6 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     m_playbackNameLabel->setObjectName("PlannerCurrentAudioLabel");
     m_playbackNameLabel->setAlignment(Qt::AlignCenter);
     centerControls->addWidget(m_playbackNameLabel,0,Qt::AlignVCenter);
-    m_playbackNameBlinkTimer=new QTimer(this);
-    m_playbackNameBlinkTimer->setInterval(500);
-    connect(m_playbackNameBlinkTimer,&QTimer::timeout,this,[this]() {
-        m_playbackNameBlinkPhase=!m_playbackNameBlinkPhase;
-        m_playbackNameLabel->setStyleSheet(m_playbackNameBlinkPhase
-            ? QStringLiteral("border: 1px solid #ef6d6d;")
-            : QStringLiteral("border: 1px solid transparent;"));
-    });
     connect(m_positionSlider,&QSlider::sliderPressed,this,[this]() {
         m_userIsSeeking=true;
     });
@@ -1378,14 +1577,16 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     fallbackLayout->setSpacing(0);
 
     auto *fallbackBar=new Frame(fallbackPanel);
+    m_standbyBar=fallbackBar;
     fallbackBar->setObjectName("framebarra");
     fallbackBar->setFixedHeight(25);
     auto *fallbackBarLayout=new QHBoxLayout(fallbackBar);
     fallbackBarLayout->setContentsMargins(0,0,0,0);
     fallbackBarLayout->setSpacing(0);
     auto *fallbackTitle=new Label(fallbackBar);
+    m_standbyTitle=fallbackTitle;
     fallbackTitle->setObjectName("PanelTitle");
-    fallbackTitle->setText(tr("Standby"));
+    fallbackTitle->setText(tr("Standby [noname]"));
     fallbackBarLayout->addWidget(fallbackTitle);
     fallbackLayout->addWidget(fallbackBar);
 
@@ -1428,6 +1629,8 @@ Planner::Planner(QWidget *parent) : Frame(parent)
             m_enginePlaybackNames.insert(engine,name);
             if (engine==positionEngine())
                 updatePlaybackNameLabel();
+            if (engine==m_standbyEngine)
+                updateStandbyBarAppearance();
         });
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
@@ -1471,11 +1674,19 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     connect(m_standbyResumeTimer,&QTimer::timeout,
             this,&Planner::resumeStandbyAfterBoundaryCheck);
 
+    m_standbyBlinkTimer=new QTimer(this);
+    m_standbyBlinkTimer->setInterval(500);
+    connect(m_standbyBlinkTimer,&QTimer::timeout,this,[this]() {
+        m_standbyBlinkPhase=!m_standbyBlinkPhase;
+        updateStandbyBarAppearance();
+    });
+
     m_clockTimer=new QTimer(this);
     m_clockTimer->setInterval(250);
     m_lastObservedDate=QDate::currentDate();
     connect(m_clockTimer,&QTimer::timeout,this,[this]() {
         const QDateTime now=QDateTime::currentDateTime();
+        updateStandbyBarTitle();
         updateRemainingTimeLabel();
         if (now.date()!=m_lastObservedDate) {
             m_lastObservedDate=now.date();
@@ -1567,6 +1778,9 @@ void Planner::startPlayback()
     m_lastObservedDate=today;
     static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(today);
     m_running=true;
+    m_standbyBlinkPhase=false;
+    m_standbyBlinkTimer->start();
+    updateStandbyBarAppearance();
     static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(
         QDateTime::currentDateTime(),true,true);
     m_triggeredSlots.clear();
@@ -1609,6 +1823,8 @@ void Planner::stopPlayback()
     m_pendingScheduleSlot.clear();
     m_pendingStartSlot.clear();
     m_running=false;
+    m_standbyBlinkTimer->stop();
+    updateStandbyBarAppearance();
     static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(
         QDateTime::currentDateTime(),false);
     updatePlaybackNameLabel();
@@ -1642,7 +1858,8 @@ void Planner::checkSchedule()
     }
     if (ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now))
         m_pendingStartSlot=dueSlot;
-    if (m_pendingStartSlot && weekTabs->slotContaining(now)!=m_pendingStartSlot)
+    if (m_pendingStartSlot && !m_pendingStartSlot->isStandbyListChangeEvent()
+        && weekTabs->slotContaining(now)!=m_pendingStartSlot)
         m_pendingStartSlot.clear();
 
     if (m_pendingStartSlot) {
@@ -1654,6 +1871,15 @@ void Planner::checkSchedule()
             .arg(quintptr(slot),0,16)
             .arg(slot->entrySecond());
         if (!m_triggeredSlots.contains(key)) {
+            if (slot->isStandbyListChangeEvent()) {
+                QString error;
+                applyStandbyListChange(slot->standbyListPath(),&error);
+                m_triggeredSlots.insert(key);
+                m_pendingStartSlot.clear();
+                if (!error.isEmpty())
+                    QMessageBox::warning(this,tr("Change standby list"),error);
+                return;
+            }
             bool voicePackLoading=false;
             for (int index=0; index<slot->contents()->layout->count(); ++index) {
                 auto *item=qobject_cast<AudioItemMeteoClockMaxi*>(
@@ -1813,6 +2039,15 @@ void Planner::finishCrossfade()
         m_activeScheduleSlot.clear();
         if (to) to->setVolume(m_volume);
     }
+    if (!m_pendingStandbyListPath.isEmpty()
+        && (!m_standbyEngine || !m_standbyEngine->getCurrentItem())) {
+        const QString pendingPath=m_pendingStandbyListPath;
+        m_pendingStandbyListPath.clear();
+        QString error;
+        applyStandbyListChange(pendingPath,&error);
+        if (!error.isEmpty())
+            QMessageBox::warning(this,tr("Change standby list"),error);
+    }
     updatePlaybackNameLabel();
     updatePlannerMeter();
 }
@@ -1841,16 +2076,95 @@ void Planner::updatePlaybackNameLabel()
     const QString name=engine ? m_enginePlaybackNames.value(engine) : QString();
     if (m_playbackNameLabel->text()!=name)
         m_playbackNameLabel->setText(name);
+}
 
-    if (name.isEmpty()) {
-        m_playbackNameBlinkTimer->stop();
-        m_playbackNameBlinkPhase=false;
-        m_playbackNameLabel->setStyleSheet("border: 1px solid transparent;");
-    } else if (!m_playbackNameBlinkTimer->isActive()) {
-        m_playbackNameBlinkPhase=true;
-        m_playbackNameLabel->setStyleSheet("border: 1px solid #ef6d6d;");
-        m_playbackNameBlinkTimer->start();
+void Planner::updateStandbyBarAppearance()
+{
+    if (!m_standbyBar || !m_standbyTitle)
+        return;
+    const bool playing=m_running && m_standbyEngine && m_standbyEngine->getCurrentItem();
+    const bool alert=playing && m_standbyBlinkPhase;
+    const QString background=alert ? QStringLiteral("#e5484d") : QStringLiteral("#4e4d7a");
+    m_standbyBar->setStyleSheet(QStringLiteral(
+        "QFrame#framebarra { background-color:%1; border:none; }"
+        "QFrame#framebarra QLabel { color:%2; }")
+        .arg(background,alert ? QStringLiteral("#ffffff") : QStringLiteral("#8a8d96")));
+}
+
+void Planner::updateStandbyBarTitle()
+{
+    if (!m_standbyTitle)
+        return;
+    const QString listPath=m_fallbackContents ? m_fallbackContents->listFileName() : QString();
+    const QString baseName=listPath.isEmpty()
+        ? QStringLiteral("noname") : QFileInfo(listPath).completeBaseName();
+    const QString title=tr("Standby [%1]").arg(baseName.isEmpty() ? QStringLiteral("noname") : baseName);
+    if (m_standbyTitle->text()!=title)
+        m_standbyTitle->setText(title);
+}
+
+bool Planner::applyStandbyListChange(const QString &path, QString *error)
+{
+    if (error) error->clear();
+    if (!m_fallbackContents || path.trimmed().isEmpty()) {
+        if (error) *error=tr("Choose a valid Radit list file.");
+        return false;
     }
+
+    if (m_standbyEngine && m_standbyEngine->getCurrentItem()
+        && (m_pendingScheduleSlot || m_fadeAction==1 || m_fadeAction==2)) {
+        m_pendingStandbyListPath=QFileInfo(path).absoluteFilePath();
+        return true;
+    }
+
+    PlannerContents staged;
+    Io io;
+    QString loadError;
+    if (!io.LoadListPlayer(&staged,path,&loadError)) {
+        if (error) *error=loadError;
+        return false;
+    }
+
+    const bool standbyWasPlaying=m_running && m_standbyEngine
+        && m_standbyEngine->getCurrentItem();
+    if (standbyWasPlaying)
+        m_standbyEngine->stopSequentialPlayback();
+
+    QList<AudioItemMaxi*> oldItems;
+    if (m_fallbackContents->layout) {
+        for (int index=0; index<m_fallbackContents->layout->count(); ++index) {
+            if (auto *item=qobject_cast<AudioItemMaxi*>(m_fallbackContents->layout->itemAt(index)->widget()))
+                oldItems.append(item);
+        }
+    }
+    for (AudioItemMaxi *item : oldItems)
+        m_fallbackContents->deleteItem(item);
+
+    QList<AudioItemMaxi*> stagedItems;
+    if (staged.layout) {
+        for (int index=0; index<staged.layout->count(); ++index) {
+            if (auto *item=qobject_cast<AudioItemMaxi*>(staged.layout->itemAt(index)->widget()))
+                stagedItems.append(item);
+        }
+    }
+    for (AudioItemMaxi *item : stagedItems) {
+        AudioItemMaxi *copy=item->copy(m_fallbackContents);
+        if (copy)
+            m_fallbackContents->createItem(copy);
+    }
+    m_fallbackContents->setListFileName(QFileInfo(path).absoluteFilePath());
+    updateStandbyBarTitle();
+
+    const bool scheduleOwnsPlayback=m_activeScheduleEngine || m_pendingScheduleSlot
+        || m_fadeAction==1 || m_fadeAction==2;
+    if (standbyWasPlaying && !scheduleOwnsPlayback && m_running) {
+        m_standbyEngine->setDevicePlay(m_devicePlay);
+        m_standbyEngine->setVolume(m_volume);
+        m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    }
+    updateStandbyBarAppearance();
+    updatePlaybackNameLabel();
+    return true;
 }
 
 void Planner::updateRemainingTimeLabel()

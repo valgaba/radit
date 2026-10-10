@@ -28,12 +28,15 @@ public:
     bool totalDurationKnown() const { return m_totalDurationKnown; }
     bool isScheduleDisabled() const { return m_disabled; }
     bool isPriority() const { return m_priority; }
+    QString standbyListPath() const { return m_standbyListPath; }
+    bool isStandbyListChangeEvent() const { return !m_standbyListPath.isEmpty(); }
     void setEntryTime(int secondsAfterMidnight);
     void setTotalDuration(double seconds, bool known);
     void setAccentColor(const QColor &color);
     void setTimelineHeight(int height);
     void setScheduleDisabled(bool disabled);
     void setPriority(bool priority);
+    void setStandbyListPath(const QString &path);
     void setUpcoming(bool upcoming);
     void setPlaying(bool playing);
 
@@ -58,6 +61,8 @@ private:
     QScrollArea *m_scrollArea = nullptr;
     int m_entrySecond = 0;
     QString m_name;
+    QString m_standbyListPath;
+    bool m_standbyListEvent = false;
     QColor m_accentColor;
     double m_totalDurationSeconds = 0.0;
     bool m_totalDurationKnown = true;

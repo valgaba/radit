@@ -20,6 +20,7 @@ class QTimer;
 class ScheduleSlot;
 class AudioItemMaxi;
 class ContentsBase;
+class Frame;
 
 class Planner : public Frame
 {
@@ -46,6 +47,8 @@ signals:
 private:
     QWidget *m_weekTabs = nullptr;
     ContentsPlayer *m_fallbackContents = nullptr;
+    Frame *m_standbyBar = nullptr;
+    Label *m_standbyTitle = nullptr;
     QList<ContentsPlayer *> m_dayContents;
     FrameOptionsPlayer *m_optionsPanel = nullptr;
     Label *m_playbackNameLabel = nullptr;
@@ -56,7 +59,7 @@ private:
     Button *m_playButton = nullptr;
     Slider *m_positionSlider = nullptr;
     VuMeter *m_vumeter = nullptr;
-    QTimer *m_playbackNameBlinkTimer = nullptr;
+    QTimer *m_standbyBlinkTimer = nullptr;
     Player *m_standbyEngine = nullptr;
     Player *m_scheduleEngineA = nullptr;
     Player *m_scheduleEngineB = nullptr;
@@ -72,11 +75,12 @@ private:
     QTimer *m_standbyResumeTimer = nullptr;
     QElapsedTimer m_fadeClock;
     QSet<QString> m_triggeredSlots;
+    QString m_pendingStandbyListPath;
     QString m_triggeredDate;
     QDate m_lastObservedDate;
     bool m_running = false;
     bool m_userIsSeeking = false;
-    bool m_playbackNameBlinkPhase = false;
+    bool m_standbyBlinkPhase = false;
     double m_positionDuration = 0.0;
     double m_currentPlaybackPosition = 0.0;
     double m_currentPlaybackDuration = 0.0;
@@ -96,7 +100,10 @@ private:
     void finishCrossfade();
     void updatePlannerMeter();
     void updatePlaybackNameLabel();
+    void updateStandbyBarTitle();
     void updateRemainingTimeLabel();
+    void updateStandbyBarAppearance();
+    bool applyStandbyListChange(const QString &path, QString *error = nullptr);
     Player *positionEngine() const;
 };
 
