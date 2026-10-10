@@ -21,6 +21,7 @@ private:
     bool m_listFileActionsEnabled = false;
 
 protected:
+    AudioItemMaxi *createFolderItem() override;
     bool supportsPlaybackOptionsInContextMenu() const override { return false; }
     bool supportsListOptionsInContextMenu() const override { return false; }
     void contextMenuEvent(QContextMenuEvent *event) override;

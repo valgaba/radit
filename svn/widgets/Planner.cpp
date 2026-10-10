@@ -45,6 +45,10 @@
 #include <QPointer>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QCheckBox>
+#include <QRadioButton>
+#include <QGridLayout>
+#include <QDialog>
 #include "widgets/scrollbar.h"
 #include <functional>
 #include <cmath>
@@ -53,6 +57,126 @@
 namespace {
 QPointer<ScheduleSlot> g_scheduleSlotClipboard;
 bool g_scheduleSlotClipboardIsCut = false;
+
+class ScheduleSlotPasteDialog final : public QDialog
+{
+public:
+    explicit ScheduleSlotPasteDialog(int currentDay, QWidget *parent = nullptr)
+        : QDialog(parent)
+    {
+        setObjectName("ScheduleSlotPasteDialog");
+        setWindowFlags(Qt::Dialog|Qt::FramelessWindowHint);
+        setWindowModality(Qt::WindowModal);
+        setModal(true);
+        setWindowTitle(tr("Paste schedule slot special"));
+        resize(390,285);
+
+        auto *root=new QVBoxLayout(this);
+        root->setContentsMargins(0,0,0,0);
+        root->setSpacing(0);
+
+        auto *titleBar=new Frame(this);
+        titleBar->setObjectName("framebarra");
+        titleBar->setFixedHeight(25);
+        auto *titleLayout=new QHBoxLayout(titleBar);
+        titleLayout->setContentsMargins(5,0,3,0);
+        auto *title=new Label(titleBar);
+        title->setText(windowTitle());
+        titleLayout->addWidget(title);
+        titleLayout->addStretch(1);
+        auto *close=new Button(titleBar);
+        close->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
+        close->setFixedSize(15,15);
+        close->SetIcon("Close-hover.svg");
+        close->setIconSize(QSize(15,15));
+        titleLayout->addWidget(close);
+        connect(close,&QPushButton::clicked,this,&QDialog::reject);
+        root->addWidget(titleBar);
+
+        auto *body=new QWidget(this);
+        auto *bodyLayout=new QVBoxLayout(body);
+        bodyLayout->setContentsMargins(12,10,12,10);
+        bodyLayout->setSpacing(7);
+        m_allDays=new QRadioButton(tr("All days"),body);
+        m_weekdays=new QRadioButton(tr("Monday to Friday"),body);
+        m_specificDays=new QRadioButton(tr("Choose specific days"),body);
+        bodyLayout->addWidget(m_allDays);
+        bodyLayout->addWidget(m_weekdays);
+        bodyLayout->addWidget(m_specificDays);
+
+        auto *daysWidget=new QWidget(body);
+        auto *daysLayout=new QGridLayout(daysWidget);
+        daysLayout->setContentsMargins(20,0,0,0);
+        daysLayout->setHorizontalSpacing(18);
+        daysLayout->setVerticalSpacing(4);
+        const QStringList names={tr("Monday"),tr("Tuesday"),tr("Wednesday"),
+                                 tr("Thursday"),tr("Friday"),tr("Saturday"),tr("Sunday")};
+        for (int index=0; index<names.size(); ++index) {
+            auto *day=new QCheckBox(names.at(index),daysWidget);
+            m_days.append(day);
+            daysLayout->addWidget(day,index/2,index%2);
+        }
+        if (currentDay>=0 && currentDay<m_days.size())
+            m_days.at(currentDay)->setChecked(true);
+        bodyLayout->addWidget(daysWidget);
+        root->addWidget(body,1);
+
+        auto *buttons=new QHBoxLayout;
+        buttons->setContentsMargins(12,0,12,10);
+        buttons->addStretch(1);
+        auto *cancel=new Button(this);
+        cancel->setText(tr("Cancel"));
+        cancel->setFixedSize(75,24);
+        auto *paste=new Button(this);
+        m_pasteButton=paste;
+        paste->setText(tr("Paste"));
+        paste->setFixedSize(75,24);
+        buttons->addWidget(cancel);
+        buttons->addWidget(paste);
+        root->addLayout(buttons);
+        connect(cancel,&QPushButton::clicked,this,&QDialog::reject);
+        connect(paste,&QPushButton::clicked,this,&QDialog::accept);
+
+        auto updateDaysEnabled=[this]() {
+            const bool enabled=m_specificDays->isChecked();
+            for (QCheckBox *day : m_days)
+                day->setEnabled(enabled);
+            m_pasteButton->setEnabled(!enabled || !selectedSpecificDays().isEmpty());
+        };
+        connect(m_allDays,&QRadioButton::toggled,this,updateDaysEnabled);
+        connect(m_weekdays,&QRadioButton::toggled,this,updateDaysEnabled);
+        connect(m_specificDays,&QRadioButton::toggled,this,updateDaysEnabled);
+        for (QCheckBox *day : m_days)
+            connect(day,&QCheckBox::toggled,this,updateDaysEnabled);
+        m_specificDays->setChecked(true);
+        updateDaysEnabled();
+    }
+
+    QList<int> selectedDays() const
+    {
+        if (m_allDays->isChecked())
+            return {0,1,2,3,4,5,6};
+        if (m_weekdays->isChecked())
+            return {0,1,2,3,4};
+        return selectedSpecificDays();
+    }
+
+private:
+    QList<int> selectedSpecificDays() const
+    {
+        QList<int> result;
+        for (int index=0; index<m_days.size(); ++index)
+            if (m_days.at(index)->isChecked())
+                result.append(index);
+        return result;
+    }
+
+    QRadioButton *m_allDays = nullptr;
+    QRadioButton *m_weekdays = nullptr;
+    QRadioButton *m_specificDays = nullptr;
+    Button *m_pasteButton = nullptr;
+    QList<QCheckBox*> m_days;
+};
 
 void showPopupBelow(QWidget *anchor, QWidget *popup)
 {
@@ -235,7 +359,11 @@ protected:
         endTimeFont.setBold(true);
         painter.setFont(endTimeFont);
         for (const auto &interval : m_slotIntervals) {
-            QPen durationPen(interval.priority ? QColor("#d13838") : QColor("#80A4AE"));
+            const QColor slotColor=interval.slot ? interval.slot->accentColor() : QColor();
+            const QColor markerColor=interval.priority
+                ? QColor("#d13838")
+                : (slotColor.isValid() ? slotColor : QColor("#80A4AE"));
+            QPen durationPen(markerColor);
             durationPen.setWidth(2);
             painter.setPen(durationPen);
             const int startY=qBound(0,static_cast<int>(qint64(interval.startSeconds)*(height()-1)/(24*60*60)),rulerBottom);
@@ -283,11 +411,22 @@ public:
         Menu menu(this);
         menu.setFixedWidth(200);
         QAction *addSlotAction=menu.addAction(QIcon(":/icons/Add.svg"),tr("Add schedule slot"));
-        menu.addSeparator();
-        QAction *pasteSlotAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),tr("Paste schedule slot"));
+        QAction *pasteSlotAction=nullptr;
+        QAction *pasteSpecialAction=nullptr;
+        if (g_scheduleSlotClipboard) {
+            menu.addSeparator();
+            pasteSlotAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),
+                                           tr("Paste schedule slot"));
+            pasteSpecialAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),
+                                              tr("Paste schedule slot special"));
+        }
         QAction *chosen=menu.exec(globalPosition);
         if (chosen==pasteSlotAction) {
             pasteScheduleSlot();
+            return;
+        }
+        if (chosen==pasteSpecialAction) {
+            pasteScheduleSlotSpecial();
             return;
         }
         if (chosen!=addSlotAction)
@@ -328,11 +467,33 @@ public:
         return false;
     }
 
+    bool hasSlotStartingWithin(int nowMilliseconds, int windowMilliseconds) const
+    {
+        for (const TimedSlot &entry : m_slots) {
+            ScheduleSlot *slot=entry.widget;
+            if (!slot || slot->isScheduleDisabled() || slot->contents()->layout->count()==0)
+                continue;
+            const int delay=slot->entrySecond()*1000-nowMilliseconds;
+            if (delay>=-250 && delay<=windowMilliseconds)
+                return true;
+        }
+        return false;
+    }
+
+    int dayIndex() const
+    {
+        auto *pages=qobject_cast<QStackedWidget*>(parentWidget());
+        return pages ? pages->indexOf(const_cast<PlannerDayPage*>(this)) : -1;
+    }
+
 private:
     void attachSlot(ScheduleSlot *slot)
     {
         m_slots.append({slot});
         connect(slot,&ScheduleSlot::entryTimeChanged,this,[this]() {
+            updateSlotPositions();
+        });
+        connect(slot,&ScheduleSlot::accentColorChanged,this,[this]() {
             updateSlotPositions();
         });
         connect(slot,&ScheduleSlot::disabledChanged,this,[this]() {
@@ -552,12 +713,127 @@ private:
         g_scheduleSlotClipboardIsCut=false;
     }
 
+    void pasteScheduleSlotSpecial()
+    {
+        if (!g_scheduleSlotClipboard)
+            return;
+
+        ScheduleSlot *source=g_scheduleSlotClipboard;
+        const bool cutOperation=g_scheduleSlotClipboardIsCut;
+        auto *sourcePage=cutOperation
+            ? dynamic_cast<PlannerDayPage*>(source->parentWidget()) : nullptr;
+        if (cutOperation && !sourcePage) {
+            g_scheduleSlotClipboard.clear();
+            g_scheduleSlotClipboardIsCut=false;
+            return;
+        }
+
+        ScheduleSlotPasteDialog dialog(dayIndex(),window());
+        if (dialog.exec()!=QDialog::Accepted)
+            return;
+        const QList<int> targetDays=dialog.selectedDays();
+        if (targetDays.isEmpty())
+            return;
+
+        auto *pages=qobject_cast<QStackedWidget*>(parentWidget());
+        if (!pages)
+            return;
+
+        const int second=source->entrySecond();
+        bool sourceRetained=false;
+        int pastedCount=0;
+        QStringList skippedDays;
+        QPointer<ScheduleSlot> firstCreated;
+        QPointer<PlannerDayPage> firstTarget;
+        const QStringList dayNames={tr("Monday"),tr("Tuesday"),tr("Wednesday"),
+                                    tr("Thursday"),tr("Friday"),tr("Saturday"),
+                                    tr("Sunday")};
+
+        for (int targetDay : targetDays) {
+            if (targetDay<0 || targetDay>=pages->count())
+                continue;
+            auto *target=dynamic_cast<PlannerDayPage*>(pages->widget(targetDay));
+            if (!target)
+                continue;
+
+            if (cutOperation && target==sourcePage) {
+                if (target->hasSlotAtTime(second,source)) {
+                    skippedDays.append(dayNames.value(targetDay));
+                    continue;
+                }
+                sourceRetained=true;
+                ++pastedCount;
+                if (!firstTarget) {
+                    firstTarget=target;
+                    firstCreated=source;
+                }
+                continue;
+            }
+
+            if (target->hasSlotAtTime(second)) {
+                skippedDays.append(dayNames.value(targetDay));
+                continue;
+            }
+
+            const bool autoFocus=target->m_contentAutoFocusEnabled;
+            target->setContentAutoFocusEnabled(false);
+            ScheduleSlot *copy=target->cloneSlot(source,target);
+            target->attachSlot(copy);
+            target->m_dayContents.append(copy->contents());
+            target->updateSlotPositions();
+            target->setContentAutoFocusEnabled(autoFocus);
+            copy->show();
+            ++pastedCount;
+            if (!firstCreated) {
+                firstCreated=copy;
+                firstTarget=target;
+            }
+        }
+
+        if (cutOperation && pastedCount>0 && !sourceRetained) {
+            for (qsizetype index=sourcePage->m_slots.size()-1; index>=0; --index) {
+                if (sourcePage->m_slots.at(index).widget==source)
+                    sourcePage->m_slots.removeAt(index);
+            }
+            QWidget *owner=sourcePage;
+            while (owner && !qobject_cast<Planner*>(owner))
+                owner=owner->parentWidget();
+            if (auto *planner=qobject_cast<Planner*>(owner))
+                planner->prepareForScheduleSlotRemoval(source);
+            sourcePage->m_dayContents.removeAll(source->contents());
+            source->hide();
+            source->deleteLater();
+            sourcePage->updateSlotPositions();
+            g_scheduleSlotClipboard.clear();
+            g_scheduleSlotClipboardIsCut=false;
+        } else if (cutOperation && sourceRetained) {
+            g_scheduleSlotClipboard.clear();
+            g_scheduleSlotClipboardIsCut=false;
+        }
+
+        if (firstCreated && firstTarget) {
+            firstTarget->m_scrollArea->ensureVisible(
+                0,(firstCreated->entrySecond()*firstTarget->m_pixelsPerHour)/3600,0,0);
+            if (firstTarget->m_focusSlot)
+                firstTarget->m_focusSlot(firstCreated);
+        }
+
+        if (pastedCount==0) {
+            QMessageBox::information(this,tr("Paste schedule slot"),
+                                     tr("No schedule slots were pasted. The selected days already have a slot at that time."));
+        } else if (!skippedDays.isEmpty()) {
+            QMessageBox::information(this,tr("Paste schedule slot"),
+                tr("Pasted to %1 day(s). Skipped: %2, because a slot already exists at that time.")
+                    .arg(pastedCount).arg(skippedDays.join(tr(", "))));
+        }
+    }
+
     void updateSlotPositions()
     {
         struct Placement {
             ScheduleSlot *widget = nullptr;
             int startSeconds = 0;
-            int endSeconds = 0;
+            int layoutEndSeconds = 0;
             int lane = 0;
         };
         QList<Placement> placements;
@@ -587,23 +863,26 @@ private:
             durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
             const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
             entry.widget->setTimelineHeight(slotHeight);
+            const int endSeconds=qMin(24*60*60,startSeconds+qMax(1,qRound(durationSeconds)));
+            const int displayedDurationSeconds=qMax(1,static_cast<int>(std::ceil(
+                entry.widget->height()*3600.0/m_pixelsPerHour)));
             placements.append({entry.widget,startSeconds,
-                               qMin(24*60*60,startSeconds+qMax(1,qRound(durationSeconds))),0});
+                               qMin(24*60*60,qMax(endSeconds,startSeconds+displayedDurationSeconds)),0});
         }
 
         std::sort(placements.begin(),placements.end(),[](const Placement &left,const Placement &right) {
             if (left.startSeconds!=right.startSeconds)
                 return left.startSeconds<right.startSeconds;
-            return left.endSeconds<right.endSeconds;
+            return left.layoutEndSeconds<right.layoutEndSeconds;
         });
 
         int groupStart=0;
         while (groupStart<placements.size()) {
             int groupEnd=groupStart+1;
-            int groupEndSeconds=placements.at(groupStart).endSeconds;
+            int groupEndSeconds=placements.at(groupStart).layoutEndSeconds;
             while (groupEnd<placements.size()
                    && placements.at(groupEnd).startSeconds<groupEndSeconds) {
-                groupEndSeconds=qMax(groupEndSeconds,placements.at(groupEnd).endSeconds);
+                groupEndSeconds=qMax(groupEndSeconds,placements.at(groupEnd).layoutEndSeconds);
                 ++groupEnd;
             }
 
@@ -614,9 +893,9 @@ private:
                        && laneEndSeconds.at(lane)>placements.at(index).startSeconds)
                     ++lane;
                 if (lane==laneEndSeconds.size())
-                    laneEndSeconds.append(placements.at(index).endSeconds);
+                    laneEndSeconds.append(placements.at(index).layoutEndSeconds);
                 else
-                    laneEndSeconds[lane]=placements.at(index).endSeconds;
+                    laneEndSeconds[lane]=placements.at(index).layoutEndSeconds;
                 placements[index].lane=lane;
             }
 
@@ -731,9 +1010,9 @@ public:
                 const double durationMinutes=slot->height()*60.0/qMax(1,m_pixelsPerHour);
                 const double targetHeight=viewportHeight*0.72;
                 int targetScale=m_pixelsPerHour;
-                while (targetScale<1600
+                while (targetScale<6400
                        && durationMinutes*targetScale/60.0<targetHeight) {
-                    targetScale=qMin(1600,targetScale*2);
+                    targetScale=qMin(6400,targetScale*2);
                 }
                 if (targetScale!=m_pixelsPerHour)
                     setZoom(targetScale,false);
@@ -776,7 +1055,7 @@ public:
         setZoom(150,false);
         m_currentTimeLine=new PlannerCurrentTimeLine(m_timelineCanvas);
         connect(m_zoomIn,&QPushButton::clicked,this,[this]() {
-            if (m_pixelsPerHour<1600) setZoom(m_pixelsPerHour*2,true);
+            if (m_pixelsPerHour<6400) setZoom(m_pixelsPerHour*2,true);
         });
         connect(m_zoomOut,&QPushButton::clicked,this,[this]() {
             if (m_pixelsPerHour>25) setZoom(m_pixelsPerHour/2,true);
@@ -798,6 +1077,25 @@ public:
                 return interval.slot;
         }
         return nullptr;
+    }
+
+    bool hasSlotStartingWithin(const QDateTime &dateTime, int windowMilliseconds) const
+    {
+        const int dayIndex=qBound(0,dateTime.date().dayOfWeek()-1,6);
+        auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+        if (!day)
+            return false;
+        const int nowMilliseconds=dateTime.time().msecsSinceStartOfDay();
+        if (day->hasSlotStartingWithin(nowMilliseconds,windowMilliseconds))
+            return true;
+
+        const int millisecondsUntilMidnight=24*60*60*1000-nowMilliseconds;
+        if (windowMilliseconds<millisecondsUntilMidnight)
+            return false;
+        const int nextDayIndex=(dayIndex+1)%m_pages->count();
+        auto *nextDay=static_cast<PlannerDayPage*>(m_pages->widget(nextDayIndex));
+        return nextDay && nextDay->hasSlotStartingWithin(
+            0,windowMilliseconds-millisecondsUntilMidnight);
     }
 
     ScheduleSlot *slotContaining(const QDateTime &dateTime)
@@ -907,7 +1205,7 @@ private:
     {
         const int oldScale=m_pixelsPerHour;
         const int oldScroll=m_scrollArea->verticalScrollBar()->value();
-        m_pixelsPerHour=qBound(25,pixelsPerHour,1600);
+        m_pixelsPerHour=qBound(25,pixelsPerHour,6400);
         const int contentHeight=24*m_pixelsPerHour+1;
         m_timelineCanvas->setFixedHeight(contentHeight);
         m_timeRuler->setPixelsPerHour(m_pixelsPerHour);
@@ -915,7 +1213,7 @@ private:
             static_cast<PlannerDayPage*>(m_pages->widget(index))->setPixelsPerHour(m_pixelsPerHour);
         }
         m_zoomOut->setEnabled(m_pixelsPerHour>25);
-        m_zoomIn->setEnabled(m_pixelsPerHour<1600);
+        m_zoomIn->setEnabled(m_pixelsPerHour<6400);
 
         if (preserveScrollPosition && oldScale>0) {
             const int target=(oldScroll*m_pixelsPerHour)/oldScale;
@@ -1150,11 +1448,28 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         });
     }
     connect(m_scheduleEngineA,&Player::sequentialPlaybackFinished,this,[this]() {
-        if (m_scheduleEngineA==m_activeScheduleEngine && m_fadeAction!=2) returnToStandby();
+        if (m_scheduleEngineA!=m_activeScheduleEngine || m_fadeAction==2)
+            return;
+        const auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
+        if (weekTabs->hasSlotStartingWithin(QDateTime::currentDateTime(),1000))
+            m_standbyResumeTimer->start(1000);
+        else
+            returnToStandby();
     });
     connect(m_scheduleEngineB,&Player::sequentialPlaybackFinished,this,[this]() {
-        if (m_scheduleEngineB==m_activeScheduleEngine && m_fadeAction!=2) returnToStandby();
+        if (m_scheduleEngineB!=m_activeScheduleEngine || m_fadeAction==2)
+            return;
+        const auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
+        if (weekTabs->hasSlotStartingWithin(QDateTime::currentDateTime(),1000))
+            m_standbyResumeTimer->start(1000);
+        else
+            returnToStandby();
     });
+
+    m_standbyResumeTimer=new QTimer(this);
+    m_standbyResumeTimer->setSingleShot(true);
+    connect(m_standbyResumeTimer,&QTimer::timeout,
+            this,&Planner::resumeStandbyAfterBoundaryCheck);
 
     m_clockTimer=new QTimer(this);
     m_clockTimer->setInterval(250);
@@ -1247,6 +1562,7 @@ void Planner::setDevicePlay(int device)
 void Planner::startPlayback()
 {
     if (m_running) return;
+    m_standbyResumeTimer->stop();
     const QDate today=QDate::currentDate();
     m_lastObservedDate=today;
     static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(today);
@@ -1275,6 +1591,7 @@ void Planner::startPlayback()
 void Planner::stopPlayback()
 {
     if (!m_running) return;
+    m_standbyResumeTimer->stop();
     if (m_activeScheduleSlot)
         m_activeScheduleSlot->setPlaying(false);
     if (m_pendingScheduleSlot)
@@ -1373,6 +1690,7 @@ void Planner::startScheduleSlot(ScheduleSlot *slot)
 {
     if (!slot || slot->contents()->layout->count()==0)
         return;
+    m_standbyResumeTimer->stop();
     if (m_fadeTimer->isActive()) {
         m_fadeTimer->stop();
         finishCrossfade();
@@ -1398,6 +1716,7 @@ void Planner::startScheduleSlot(ScheduleSlot *slot)
 
 void Planner::returnToStandby()
 {
+    m_standbyResumeTimer->stop();
     if (!m_running || (m_fadeTimer->isActive() && (m_fadeAction==3 || m_fadeAction==4)))
         return;
     if (m_fadeTimer->isActive()) {
@@ -1418,6 +1737,25 @@ void Planner::returnToStandby()
         m_standbyEngine->stopSequentialPlayback();
     m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
     beginCrossfade(outgoing,m_standbyEngine,3);
+}
+
+void Planner::resumeStandbyAfterBoundaryCheck()
+{
+    if (!m_running)
+        return;
+
+    // Give the normal clock check the first chance to start a slot scheduled
+    // at this boundary before bringing standby audio back.
+    checkSchedule();
+    if (!m_running || m_pendingScheduleSlot
+        || m_fadeAction==1 || m_fadeAction==2)
+        return;
+
+    if (m_pendingStartSlot) {
+        m_standbyResumeTimer->start(250);
+        return;
+    }
+    returnToStandby();
 }
 
 void Planner::beginCrossfade(Player *from, Player *to, int action)

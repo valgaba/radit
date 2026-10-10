@@ -69,6 +69,7 @@ private:
     QPointer<ScheduleSlot> m_pendingStartSlot;
     QTimer *m_clockTimer = nullptr;
     QTimer *m_fadeTimer = nullptr;
+    QTimer *m_standbyResumeTimer = nullptr;
     QElapsedTimer m_fadeClock;
     QSet<QString> m_triggeredSlots;
     QString m_triggeredDate;
@@ -90,6 +91,7 @@ private:
     void checkSchedule();
     void startScheduleSlot(ScheduleSlot *slot);
     void returnToStandby();
+    void resumeStandbyAfterBoundaryCheck();
     void beginCrossfade(Player *from, Player *to, int action);
     void finishCrossfade();
     void updatePlannerMeter();

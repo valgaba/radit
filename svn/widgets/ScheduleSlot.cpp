@@ -279,8 +279,13 @@ void ScheduleSlot::setTotalDuration(double seconds, bool known)
 
 void ScheduleSlot::setAccentColor(const QColor &color)
 {
+    if (m_accentColor==color) {
+        updateHeaderAppearance();
+        return;
+    }
     m_accentColor=color;
     updateHeaderAppearance();
+    emit accentColorChanged();
 }
 
 void ScheduleSlot::updateHeaderAppearance()
@@ -305,7 +310,20 @@ void ScheduleSlot::updateHeaderAppearance()
 
 void ScheduleSlot::setTimelineHeight(int height)
 {
-    m_timelineHeight=qMax(m_header->height()+2,height);
+    // Keep short cues large enough to show one compact planner item, including
+    // its settings button. Further items remain accessible through the slot's
+    // vertical scrollbar, so visual height does not push later slots sideways.
+    int contentHeight=0;
+    if (m_contents && m_contents->layout) {
+        for (int index=0; index<m_contents->layout->count(); ++index) {
+            QWidget *item=m_contents->layout->itemAt(index)->widget();
+            if (item)
+                contentHeight=qMax(contentHeight,
+                                   qMax(item->height(),item->minimumSizeHint().height()));
+        }
+    }
+    const int readableHeight=m_header->height()+contentHeight+4;
+    m_timelineHeight=qMax(qMax(m_header->height()+2,height),readableHeight);
     setFixedHeight(m_contentsVisible ? m_timelineHeight : m_header->height()+2);
 }
 

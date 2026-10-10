@@ -159,6 +159,11 @@ void ContentsBase::importDroppedFiles(const QStringList &paths)
     importNextDroppedFile();
 }
 
+AudioItemMaxi *ContentsBase::createFolderItem()
+{
+    return new AudioItemFolderMaxi(this);
+}
+
 void ContentsBase::importNextDroppedFile()
 {
     if (!m_importingFiles || !m_dropCancel || m_dropCancel->load()) return;
@@ -173,8 +178,9 @@ void ContentsBase::importNextDroppedFile()
         item->setVoicePackPath(path);createItem(item);finishDroppedFile();return;
     }
     if (info.isDir()) {
-        auto *item = new AudioItemFolderMaxi(this);
-        item->setFolderPath(path);
+        auto *item = createFolderItem();
+        if (auto *folderItem = qobject_cast<AudioItemFolderMaxi*>(item))
+            folderItem->setFolderPath(path);
         createItem(item);
         finishDroppedFile();
         return;

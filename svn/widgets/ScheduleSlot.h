@@ -40,6 +40,7 @@ public:
 signals:
     void closeRequested(ScheduleSlot *slot);
     void entryTimeChanged();
+    void accentColorChanged();
     void disabledChanged();
     void focusRequested(ScheduleSlot *slot);
     void copyRequested(ScheduleSlot *slot);

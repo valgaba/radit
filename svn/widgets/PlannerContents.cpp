@@ -59,6 +59,11 @@ PlannerContents::PlannerContents(QWidget *parent) : ContentsPlayer(parent)
 {
 }
 
+AudioItemMaxi *PlannerContents::createFolderItem()
+{
+    return new AudioItemFolderPlanner(this);
+}
+
 AudioItemMaxi *PlannerContents::createItem(AudioItemMaxi *item)
 {
     if (item && !isPlannerItem(item)) {
