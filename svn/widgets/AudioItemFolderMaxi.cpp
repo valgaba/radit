@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QDateTime>
 #include <QFutureWatcher>
 #include <QRandomGenerator>
 #include <QtConcurrent/QtConcurrentRun>
@@ -101,8 +102,25 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
     setNameFile(name.isEmpty() ? QDir::toNativeSeparators(folder) : name);
     setToolTip(folder);
     m_tracks.clear(); m_currentTrack.clear();
-    m_scanning = true;
     setSecond(0); setSecondStart(0);
+
+    // Reuse a recent in-memory index when another item points at the same folder.
+    // Missing files are discarded lazily by preparePlayback().
+    constexpr qint64 cacheLifetimeMs = 2 * 60 * 1000;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    const qint64 cacheAgeMs = nowMs - (m_sequence ? m_sequence->scannedAtMs : 0);
+    if (m_sequence && m_sequence->scanComplete
+        && cacheAgeMs >= 0 && cacheAgeMs < cacheLifetimeMs) {
+        m_tracks = m_sequence->tracks.values().toVector();
+        m_scanning = false;
+        setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
+        setToolTip(tr("%1\n%2 audio files — random playback without repeats")
+                       .arg(folder).arg(m_tracks.size()));
+        emit scanFinished();
+        return;
+    }
+
+    m_scanning = true;
     setFolderPresentation(tr("Loading..."), false);
     const QStringList filters = MediaManager::supportedAudioNameFilters();
     auto *watcher = new QFutureWatcher<QVector<Track>>(this);
@@ -112,6 +130,8 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
         if (cancel != m_cancel || cancel->load()) return;
         m_tracks = tracks; m_scanning = false;
         updateSequence(tracks);
+        m_sequence->scannedAtMs = QDateTime::currentMSecsSinceEpoch();
+        m_sequence->scanComplete = true;
         setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
         setToolTip(tr("%1\n%2 audio files — random playback without repeats").arg(folder).arg(m_tracks.size()));
         emit scanFinished();
@@ -122,10 +142,10 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
                            QDirIterator::Subdirectories);
         while (!cancel->load() && files.hasNext()) {
             files.next();
-            const QString path = files.fileInfo().canonicalFilePath();
-            if (path.isEmpty()) continue;
-            const double seconds = MediaManager::readFileDuration(path);
-            if (seconds > 0) tracks.append({path, seconds});
+            // Enumerate only. Opening every file with BASS to read its duration
+            // makes network folders with thousands of entries take minutes.
+            const QString path = QDir::cleanPath(files.filePath());
+            if (!path.isEmpty()) tracks.append({path, 0.0});
         }
         return tracks;
     }));

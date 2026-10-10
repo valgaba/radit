@@ -563,7 +563,16 @@ void Player::playItem(AudioItemMaxi *item)
        currentItem = item;
 
 
-       m_duration=item->second();
+       const double loadedDuration=mediamanager->getDuration();
+       if (loadedDuration>0.0) {
+           m_duration=loadedDuration;
+           if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(item)) {
+               folderItem->setSecond(loadedDuration);
+               folderItem->setTiempoFile(loadedDuration);
+           }
+       } else {
+           m_duration=item->second();
+       }
        emit playbackProgressChanged(mediamanager->getPosition(),m_duration,
                                     !mediamanager->isNetworkSource() && m_duration>0.0);
        startPlaybackLimit(item->playbackLimitSeconds());

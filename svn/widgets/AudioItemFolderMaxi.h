@@ -37,6 +37,8 @@ private:
         QSet<QString> played;
         QString lastTrack;
         quint64 revision = 0;
+        qint64 scannedAtMs = 0;
+        bool scanComplete = false;
     };
     static std::shared_ptr<Sequence> sequenceForFolder(const QString &path);
     static QString trackKey(const QString &path);
