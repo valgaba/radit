@@ -829,9 +829,11 @@ private:
 
     void pasteScheduleSlot()
     {
+        // The clipboard can be cleared while a context menu is open (for
+        // example, deleting a slot that was cut). In that case, ignore the
+        // stale Paste action instead of interrupting the user with a dialog.
         if (!g_scheduleSlotClipboard) {
-            QMessageBox::information(this,tr("Paste schedule slot"),
-                                     tr("Copy or cut a schedule slot first."));
+            g_scheduleSlotClipboardIsCut=false;
             return;
         }
 
@@ -1734,6 +1736,10 @@ void Planner::prepareForScheduleSlotRemoval(ScheduleSlot *slot)
 {
     if (!slot)
         return;
+    if (g_scheduleSlotClipboard==slot) {
+        g_scheduleSlotClipboard.clear();
+        g_scheduleSlotClipboardIsCut=false;
+    }
     if (m_pendingStartSlot==slot)
         m_pendingStartSlot.clear();
     if (m_activeScheduleSlot==slot || m_pendingScheduleSlot==slot)
