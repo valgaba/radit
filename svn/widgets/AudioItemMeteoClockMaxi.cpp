@@ -7,6 +7,7 @@
 #include "widgets/Player.h"
 #include "widgets/MeteoClockPropertiesFrame.h"
 #include "core/LocutionPack.h"
+#include "core/ElevenLabsTts.h"
 #include <QFileInfo>
 #include <cmath>
 
@@ -18,7 +19,7 @@ AudioItemMeteoClockMaxi::AudioItemMeteoClockMaxi(QWidget *parent) : AudioItemMax
         showOptionsFrame();
     });
 }
-bool AudioItemMeteoClockMaxi::isLoading() const {return m_pack && m_pack->isLoading();}
+bool AudioItemMeteoClockMaxi::isLoading() const {return m_aiPreparing || (m_pack && m_pack->isLoading());}
 void AudioItemMeteoClockMaxi::setAnnouncementOptions(bool announceTime, bool announceWeather)
 {
     if (!announceTime && !announceWeather)
@@ -81,6 +82,39 @@ bool AudioItemMeteoClockMaxi::fail(const QString &message)
 }
 bool AudioItemMeteoClockMaxi::preparePlayback()
 {
+    if (m_useAiVoice) {
+        if (!m_aiAudioPath.isEmpty()) return true;
+        if (m_aiPreparing) return false;
+        const auto readings=MeteoClock::currentReadings();
+        const QTime time=QTime::currentTime();
+        if (m_announceWeather && !MeteoClock::hasFreshReadings()) {
+            const bool refreshRequested=MeteoClock::requestCurrentReadings();
+            return fail(refreshRequested ? tr("Waiting for fresh weather readings.")
+                                         : tr("Weather readings are unavailable. Select a location in MeteoClock and wait for the weather update."));
+        }
+        if (m_announceWeather && (!std::isfinite(readings.temperature)
+                                  || readings.temperature < -100 || readings.temperature > 100
+                                  || readings.humidity < 0 || readings.humidity > 100))
+            return fail(tr("Weather readings are outside the supported range."));
+        QStringList parts;
+        if (m_announceTime) parts.append(tr("Son las %1").arg(time.toString("H:mm")));
+        if (m_announceWeather)
+            parts.append(tr("La temperatura es de %1 grados y la humedad es del %2 por ciento")
+                             .arg(qRound(readings.temperature)).arg(readings.humidity));
+        if (parts.isEmpty()) return fail(tr("Select at least one announcement option."));
+        m_announcement=parts.join(QStringLiteral(". "));
+        m_error.clear();
+        m_aiPreparing=true;
+        ElevenLabsTts::instance()->generate(m_announcement, this,
+            [this](const QString &path, const QString &error) {
+                m_aiPreparing=false;
+                m_aiAudioPath=path;
+                m_error=error;
+                if (!error.isEmpty()) setToolTip(error);
+                emit playbackPreparationReady(!path.isEmpty());
+            });
+        return false;
+    }
     if(!m_pack || !m_pack->isReady())return fail(m_pack && !m_pack->error().isEmpty()?m_pack->error():tr("Voice pack is not ready."));
     const auto readings=MeteoClock::currentReadings();
     if(m_announceWeather && !MeteoClock::hasFreshReadings()) {
@@ -128,6 +162,12 @@ bool AudioItemMeteoClockMaxi::preparePlayback()
 }
 bool AudioItemMeteoClockMaxi::loadPreparedPlayback(MediaManager *manager)
 {
+    if (m_useAiVoice) {
+        const QString path=m_aiAudioPath;
+        if (path.isEmpty() || !manager->loadFile(path)) return fail(tr("The ElevenLabs voice clip could not be loaded."));
+        m_aiAudioPath.clear();
+        setSecond(manager->getDuration());setTiempoFile(second());return true;
+    }
     QString error;
     if(!manager->loadAudioSequence(m_clips,&error))return fail(error);
     setSecond(manager->getDuration());setTiempoFile(second());return true;
@@ -135,8 +175,11 @@ bool AudioItemMeteoClockMaxi::loadPreparedPlayback(MediaManager *manager)
 QString AudioItemMeteoClockMaxi::playbackName() const {return m_announcement.isEmpty()?nameFile():nameFile()+" — "+m_announcement;}
 AudioItemMaxi *AudioItemMeteoClockMaxi::copy(QWidget *parent) const
 {
-    auto *item=new AudioItemMeteoClockMaxi(parent);item->setVoicePackPath(filePath());item->setNameFile(nameFile());
+    auto *item=new AudioItemMeteoClockMaxi(parent);
+    if (!filePath().isEmpty()) item->setVoicePackPath(filePath());
+    item->setNameFile(nameFile());
     item->setAnnouncementOptions(m_announceTime,m_announceWeather);
+    item->setUseElevenLabs(m_useAiVoice);
     item->setIsLoop(isLoop());item->setIsPurge(isPurge());item->setIsPlayNext(isPlayNext());item->setIsSelect(isSelect());item->setColor(color());
     return item;
 }

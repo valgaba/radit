@@ -14,6 +14,9 @@ TARGET = radit
 
 SOURCES += \
     core/LocutionPack.cpp \
+    widgets/ElevenLabsSettingsDialog.cpp \
+    widgets/Id3TagsDialog.cpp \
+    core/ElevenLabsTts.cpp \
     widgets/AudioItemMeteoClockMaxi.cpp \
     widgets/Planner.cpp \
     widgets/PlannerContents.cpp \
@@ -68,6 +71,9 @@ SOURCES += \
 
 HEADERS += \
     core/LocutionPack.h \
+    widgets/ElevenLabsSettingsDialog.h \
+    widgets/Id3TagsDialog.h \
+    core/ElevenLabsTts.h \
     widgets/AudioItemMeteoClockMaxi.h \
     widgets/Planner.h \
     widgets/PlannerContents.h \
@@ -137,6 +143,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 # -------------------------------------------------
 # mis lib
 # -------------------------------------------------
+win32:LIBS += -lcrypt32
 
 
 win32 {

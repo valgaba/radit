@@ -5,6 +5,7 @@
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/Player.h"
 #include "widgets/FolderPropertiesFrame.h"
+#include "core/ElevenLabsTts.h"
 #include <cmath>
 #include <QDir>
 #include <QDirIterator>
@@ -37,6 +38,123 @@ void AudioItemFolderMaxi::setMixSettings(bool enabled, double seconds)
     if (!std::isfinite(seconds)) return;
     m_mixEnabled = enabled;
     m_mixSeconds = qBound(0.1, seconds, 30.0);
+}
+
+void AudioItemFolderMaxi::setAnnouncementTexts(const QString &intro, const QString &outro,
+                                               int delaySeconds)
+{
+    const QString nextIntro = intro.trimmed();
+    const QString nextOutro = outro.trimmed();
+    if (nextIntro != m_introAnnouncement || nextOutro != m_outroAnnouncement) {
+        m_introAudioPath.clear();
+        m_outroAudioPath.clear();
+    }
+    m_introAnnouncement = nextIntro;
+    m_outroAnnouncement = nextOutro;
+    m_announcementDelaySeconds = qBound(0, delaySeconds, 30);
+}
+
+void AudioItemFolderMaxi::setAnnouncementsEnabled(bool enabled)
+{
+    m_announcementsEnabled = enabled;
+    if (!enabled) {
+        m_introAudioPath.clear();
+        m_outroAudioPath.clear();
+    }
+}
+
+void AudioItemFolderMaxi::setAnnouncementVolumePercent(int percent)
+{
+    m_announcementVolumePercent = qBound(0, percent, 200);
+}
+
+void AudioItemFolderMaxi::setAnnouncementMusicVolumePercent(int percent)
+{
+    m_announcementMusicVolumePercent = qBound(0, percent, 100);
+}
+
+void AudioItemFolderMaxi::setAnnouncementRecoverySeconds(double seconds)
+{
+    if (std::isfinite(seconds))
+        m_announcementRecoverySeconds = qBound(0.1, seconds, 5.0);
+}
+
+QString AudioItemFolderMaxi::resolvedIntroAnnouncement() const
+{
+    if (m_currentTrack.isEmpty()) return {};
+    const AudioFileMetadata metadata=MediaManager::readAudioFileMetadata(m_currentTrack);
+    const QString group=metadata.artist.trimmed().isEmpty() ? QDir(folderPath()).dirName()
+                                                            : metadata.artist.trimmed();
+    const QString title=metadata.title.trimmed().isEmpty()
+        ? QFileInfo(m_currentTrack).completeBaseName() : metadata.title.trimmed();
+    QString text=m_introAnnouncement;
+    text.replace(QStringLiteral("[artist]"),group,Qt::CaseInsensitive);
+    text.replace(QStringLiteral("[title]"),title,Qt::CaseInsensitive);
+    text.replace(QStringLiteral("[album]"),metadata.album.trimmed(),Qt::CaseInsensitive);
+    // Keep templates from older saved lists working.
+    text.replace(QStringLiteral("@grupo"),group,Qt::CaseInsensitive);
+    text.replace(QStringLiteral("@nombrecancion"),title,Qt::CaseInsensitive);
+    return text.trimmed();
+}
+
+QString AudioItemFolderMaxi::resolvedOutroAnnouncement() const
+{
+    if (m_currentTrack.isEmpty()) return {};
+    const AudioFileMetadata metadata=MediaManager::readAudioFileMetadata(m_currentTrack);
+    const QString group=metadata.artist.trimmed().isEmpty() ? QDir(folderPath()).dirName()
+                                                            : metadata.artist.trimmed();
+    const QString title=metadata.title.trimmed().isEmpty()
+        ? QFileInfo(m_currentTrack).completeBaseName() : metadata.title.trimmed();
+    QString text=m_outroAnnouncement;
+    text.replace(QStringLiteral("[artist]"),group,Qt::CaseInsensitive);
+    text.replace(QStringLiteral("[title]"),title,Qt::CaseInsensitive);
+    text.replace(QStringLiteral("[album]"),metadata.album.trimmed(),Qt::CaseInsensitive);
+    text.replace(QStringLiteral("@grupo"),group,Qt::CaseInsensitive);
+    text.replace(QStringLiteral("@nombrecancion"),title,Qt::CaseInsensitive);
+    return text.trimmed();
+}
+
+bool AudioItemFolderMaxi::prepareAnnouncementAudio()
+{
+    if (!m_announcementsEnabled) {
+        m_introAudioPath.clear();
+        m_outroAudioPath.clear();
+        return true;
+    }
+    if (m_announcementPreparing) return false;
+    m_introAudioPath.clear();
+    m_outroAudioPath.clear();
+    const QString intro=resolvedIntroAnnouncement();
+    const QString outro=resolvedOutroAnnouncement();
+    m_announcementRequests=int(!intro.isEmpty())+int(!outro.isEmpty());
+    if (m_announcementRequests==0) return true;
+    m_announcementPreparing=true;
+    const auto finished=[this](bool isIntro,const QString &path,const QString &error) {
+        if (!m_announcementsEnabled) {
+            m_introAudioPath.clear();
+            m_outroAudioPath.clear();
+            if (--m_announcementRequests <= 0) {
+                m_announcementPreparing = false;
+                emit playbackPreparationReady(true);
+            }
+            return;
+        }
+        if (!path.isEmpty()) {
+            if (isIntro) m_introAudioPath=path;
+            else m_outroAudioPath=path;
+        } else if (!error.isEmpty()) {
+            setToolTip(folderPath()+QStringLiteral("\n")+error);
+        }
+        if (--m_announcementRequests<=0) {
+            m_announcementPreparing=false;
+            emit playbackPreparationReady(true); // Keep the music going if TTS is unavailable.
+        }
+    };
+    if (!intro.isEmpty()) ElevenLabsTts::instance()->generate(intro,this,
+        [finished](const QString &path,const QString &error) { finished(true,path,error); });
+    if (!outro.isEmpty()) ElevenLabsTts::instance()->generate(outro,this,
+        [finished](const QString &path,const QString &error) { finished(false,path,error); });
+    return false;
 }
 
 QString AudioItemFolderMaxi::trackKey(const QString &path)
@@ -153,6 +271,7 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
 
 bool AudioItemFolderMaxi::preparePlayback()
 {
+    if (m_trackPrepared) return !m_announcementPreparing;
     if (m_scanning || !m_sequence || m_sequence->tracks.isEmpty()) return false;
     auto &sequence = *m_sequence;
     if (sequence.remaining.isEmpty()) {
@@ -174,10 +293,21 @@ bool AudioItemFolderMaxi::preparePlayback()
         sequence.played.insert(key);
         m_currentTrack = track.path; sequence.lastTrack = key;
         setSecond(track.seconds); setTiempoFile(track.seconds); setSecondStart(0);
-        return true;
+        m_trackPrepared=true;
+        return prepareAnnouncementAudio();
     }
     setFolderPresentation(tr("No files"), false);
     return false;
+}
+
+bool AudioItemFolderMaxi::loadPreparedPlayback(MediaManager *manager)
+{
+    const bool loaded=manager->loadFile(m_currentTrack);
+    m_trackPrepared=false;
+    if (!loaded) return false;
+    setSecond(manager->getDuration());
+    setTiempoFile(second());
+    return true;
 }
 
 QString AudioItemFolderMaxi::playbackName() const
@@ -190,6 +320,11 @@ AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
 {
     auto *item = new AudioItemFolderMaxi(newParent);
     item->setMixSettings(m_mixEnabled, m_mixSeconds);
+    item->setAnnouncementTexts(m_introAnnouncement, m_outroAnnouncement,
+                               m_announcementDelaySeconds);
+    item->setAnnouncementsEnabled(m_announcementsEnabled);
+    item->setAnnouncementVolumePercent(m_announcementVolumePercent);
+    item->setAnnouncementRecoverySeconds(m_announcementRecoverySeconds);
     item->setIsPurge(isPurge()); item->setIsPlayNext(isPlayNext());
     item->setIsLoop(isLoop()); item->setIsSelect(isSelect()); item->setColor(color());
     if (m_scanning) item->setFolderPath(folderPath());

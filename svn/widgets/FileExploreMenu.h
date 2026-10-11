@@ -24,6 +24,7 @@ private:
     QAction *m_copy = nullptr;
     QAction *m_paste = nullptr;
     QAction *m_rename = nullptr;
+    QAction *m_editId3 = nullptr;
     QAction *m_delete = nullptr;
     QAction *m_selectAll = nullptr;
 };

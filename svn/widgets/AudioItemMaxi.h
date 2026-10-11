@@ -110,6 +110,7 @@ public:
      virtual double playbackLimitSeconds() const { return 0.0; }
      virtual bool advancesOnLoop() const { return false; }
      virtual bool preparePlayback() { return true; }
+     virtual bool isPreparingPlayback() const { return false; }
      virtual bool loadPreparedPlayback(MediaManager *manager) { return manager->loadFile(playbackPath()); }
      virtual QString playbackPath() const { return filePath(); }
      virtual QString playbackName() const { return nameFile(); }
@@ -238,6 +239,7 @@ public:
       void requestDelete(AudioItemMaxi* item); //pregunta antes
       void requestAutoDelete(AudioItemMaxi* item); //no pregunta
       void requestPlay(AudioItemMaxi *item);
+      void playbackPreparationReady(bool ready);
 
 
 

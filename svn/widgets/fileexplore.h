@@ -35,6 +35,7 @@ public slots:
     void cutSelectedFiles();
     void pasteFiles();
     void renameSelectedFile();
+    void editId3SelectedFile();
     void deleteSelectedFiles();
     void selectAllFiles();
 

@@ -96,6 +96,24 @@ Player::Player(QWidget *parent) : Frame(parent) {
     m_mixTimer->setInterval(20);
     m_mixTimer->setTimerType(Qt::PreciseTimer);
     connect(m_mixTimer, &QTimer::timeout, this, &Player::updateMix);
+    m_announcementFadeTimer = new QTimer(this);
+    m_announcementFadeTimer->setInterval(25);
+    connect(m_announcementFadeTimer, &QTimer::timeout, this, [this]() {
+        const qint64 fadeDurationMs = qMax(1, m_announcementRecoveryDurationMs);
+        const float progress = std::clamp(float(m_announcementFadeClock.elapsed())
+                                          / float(fadeDurationMs), 0.0f, 1.0f);
+        const float gain = m_announcementFadeStartVolume
+                           + (1.0f - m_announcementFadeStartVolume) * progress;
+        m_announcementRecoveryGain = gain;
+        if (m_announcementManager)
+            m_announcementFadeTimer->stop();
+        else if (m_outgoingManager)
+            updateMix();
+        else if (mediamanager)
+            mediamanager->setVolume(m_playerVolume * gain);
+        if (progress >= 1.0f)
+            m_announcementFadeTimer->stop();
+    });
     m_playbackLimitTimer=new QTimer(this);
     m_playbackLimitTimer->setSingleShot(true);
     connect(m_playbackLimitTimer,&QTimer::timeout,this,[this]() {
@@ -424,7 +442,8 @@ void Player::bindMediaManager()
          }
          emit playbackProgressChanged(frame.position,m_duration,
                                       !mediamanager->isNetworkSource() && m_duration>0.0);
-         tryFolderMix(frame.position);
+         checkFolderAnnouncement(frame);
+         tryFolderMix(frame);
 
        });
 
@@ -526,8 +545,13 @@ void Player::playItem(AudioItemMaxi *item)
 {
     if (!item)
            return;
+    m_preparingPlaybackItem.clear();
     finishMix(false);
     m_mixAttempted = false;
+    m_mixSearchStartPosition = -1.0;
+    m_mixSearchStartLevel = -120.0;
+    m_mixQuietSincePosition = -1.0;
+    m_mixSmoothedLevel = -120.0;
 
 
     if (currentItem && currentItem != item) {
@@ -539,11 +563,43 @@ void Player::playItem(AudioItemMaxi *item)
            return;
        }
        if (!item->preparePlayback()) {
+           if (item->isPreparingPlayback()) {
+               m_preparingPlaybackItem = item;
+               labelnombre->setText(tr("Preparing voice…"));
+               connect(item, &AudioItemMaxi::playbackPreparationReady, this,
+                       [this, guarded = QPointer<AudioItemMaxi>(item)](bool ready) {
+                   if (!guarded || m_preparingPlaybackItem != guarded)
+                       return;
+                   m_preparingPlaybackItem.clear();
+                   if (ready)
+                       startPreparedItem(guarded);
+                   else {
+                       if (auto *meteo=qobject_cast<AudioItemMeteoClockMaxi*>(guarded.data()))
+                           labelnombre->setText(meteo->error());
+                       // A sequential playlist must continue from this item if
+                       // asynchronous preparation fails, rather than leaving
+                       // playback stuck with an empty current item.
+                       if (m_sequenceContents)
+                           advanceSequence();
+                   }
+               });
+               return;
+           }
            const auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(item);
            qWarning().noquote() << "No se pudo preparar el audio:" << item->playbackName()
                                 << (meteoItem ? meteoItem->error() : QString());
            return;
        }
+       startPreparedItem(item);
+}
+
+void Player::startPreparedItem(AudioItemMaxi *item)
+{
+       if (!item || !mediamanager->setDevice(this->devicePlay()))
+           return;
+       m_folderIntroAnnounced=false;
+       m_folderOutroAnnounced=false;
+       m_queuedAnnouncementPath.clear();
        if (!item->loadPreparedPlayback(mediamanager)) {
            const auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(item);
            qWarning().noquote() << "No se pudo cargar el audio:" << item->playbackName()
@@ -580,6 +636,116 @@ void Player::playItem(AudioItemMaxi *item)
        labelnombre->setText(item->playbackName());
        emit currentPlaybackNameChanged(labelnombre->text());
        btnpause->SetIcon("Pausemini.svg");
+}
+
+void Player::checkFolderAnnouncement(const AudioFrame &frame)
+{
+    auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    if (!folder || !mediamanager->isPlaying()) return;
+    if (!m_folderIntroAnnounced && frame.position>=folder->announcementDelaySeconds()) {
+        m_folderIntroAnnounced=true;
+        const QString path=folder->introAnnouncementPath();
+        if (!path.isEmpty()) {
+            if (m_announcementManager) m_queuedAnnouncementPath=path;
+            else startFolderAnnouncement(path);
+        }
+    }
+    if (!m_folderOutroAnnounced && m_duration>0.0 && m_duration-frame.position<=10.0) {
+        m_folderOutroAnnounced=true;
+        const QString path=folder->outroAnnouncementPath();
+        if (!path.isEmpty()) {
+            if (m_announcementManager) m_queuedAnnouncementPath=path;
+            else startFolderAnnouncement(path);
+        }
+    }
+}
+
+float Player::folderAnnouncementMusicGain() const
+{
+    return m_announcementMusicGain;
+}
+
+void Player::startFolderAnnouncement(const QString &audioPath, int voiceVolumePercent,
+                                     int musicVolumePercent, double recoverySeconds)
+{
+    if (audioPath.isEmpty() || !mediamanager->isPlaying()) return;
+    m_announcementFadeTimer->stop();
+    auto *voice=new MediaManager(this);
+    if (!voice->setDevice(devicePlay()) || !voice->loadFile(audioPath)) {
+        delete voice;
+        return;
+    }
+    auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    const float voiceVolume = voiceVolumePercent >= 0 ? qBound(0, voiceVolumePercent, 200) / 100.0f
+        : folder ? folder->announcementVolumePercent() / 100.0f : 1.0f;
+    m_announcementMusicGain = musicVolumePercent >= 0
+        ? qBound(0, musicVolumePercent, 100) / 100.0f
+        : folder ? folder->announcementMusicVolumePercent() / 100.0f : 0.08f;
+    const double recovery = recoverySeconds >= 0.0 ? qBound(0.1, recoverySeconds, 5.0)
+        : folder ? folder->announcementRecoverySeconds() : 1.0;
+    m_announcementRecoveryDurationMs = qRound(recovery * 1000.0);
+    m_announcementVoiceGain = voiceVolume;
+    voice->setVolume(voiceVolume);
+    m_announcementManager=voice;
+    const float musicGain = folderAnnouncementMusicGain();
+    m_announcementRecoveryGain=musicGain;
+    mediamanager->setVolume(m_playerVolume*musicGain);
+    if (m_outgoingManager) {
+        const MixGains gains=equalPowerGains(m_mixProgress);
+        m_outgoingManager->setVolume(m_playerVolume*gains.outgoing*musicGain);
+    }
+    connect(voice,&MediaManager::playbackFinished,this,[this,voice]() {
+        if (m_announcementManager!=voice) return;
+        m_announcementManager=nullptr;
+        voice->stop();
+        voice->deleteLater();
+        const QString next=m_queuedAnnouncementPath;
+        m_queuedAnnouncementPath.clear();
+        if (!next.isEmpty()) startFolderAnnouncement(next);
+        else fadeMusicBackAfterAnnouncement();
+    });
+    connect(voice,&MediaManager::playbackError,this,[this,voice](const QString &) {
+        if (m_announcementManager!=voice) return;
+        stopFolderAnnouncement();
+    });
+    voice->play();
+}
+
+void Player::stopFolderAnnouncement()
+{
+    if (m_announcementFadeTimer)
+        m_announcementFadeTimer->stop();
+    m_queuedAnnouncementPath.clear();
+    if (m_announcementManager) {
+        MediaManager *voice=m_announcementManager;
+        m_announcementManager=nullptr;
+        voice->stop();
+        voice->deleteLater();
+        m_announcementRecoveryGain=1.0f;
+        if (mediamanager) setVolume(m_playerVolume);
+    }
+}
+
+void Player::fadeMusicBackAfterAnnouncement()
+{
+    if (!mediamanager)
+        return;
+    m_announcementFadeStartVolume = folderAnnouncementMusicGain();
+    m_announcementRecoveryGain = m_announcementFadeStartVolume;
+    m_announcementFadeClock.restart();
+    m_announcementFadeTimer->start();
+}
+
+bool Player::previewFolderAnnouncement(const QString &audioPath, int voiceVolumePercent,
+                                       int musicVolumePercent, double recoverySeconds)
+{
+    if (audioPath.isEmpty() || !mediamanager || !mediamanager->isPlaying()
+        || !qobject_cast<AudioItemFolderMaxi*>(currentItem))
+        return false;
+    if (m_announcementManager)
+        stopFolderAnnouncement();
+    startFolderAnnouncement(audioPath, voiceVolumePercent, musicVolumePercent, recoverySeconds);
+    return true;
 }
 
 bool Player::startSequentialPlayback(ContentsBase *contents, bool repeat)
@@ -635,6 +801,13 @@ bool Player::playSequenceFrom(int index)
             m_sequenceIndex=candidate;
             return true;
         }
+        // Some items (for example ElevenLabs MeteoClock) prepare their audio
+        // asynchronously. Keep the sequence on that item while it prepares;
+        // trying the next row here silently skips the pending item.
+        if (m_preparingPlaybackItem==item) {
+            m_sequenceIndex=candidate;
+            return true;
+        }
     }
     return false;
 }
@@ -672,13 +845,57 @@ void Player::advanceSequence()
     emit sequentialPlaybackFinished();
 }
 
-bool Player::tryFolderMix(double position)
+bool Player::tryFolderMix(const AudioFrame &frame)
 {
     auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
     if (!folder || !folder->mixEnabled() || m_outgoingManager || m_pendingMixManager || m_mixAttempted
-        || m_userIsSeeking || !mediamanager->isPlaying()) return false;
-    const double remaining = m_duration - position;
-    if (remaining <= 0.02 || remaining > folder->mixSeconds()) return false;
+        || !mediamanager->isPlaying()) return false;
+    const double remaining = m_duration - frame.position;
+    if (remaining <= 0.02) return false;
+
+    // Look slightly ahead of the configured mix duration so a natural quiet/fade
+    // near the end can choose the transition point. The configured duration stays
+    // the maximum overlap; if no useful point is found, the old fixed-time start
+    // remains the fallback.
+    const double searchWindow = std::min({30.0, folder->mixSeconds() + 5.0,
+                                          std::max(folder->mixSeconds(), m_duration * 0.25)});
+    if (remaining > searchWindow || m_userIsSeeking) {
+        m_mixSearchStartPosition = -1.0;
+        m_mixQuietSincePosition = -1.0;
+        return false;
+    }
+
+    double level = std::max(double(frame.left), double(frame.right));
+    // AudioFrame levels include the master, announcement ducking and recovery
+    // gains. Compensate so these output controls do not look like a natural fade.
+    const float outputGain = m_playerVolume
+        * (m_announcementManager ? folderAnnouncementMusicGain() : m_announcementRecoveryGain);
+    if (outputGain > 0.001f)
+        level -= 20.0 * std::log10(double(outputGain));
+    if (m_mixSearchStartPosition < 0.0) {
+        m_mixSearchStartPosition = frame.position;
+        m_mixSmoothedLevel = level;
+        m_mixSearchStartLevel = level;
+    } else {
+        // Smooth short peaks so a single quiet frame cannot trigger a transition.
+        m_mixSmoothedLevel = 0.7 * m_mixSmoothedLevel + 0.3 * level;
+    }
+
+    if (m_mixSmoothedLevel <= -32.0) {
+        if (m_mixQuietSincePosition < 0.0)
+            m_mixQuietSincePosition = frame.position;
+    } else if (m_mixSmoothedLevel > -28.0) {
+        m_mixQuietSincePosition = -1.0;
+    }
+
+    const bool sustainedQuiet = m_mixQuietSincePosition >= 0.0
+        && frame.position - m_mixQuietSincePosition >= 0.30;
+    const bool naturalFade = frame.position - m_mixSearchStartPosition >= 0.50
+        && m_mixSearchStartLevel - m_mixSmoothedLevel >= 9.0
+        && m_mixSmoothedLevel <= -18.0;
+    const bool fixedFallback = remaining <= folder->mixSeconds();
+    if (!sustainedQuiet && !naturalFade && !fixedFallback)
+        return false;
     AudioItemMaxi *next = folderTransitionTarget(
         folder,m_sequenceContents.data(),m_sequenceIndex,m_sequenceRepeat);
     if (!next) return false;
@@ -696,11 +913,32 @@ bool Player::tryFolderMix(double position)
         nextFolder->setSecond(oldSeconds); nextFolder->setTiempoFile(oldSeconds); nextFolder->setSecondStart(oldStart);
     };
     auto *incoming = new MediaManager(this);
-    const bool prepared = incoming->setDevice(devicePlay()) && next->preparePlayback();
+    if (!incoming->setDevice(devicePlay())) {
+        delete incoming;
+        return false;
+    }
+    const bool prepared = next->preparePlayback();
+    if (!prepared && next->isPreparingPlayback()) {
+        m_pendingMixManager = incoming;
+        m_pendingMixItem = next;
+        m_pendingMixNeedsPlaybackPreparation = true;
+        connect(next, &AudioItemMaxi::playbackPreparationReady, this,
+                [this, guarded = QPointer<AudioItemMaxi>(next)](bool ready) {
+            if (!guarded || m_pendingMixItem != guarded)
+                return;
+            if (!ready) {
+                cancelPendingMix();
+                return;
+            }
+            finishPendingMix();
+        });
+        return false;
+    }
     if (prepared && next->isLiveStream()) {
         // Keep the current audio playing until the asynchronous radio connection is ready.
         incoming->setVolume(0.0f);
         m_pendingMixManager = incoming; m_pendingMixItem = next;
+        m_pendingMixNeedsPlaybackPreparation = false;
         connect(incoming, &MediaManager::networkLoadingChanged, this, [this, incoming](bool loading) {
             if (incoming == m_pendingMixManager && !loading) finishPendingMix();
         });
@@ -754,6 +992,12 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
             m_outgoingLeft = frame.left; m_outgoingRight = frame.right;
         });
     currentItem = next;
+    m_folderIntroAnnounced=false;
+    m_folderOutroAnnounced=false;
+    m_mixSearchStartPosition = -1.0;
+    m_mixSearchStartLevel = -120.0;
+    m_mixQuietSincePosition = -1.0;
+    m_mixSmoothedLevel = -120.0;
     startPlaybackLimit(next->playbackLimitSeconds());
     next->setPlaying(true); next->playColor(true); next->setIsPlayNext(false);
     m_duration = incoming->getDuration();
@@ -779,17 +1023,25 @@ void Player::finishPendingMix()
     }
     if (!mediamanager->isPlaying()) return; // Pause also holds a connection that becomes ready.
     MediaManager *incoming = m_pendingMixManager;
-    if (!incoming || incoming->isLoading()) return;
+    auto *next = m_pendingMixItem.data();
+    if (!incoming || !next) return;
+    if (m_pendingMixNeedsPlaybackPreparation) {
+        if (next->isPreparingPlayback()) return;
+        if (!next->loadPreparedPlayback(incoming)) { cancelPendingMix(); return; }
+        m_pendingMixNeedsPlaybackPreparation = false;
+    }
+    if (incoming->isLoading()) return;
+    incoming->setVolume(0.0f);
     incoming->play();
     const double remaining = m_duration - mediamanager->getPosition();
     if (!incoming->isPlaying() || remaining <= 0.02) { cancelPendingMix(); return; }
-    auto *next = m_pendingMixItem.data();
     m_pendingMixManager = nullptr; m_pendingMixItem.clear();
     beginMix(next, incoming, remaining);
 }
 
 void Player::cancelPendingMix()
 {
+    m_pendingMixNeedsPlaybackPreparation = false;
     if (!m_pendingMixManager) return;
     MediaManager *pending = m_pendingMixManager;
     m_pendingMixManager = nullptr; m_pendingMixItem.clear();
@@ -802,8 +1054,9 @@ void Player::updateMix()
     const int elapsed = m_mixElapsedMs + int(m_mixClock.elapsed());
     m_mixProgress = std::clamp(float(elapsed) / m_mixDurationMs, 0.0f, 1.0f);
     const MixGains gains=equalPowerGains(m_mixProgress);
-    mediamanager->setVolume(m_playerVolume * gains.incoming);
-    m_outgoingManager->setVolume(m_playerVolume * gains.outgoing);
+    const float announcementGain = m_announcementManager ? folderAnnouncementMusicGain() : m_announcementRecoveryGain;
+    mediamanager->setVolume(m_playerVolume * gains.incoming * announcementGain);
+    m_outgoingManager->setVolume(m_playerVolume * gains.outgoing * announcementGain);
     if (elapsed >= m_mixDurationMs) finishMix(true);
 }
 
@@ -816,7 +1069,7 @@ void Player::finishMix(bool purge)
     m_outgoingManager = nullptr;
     outgoing->stop(); outgoing->deleteLater();
     m_mixProgress = 1.0f;
-    mediamanager->setVolume(m_playerVolume);
+    mediamanager->setVolume(m_playerVolume * (m_announcementManager ? folderAnnouncementMusicGain() : m_announcementRecoveryGain));
     auto item = m_outgoingItem;
     m_outgoingItem.clear();
     if (purge && m_purgeOutgoing && item && item != currentItem)
@@ -831,6 +1084,7 @@ void Player::pauseMain()
 
         if (mediamanager->isPlaying()) {
             mediamanager->pause();
+            if (m_announcementManager) m_announcementManager->pause();
             pausePlaybackLimit();
             if (m_outgoingManager) {
                 m_outgoingManager->pause();
@@ -842,6 +1096,7 @@ void Player::pauseMain()
 
         } else {
             mediamanager->play();
+            if (m_announcementManager) m_announcementManager->play();
             resumePlaybackLimit();
             if (m_pendingMixManager && !m_pendingMixManager->isLoading()) finishPendingMix();
             if (m_outgoingManager) {
@@ -867,6 +1122,8 @@ void Player::dropEvent(QDropEvent *event)
 
 void Player::stopMain()
 {
+    m_preparingPlaybackItem.clear();
+    stopFolderAnnouncement();
     if (m_playbackLimitTimer)
         m_playbackLimitTimer->stop();
     m_playbackLimitRemainingMs=0;
@@ -940,9 +1197,13 @@ bool Player::setVolume(float volume)
     if (!std::isfinite(volume)) return false;
     m_playerVolume = std::clamp(volume, 0.0f, 1.0f);
     const MixGains gains=equalPowerGains(m_mixProgress);
-    bool result = mediamanager->setVolume(m_playerVolume * gains.incoming);
+    const float announcementGain = m_announcementManager ? folderAnnouncementMusicGain() : m_announcementRecoveryGain;
+    bool result = mediamanager->setVolume(m_playerVolume * gains.incoming * announcementGain);
     if (m_outgoingManager)
-        result = m_outgoingManager->setVolume(m_playerVolume * gains.outgoing) && result;
+        result = m_outgoingManager->setVolume(m_playerVolume * gains.outgoing * announcementGain) && result;
+    if (m_announcementManager) {
+        result = m_announcementManager->setVolume(m_announcementVoiceGain) && result;
+    }
     return result;
 }
 

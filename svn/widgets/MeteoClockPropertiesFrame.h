@@ -63,6 +63,11 @@ public:
         layout->setSpacing(8);
         root->addWidget(content);
 
+        m_aiVoice = new QCheckBox(tr("Use ElevenLabs voice"), content);
+        m_aiVoice->setObjectName("MeteoUseElevenLabs");
+        m_aiVoice->setChecked(item->usesElevenLabs());
+        layout->addWidget(m_aiVoice);
+
         auto *voicePackRow = new QHBoxLayout;
         voicePackRow->setSpacing(8);
         auto *voicePackLabel = new Label(content);
@@ -117,11 +122,15 @@ public:
         buttons->addWidget(save);
         layout->addLayout(buttons);
 
-        const auto validate = [this, save]() {
-            const bool hasVoicePack = !m_voicePackPath->text().isEmpty();
+        const auto validate = [this, save, voicePackLabel, browse]() {
+            const bool hasVoicePack = !m_aiVoice->isChecked() && !m_voicePackPath->text().isEmpty();
+            voicePackLabel->setEnabled(!m_aiVoice->isChecked());
+            m_voicePackPath->setEnabled(!m_aiVoice->isChecked());
+            browse->setEnabled(!m_aiVoice->isChecked());
             save->setEnabled((m_time->isChecked() || m_weather->isChecked())
-                             && (!hasVoicePack || QFileInfo(m_voicePackPath->text()).isFile()));
+                             && (m_aiVoice->isChecked() || (hasVoicePack && QFileInfo(m_voicePackPath->text()).isFile())));
         };
+        connect(m_aiVoice, &QCheckBox::toggled, this, validate);
         connect(m_time, &QCheckBox::toggled, this, [this, validate](bool checked) {
             if (!checked && !m_weather->isChecked()) {
                 m_time->blockSignals(true);
@@ -153,6 +162,7 @@ public:
                 return;
             }
             m_item->setAnnouncementOptions(m_time->isChecked(), m_weather->isChecked());
+            m_item->setUseElevenLabs(m_aiVoice->isChecked());
             const QString selectedPath = m_voicePackPath->text();
             if (!selectedPath.isEmpty() && selectedPath != m_item->filePath())
                 m_item->setVoicePackPath(selectedPath);
@@ -192,6 +202,7 @@ private:
     QLineEdit *m_voicePackPath = nullptr;
     QCheckBox *m_time = nullptr;
     QCheckBox *m_weather = nullptr;
+    QCheckBox *m_aiVoice = nullptr;
     bool m_dragging = false;
     QPoint m_dragOffset;
 };

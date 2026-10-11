@@ -24,6 +24,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
+#include <QSet>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QProcess>
@@ -1317,6 +1319,179 @@ AudioFileMetadata MediaManager::readAudioFileMetadata(const QString &filePath)
     return metadata;
 }
 
+bool MediaManager::writeAudioFileMetadata(const QString &filePath,
+                                          const AudioFileMetadata &metadata,
+                                          QString *error)
+{
+    const auto fail = [error](const QString &message) {
+        if (error) *error = message;
+        return false;
+    };
+    if (QFileInfo(filePath).suffix().compare(QStringLiteral("mp3"), Qt::CaseInsensitive) != 0)
+        return fail(QObject::tr("ID3 editing is available for MP3 files."));
+
+    QFile input(filePath);
+    if (!input.open(QIODevice::ReadOnly))
+        return fail(QObject::tr("Could not open the audio file: %1").arg(input.errorString()));
+
+    int version = 3;
+    qint64 oldTagEnd = 0;
+    QByteArray oldTagBody;
+    const QByteArray header = input.read(10);
+    if (header.size() == 10 && header.startsWith("ID3")) {
+        version = static_cast<uchar>(header[3]);
+        if (version != 3 && version != 4)
+            return fail(QObject::tr("This ID3 version is not supported for editing."));
+        const uchar flags = static_cast<uchar>(header[5]);
+        if ((flags & 0xC0) || (version == 4 && (flags & 0x10)))
+            return fail(QObject::tr("This ID3 tag uses compression, unsynchronisation or a footer that Radit cannot safely rewrite."));
+        const auto syncSafe = [](const char *bytes) -> quint32 {
+            return (quint32(static_cast<uchar>(bytes[0]) & 0x7f) << 21)
+                 | (quint32(static_cast<uchar>(bytes[1]) & 0x7f) << 14)
+                 | (quint32(static_cast<uchar>(bytes[2]) & 0x7f) << 7)
+                 | quint32(static_cast<uchar>(bytes[3]) & 0x7f);
+        };
+        const quint32 bodySize = syncSafe(header.constData() + 6);
+        if (bodySize > 16u * 1024u * 1024u || qint64(10) + bodySize > input.size())
+            return fail(QObject::tr("The ID3 tag is invalid or too large."));
+        oldTagBody = input.read(bodySize);
+        if (oldTagBody.size() != int(bodySize))
+            return fail(QObject::tr("Could not read the complete ID3 tag."));
+        oldTagEnd = 10 + bodySize;
+    } else {
+        if (!input.seek(0))
+            return fail(QObject::tr("Could not seek to the start of the audio file."));
+    }
+
+    struct Id3Frame { QByteArray id; QByteArray flags; QByteArray body; };
+    QVector<Id3Frame> frames;
+    const QSet<QByteArray> editableFrames = {"TIT2", "TPE1", "TALB", "TYER", "TDRC", "COMM", "TCON"};
+    qsizetype cursor = 0;
+    while (cursor + 10 <= oldTagBody.size()) {
+        const char *frame = oldTagBody.constData() + cursor;
+        if (frame[0] == 0) break;
+        const QByteArray id(frame, 4);
+        quint32 frameSize = 0;
+        if (version == 4) {
+            frameSize = (quint32(static_cast<uchar>(frame[4]) & 0x7f) << 21)
+                      | (quint32(static_cast<uchar>(frame[5]) & 0x7f) << 14)
+                      | (quint32(static_cast<uchar>(frame[6]) & 0x7f) << 7)
+                      | quint32(static_cast<uchar>(frame[7]) & 0x7f);
+        } else {
+            frameSize = (quint32(static_cast<uchar>(frame[4])) << 24)
+                      | (quint32(static_cast<uchar>(frame[5])) << 16)
+                      | (quint32(static_cast<uchar>(frame[6])) << 8)
+                      | quint32(static_cast<uchar>(frame[7]));
+        }
+        cursor += 10;
+        if (frameSize > quint32(oldTagBody.size() - cursor))
+            return fail(QObject::tr("The ID3 tag contains a damaged frame."));
+        if (!editableFrames.contains(id))
+            frames.append({id, QByteArray(frame + 8, 2), oldTagBody.mid(cursor, frameSize)});
+        cursor += frameSize;
+    }
+
+    const auto utf16Le = [](const QString &text, bool terminate) {
+        QByteArray out("\xFF\xFE", 2);
+        const ushort *chars = text.utf16();
+        for (qsizetype i = 0; i < text.size(); ++i) {
+            const ushort ch = chars[i];
+            out.append(char(ch & 0xff));
+            out.append(char((ch >> 8) & 0xff));
+        }
+        if (terminate) out.append("\0\0", 2);
+        return out;
+    };
+    const auto textBody = [&](const QString &text) {
+        QByteArray body;
+        if (text.isEmpty()) return body;
+        if (version == 4) {
+            body.append(char(3));
+            body.append(text.toUtf8());
+            body.append('\0');
+        } else {
+            body.append(char(1));
+            body.append(utf16Le(text, true));
+        }
+        return body;
+    };
+    const auto addText = [&](const QByteArray &id, const QString &text) {
+        const QByteArray body = textBody(text.trimmed());
+        if (!body.isEmpty()) frames.append({id, QByteArray(2, '\0'), body});
+    };
+    addText("TIT2", metadata.title);
+    addText("TPE1", metadata.artist);
+    addText("TALB", metadata.album);
+    addText(version == 4 ? QByteArray("TDRC") : QByteArray("TYER"), metadata.year);
+    addText("TCON", metadata.genre);
+    if (!metadata.comment.trimmed().isEmpty()) {
+        QByteArray body;
+        if (version == 4) {
+            body.append(char(3)); body.append("eng", 3); body.append('\0');
+            body.append(metadata.comment.trimmed().toUtf8()); body.append('\0');
+        } else {
+            body.append(char(1)); body.append("eng", 3); body.append(utf16Le(QString(), false));
+            body.append("\0\0", 2); body.append(utf16Le(metadata.comment.trimmed(), true));
+        }
+        frames.append({"COMM", QByteArray(2, '\0'), body});
+    }
+
+    QByteArray encodedFrames;
+    for (const Id3Frame &frame : frames) {
+        if (frame.id.size() != 4 || frame.body.size() > 0x0fffffff)
+            return fail(QObject::tr("An ID3 frame is too large to save."));
+        encodedFrames.append(frame.id);
+        const quint32 size = quint32(frame.body.size());
+        if (version == 4) {
+            encodedFrames.append(char((size >> 21) & 0x7f));
+            encodedFrames.append(char((size >> 14) & 0x7f));
+            encodedFrames.append(char((size >> 7) & 0x7f));
+            encodedFrames.append(char(size & 0x7f));
+        } else {
+            encodedFrames.append(char((size >> 24) & 0xff));
+            encodedFrames.append(char((size >> 16) & 0xff));
+            encodedFrames.append(char((size >> 8) & 0xff));
+            encodedFrames.append(char(size & 0xff));
+        }
+        encodedFrames.append(frame.flags);
+        encodedFrames.append(frame.body);
+    }
+    encodedFrames.append(QByteArray(1024, '\0'));
+    if (encodedFrames.size() > 0x0fffffff)
+        return fail(QObject::tr("The resulting ID3 tag is too large."));
+
+    QByteArray outputHeader("ID3", 3);
+    outputHeader.append(char(version));
+    outputHeader.append(char(0));
+    outputHeader.append(char(0));
+    const quint32 tagSize = quint32(encodedFrames.size());
+    outputHeader.append(char((tagSize >> 21) & 0x7f));
+    outputHeader.append(char((tagSize >> 14) & 0x7f));
+    outputHeader.append(char((tagSize >> 7) & 0x7f));
+    outputHeader.append(char(tagSize & 0x7f));
+
+    QSaveFile output(filePath);
+    if (!output.open(QIODevice::WriteOnly))
+        return fail(QObject::tr("Could not write the audio file: %1").arg(output.errorString()));
+    if (output.write(outputHeader) != outputHeader.size()
+        || output.write(encodedFrames) != encodedFrames.size())
+        return fail(QObject::tr("Could not write the new ID3 tag."));
+    if (!input.seek(oldTagEnd))
+        return fail(QObject::tr("Could not seek past the old ID3 tag."));
+    while (!input.atEnd()) {
+        const QByteArray chunk = input.read(1024 * 1024);
+        if (chunk.isEmpty() && input.error() != QFile::NoError)
+            return fail(QObject::tr("Could not read the audio data: %1").arg(input.errorString()));
+        if (!chunk.isEmpty() && output.write(chunk) != chunk.size())
+            return fail(QObject::tr("Could not copy the audio data: %1").arg(output.errorString()));
+    }
+    input.close();
+    if (!output.commit())
+        return fail(QObject::tr("Could not replace the audio file: %1").arg(output.errorString()));
+    if (error) error->clear();
+    return true;
+}
+
 //****************************************************
 
 
@@ -1355,7 +1530,9 @@ bool MediaManager::setVolume(float volume)
 {
     if (!std::isfinite(volume))
         return false;
-    const float value = std::clamp(volume, 0.0f, 1.0f);
+    // Values above 1.0 are used to boost locally played voice clips; regular
+    // player and master-volume controls remain capped at unity by Player.
+    const float value = std::clamp(volume, 0.0f, 2.0f);
     if (m_backend->stream && !BASS_ChannelSetAttribute(m_backend->stream, BASS_ATTRIB_VOL, value)) {
         qWarning() << "BASS: no se pudo ajustar el volumen, error" << BASS_ErrorGetCode();
         return false;

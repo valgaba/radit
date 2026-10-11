@@ -68,10 +68,18 @@ QJsonArray saveItems(QLayout *layout)
         if (auto *folder = qobject_cast<AudioItemFolderMaxi*>(item)) {
             object["mixEnabled"] = folder->mixEnabled();
             object["mixSeconds"] = folder->mixSeconds();
+            object["introAnnouncement"] = folder->introAnnouncement();
+            object["outroAnnouncement"] = folder->outroAnnouncement();
+            object["announcementDelaySeconds"] = folder->announcementDelaySeconds();
+            object["announcementsEnabled"] = folder->announcementsEnabled();
+            object["announcementVolumePercent"] = folder->announcementVolumePercent();
+            object["announcementMusicVolumePercent"] = folder->announcementMusicVolumePercent();
+            object["announcementRecoverySeconds"] = folder->announcementRecoverySeconds();
         }
         if (auto *meteo = qobject_cast<AudioItemMeteoClockMaxi*>(item)) {
             object["announceTime"] = meteo->announcesTime();
             object["announceWeather"] = meteo->announcesWeather();
+            object["useElevenLabs"] = meteo->usesElevenLabs();
         }
         items.append(object);
     }
@@ -85,7 +93,9 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
         if (!value.isObject()) continue;
         const auto object = value.toObject();
         const QString path = object["url"].toString();
-        if (path.isEmpty()) continue;
+        const bool aiMeteo = object["type"].toString() == "meteo"
+                             && object["useElevenLabs"].toBool();
+        if (path.isEmpty() && !aiMeteo) continue;
         const bool network = MediaManager::isNetworkUrl(path);
         const bool folder = object["type"].toString() == "folder";
         const bool meteo = object["type"].toString() == "meteo";
@@ -97,12 +107,20 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
             auto *folderItem = static_cast<AudioItemFolderMaxi*>(item);
             folderItem->setFolderPath(path);
             folderItem->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
+            folderItem->setAnnouncementTexts(object["introAnnouncement"].toString(),
+                                             object["outroAnnouncement"].toString(),
+                                             object["announcementDelaySeconds"].toInt(5));
+            folderItem->setAnnouncementsEnabled(object["announcementsEnabled"].toBool(true));
+            folderItem->setAnnouncementVolumePercent(object["announcementVolumePercent"].toInt(140));
+            folderItem->setAnnouncementMusicVolumePercent(object["announcementMusicVolumePercent"].toInt(8));
+            folderItem->setAnnouncementRecoverySeconds(object["announcementRecoverySeconds"].toDouble(1.0));
         }
         if (meteo) {
             auto *meteoItem=static_cast<AudioItemMeteoClockMaxi*>(item);
-            meteoItem->setVoicePackPath(path);
+            if (!path.isEmpty()) meteoItem->setVoicePackPath(path);
             meteoItem->setAnnouncementOptions(object["announceTime"].toBool(true),
                                               object["announceWeather"].toBool(true));
+            meteoItem->setUseElevenLabs(object["useElevenLabs"].toBool(false));
         }
         item->setFilePath(path);
         item->setToolTip(path);
@@ -181,7 +199,8 @@ bool validItems(const QJsonArray &items, LoadingDialog &loading)
         const auto item = value.toObject();
         if (item.contains("type") && (!item["type"].isString() ||
             !QStringList{"file", "net", "folder", "meteo"}.contains(item["type"].toString()))) return false;
-        if (!item["url"].isString() || item["url"].toString().isEmpty()
+        const bool aiMeteo=item["type"].toString()=="meteo" && item["useElevenLabs"].toBool();
+        if (!item["url"].isString() || (item["url"].toString().isEmpty() && !aiMeteo)
             || !item["name"].isString() || !item["second"].isDouble()
             || item["second"].toDouble() < 0 || !std::isfinite(item["second"].toDouble()))
             return false;
@@ -192,6 +211,23 @@ bool validItems(const QJsonArray &items, LoadingDialog &loading)
         if (item.contains("mixSeconds") && (!item["mixSeconds"].isDouble()
             || !std::isfinite(item["mixSeconds"].toDouble()) || item["mixSeconds"].toDouble() < 0.1
             || item["mixSeconds"].toDouble() > 30)) return false;
+        if (item.contains("introAnnouncement") && !item["introAnnouncement"].isString()) return false;
+        if (item.contains("outroAnnouncement") && !item["outroAnnouncement"].isString()) return false;
+        if (item.contains("announcementsEnabled") && !item["announcementsEnabled"].isBool()) return false;
+        if (item.contains("announcementVolumePercent") && (!item["announcementVolumePercent"].isDouble()
+            || item["announcementVolumePercent"].toInt(-1) < 0
+            || item["announcementVolumePercent"].toInt(-1) > 200)) return false;
+        if (item.contains("announcementMusicVolumePercent") && (!item["announcementMusicVolumePercent"].isDouble()
+            || item["announcementMusicVolumePercent"].toInt(-1) < 0
+            || item["announcementMusicVolumePercent"].toInt(-1) > 100)) return false;
+        if (item.contains("announcementRecoverySeconds") && (!item["announcementRecoverySeconds"].isDouble()
+            || !std::isfinite(item["announcementRecoverySeconds"].toDouble())
+            || item["announcementRecoverySeconds"].toDouble() < 0.1
+            || item["announcementRecoverySeconds"].toDouble() > 5.0)) return false;
+        if (item.contains("useElevenLabs") && !item["useElevenLabs"].isBool()) return false;
+        if (item.contains("announcementDelaySeconds") && (!item["announcementDelaySeconds"].isDouble()
+            || item["announcementDelaySeconds"].toInt(-1) < 0
+            || item["announcementDelaySeconds"].toInt(-1) > 30)) return false;
         if (item.contains("secondStart") && (!item["secondStart"].isDouble()
             || item["secondStart"].toDouble() < 0
             || !std::isfinite(item["secondStart"].toDouble()))) return false;

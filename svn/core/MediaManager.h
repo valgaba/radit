@@ -97,6 +97,9 @@ public:
 
     static double readFileDuration(const QString &filePath);
     static AudioFileMetadata readAudioFileMetadata(const QString &filePath);
+    static bool writeAudioFileMetadata(const QString &filePath,
+                                       const AudioFileMetadata &metadata,
+                                       QString *error = nullptr);
     double getDurationSecond(const QString &filePath);
     bool loadFile(const QString &filePath);
     bool loadAudioSequence(const QStringList &files, QString *error = nullptr);

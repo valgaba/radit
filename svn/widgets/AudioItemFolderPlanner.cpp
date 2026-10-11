@@ -15,6 +15,12 @@ AudioItemFolderPlanner::AudioItemFolderPlanner(const AudioItemFolderMaxi &source
     : AudioItemFolderPlanner(parent)
 {
     setMixSettings(source.mixEnabled(), source.mixSeconds());
+    setAnnouncementTexts(source.introAnnouncement(), source.outroAnnouncement(),
+                         source.announcementDelaySeconds());
+    setAnnouncementsEnabled(source.announcementsEnabled());
+    setAnnouncementVolumePercent(source.announcementVolumePercent());
+    setAnnouncementMusicVolumePercent(source.announcementMusicVolumePercent());
+    setAnnouncementRecoverySeconds(source.announcementRecoverySeconds());
     setIsPurge(source.isPurge());
     setIsPlayNext(source.isPlayNext());
     setIsLoop(source.isLoop());

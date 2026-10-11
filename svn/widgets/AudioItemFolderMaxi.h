@@ -22,11 +22,31 @@ public:
     bool mixEnabled() const { return m_mixEnabled; }
     double mixSeconds() const { return m_mixSeconds; }
     void setMixSettings(bool enabled, double seconds);
+    QString introAnnouncement() const { return m_introAnnouncement; }
+    QString outroAnnouncement() const { return m_outroAnnouncement; }
+    int announcementDelaySeconds() const { return m_announcementDelaySeconds; }
+    void setAnnouncementTexts(const QString &intro, const QString &outro, int delaySeconds = 5);
+    bool announcementsEnabled() const { return m_announcementsEnabled; }
+    void setAnnouncementsEnabled(bool enabled);
+    int announcementVolumePercent() const { return m_announcementVolumePercent; }
+    void setAnnouncementVolumePercent(int percent);
+    int announcementMusicVolumePercent() const { return m_announcementMusicVolumePercent; }
+    void setAnnouncementMusicVolumePercent(int percent);
+    double announcementRecoverySeconds() const { return m_announcementRecoverySeconds; }
+    void setAnnouncementRecoverySeconds(double seconds);
+    bool hasAnnouncements() const { return m_announcementsEnabled
+        && (!m_introAnnouncement.isEmpty() || !m_outroAnnouncement.isEmpty()); }
+    QString introAnnouncementPath() const { return m_introAudioPath; }
+    QString outroAnnouncementPath() const { return m_outroAudioPath; }
+    QString resolvedIntroAnnouncement() const;
+    QString resolvedOutroAnnouncement() const;
     AudioItemMaxi *copy(QWidget *newParent) const override;
     bool preparePlayback() override;
+    bool isPreparingPlayback() const override { return m_announcementPreparing; }
     bool advancesOnLoop() const override { return true; }
     QString playbackPath() const override { return m_currentTrack; }
     QString playbackName() const override;
+    bool loadPreparedPlayback(MediaManager *manager) override;
 signals:
     void scanFinished();
 private:
@@ -43,12 +63,24 @@ private:
     static std::shared_ptr<Sequence> sequenceForFolder(const QString &path);
     static QString trackKey(const QString &path);
     void updateSequence(const QVector<Track> &tracks);
+    bool prepareAnnouncementAudio();
     QVector<Track> m_tracks;
     std::shared_ptr<Sequence> m_sequence;
     QString m_currentTrack;
     bool m_scanning = false;
-    bool m_mixEnabled = false;
+    bool m_mixEnabled = true;
     double m_mixSeconds = 3.0;
+    QString m_introAnnouncement = QStringLiteral("[excited] ¡Sigues en tu emisora favorita! Te dejamos con [artist] y su tema [title].");
+    QString m_outroAnnouncement;
+    int m_announcementDelaySeconds = 5;
+    bool m_announcementsEnabled = true;
+    int m_announcementVolumePercent = 140;
+    int m_announcementMusicVolumePercent = 8;
+    double m_announcementRecoverySeconds = 1.0;
+    QString m_introAudioPath, m_outroAudioPath;
+    bool m_announcementPreparing = false;
+    bool m_trackPrepared = false;
+    int m_announcementRequests = 0;
     QPointer<Frame> m_propertiesFrame;
     std::shared_ptr<std::atomic_bool> m_cancel;
 };

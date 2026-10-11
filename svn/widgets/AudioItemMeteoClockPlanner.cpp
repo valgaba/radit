@@ -25,6 +25,7 @@ AudioItemMeteoClockPlanner::AudioItemMeteoClockPlanner(const AudioItemMeteoClock
     setColor(source.color());
     setToolTip(source.toolTip());
     setAnnouncementOptions(source.announcesTime(),source.announcesWeather());
+    setUseElevenLabs(source.usesElevenLabs());
 }
 
 AudioItemMaxi *AudioItemMeteoClockPlanner::copy(QWidget *newParent) const

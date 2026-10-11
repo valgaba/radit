@@ -20,6 +20,7 @@
 #include "widgets/fileexplore.h"
 
 #include <QAction>
+#include <QFileInfo>
 #include <QKeySequence>
 
 FileExploreMenu::FileExploreMenu(FileExplore *parent, QWidget *shortcutTarget)
@@ -49,6 +50,7 @@ void FileExploreMenu::setupActions(QWidget *shortcutTarget)
     m_paste = action(tr("Paste"), ":/icons/ActionPaste.svg", QKeySequence::Paste);
     addSeparator();
     m_rename = action(tr("Rename"), ":/icons/rename.svg", QKeySequence(Qt::Key_F2));
+    m_editId3 = action(tr("View/Edit ID3 tags..."), ":/icons/settings.svg", QKeySequence());
     m_delete = action(tr("Delete"), ":/icons/Remove.svg", QKeySequence::Delete);
     addSeparator();
     m_selectAll = action(tr("Select All"), ":/icons/Selectall.svg", QKeySequence::SelectAll);
@@ -60,6 +62,7 @@ void FileExploreMenu::connectActions()
     connect(m_copy, &QAction::triggered, m_explorer, &FileExplore::copySelectedFiles);
     connect(m_paste, &QAction::triggered, m_explorer, &FileExplore::pasteFiles);
     connect(m_rename, &QAction::triggered, m_explorer, &FileExplore::renameSelectedFile);
+    connect(m_editId3, &QAction::triggered, m_explorer, &FileExplore::editId3SelectedFile);
     connect(m_delete, &QAction::triggered, m_explorer, &FileExplore::deleteSelectedFiles);
     connect(m_selectAll, &QAction::triggered, m_explorer, &FileExplore::selectAllFiles);
 }
@@ -71,6 +74,9 @@ void FileExploreMenu::updateActions()
     m_copy->setEnabled(!files.isEmpty());
     m_delete->setEnabled(!files.isEmpty());
     m_rename->setEnabled(files.size() == 1);
+    const bool singleMp3 = files.size() == 1
+        && QFileInfo(files.first()).suffix().compare(QStringLiteral("mp3"), Qt::CaseInsensitive) == 0;
+    m_editId3->setVisible(singleMp3);
     m_paste->setEnabled(m_explorer->canPasteFiles());
 }
 

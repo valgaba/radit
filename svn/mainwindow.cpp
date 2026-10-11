@@ -52,6 +52,7 @@
 #include "widgets/MeteoClock.h"
 #include "widgets/Planner.h"
 #include "widgets/Player.h"
+#include "widgets/ElevenLabsSettingsDialog.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -79,6 +80,15 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
        quitAction->setMenuRole(QAction::QuitRole);
        connect(quitAction, &QAction::triggered, this, &QWidget::close);
        QMenu *vistasMenu = menubar->addMenu(tr("&View"));
+
+       QMenu *toolsMenu = menubar->addMenu(tr("&Tools"));
+       QMenu *aiVoicesMenu = toolsMenu->addMenu(tr("AI voices (experimental)"));
+       QAction *elevenLabsSettings = aiVoicesMenu->addAction(tr("Configure ElevenLabs..."));
+       elevenLabsSettings->setObjectName("ConfigureElevenLabsAction");
+       connect(elevenLabsSettings, &QAction::triggered, this, [this]() {
+           ElevenLabsSettingsDialog dialog(this);
+           dialog.exec();
+       });
 
 
        // Crear submenús

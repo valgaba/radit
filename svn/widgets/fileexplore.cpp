@@ -19,6 +19,7 @@
 #include "widgets/FileExploreMenu.h"
 #include "widgets/FileExploreModel.h"
 #include "widgets/LoadingProgress.h"
+#include "widgets/Id3TagsDialog.h"
 #include "widgets/menu.h"
 #include <functional>
 #include <QKeySequence>
@@ -651,6 +652,16 @@ QStringList FileExplore::selectedFilePaths() const
     }
     paths.removeDuplicates();
     return paths;
+}
+
+void FileExplore::editId3SelectedFile()
+{
+    const QStringList files = selectedFilePaths();
+    if (files.size() != 1
+        || QFileInfo(files.first()).suffix().compare(QStringLiteral("mp3"), Qt::CaseInsensitive) != 0)
+        return;
+    Id3TagsDialog dialog(files.first(), this);
+    dialog.exec();
 }
 
 QString FileExplore::pasteDestination() const

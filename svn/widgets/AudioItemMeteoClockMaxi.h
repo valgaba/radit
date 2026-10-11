@@ -14,6 +14,9 @@ public:
     void setVoicePackPath(const QString &path);
     bool announcesTime() const { return m_announceTime; }
     bool announcesWeather() const { return m_announceWeather; }
+    bool usesElevenLabs() const { return m_useAiVoice; }
+    void setUseElevenLabs(bool enabled) { m_useAiVoice = enabled; }
+    bool isPreparingPlayback() const override { return m_aiPreparing; }
     void setAnnouncementOptions(bool announceTime, bool announceWeather);
     bool isLoading() const;
     QString error() const { return m_error; }
@@ -34,6 +37,9 @@ private:
     QPointer<QWidget> m_optionsFrame;
     QStringList m_clips;
     QString m_error, m_announcement;
+    QString m_aiAudioPath;
+    bool m_aiPreparing = false;
+    bool m_useAiVoice = false;
     bool m_announceTime = true;
     bool m_announceWeather = true;
 };
