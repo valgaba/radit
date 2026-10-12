@@ -6,6 +6,9 @@
 #include <QPixmap>
 #include <QDebug>
 #include <QFile>
+#include <QDir>
+#include <QSettings>
+#include "core/SpanishTranslator.h"
 
 
 /*int main(int argc, char *argv[])
@@ -49,6 +52,13 @@
 
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
+    SpanishTranslator spanishTranslator;
+    const QString settingsPath=QDir(QCoreApplication::applicationDirPath())
+                                   .filePath(QStringLiteral("interface.ini"));
+    QSettings settings(settingsPath,QSettings::IniFormat);
+    if (settings.value(QStringLiteral("Interface/language"),QStringLiteral("en")).toString()
+        ==QLatin1String("es"))
+        a.installTranslator(&spanishTranslator);
     a.setWindowIcon(QIcon(":/icons/radit.ico"));
 
     //  Cargar y aplicar la hoja de estilos (QSS)

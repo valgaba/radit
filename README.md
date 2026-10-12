@@ -8,7 +8,7 @@ Open-source radio automation software.
 
 **These are development builds, currently in testing. They may contain bugs and incomplete features.**
 
-1. Open the [Releases page](https://github.com/valgaba/radit/releases) and download `binaries.zip` from a development release.
+1. Download the [current Windows build](https://github.com/valgaba/radit/releases/download/dev-2026-10-09/radit_1_0_0.zip) (`radit_1_0_0.zip`).
 2. Extract the entire `binaries` folder, preserving its subfolders.
 3. Run `binaries/radit.exe`.
 
@@ -56,7 +56,7 @@ Radit es un proyecto de software libre para la automatización de emisoras de ra
 
 **Las descargas son versiones de desarrollo en fase de pruebas. Pueden contener errores y funciones incompletas.**
 
-Descarga `binaries.zip` desde [Releases](https://github.com/valgaba/radit/releases), extrae la carpeta `binaries` completa y ejecuta `radit.exe`. Conserva las bibliotecas y subcarpetas incluidas, especialmente `locution/es_latino.zip` para la locución de MeteoClock. El paquete es portable para Windows de 64 bits y no requiere Qt Creator. Selecciona los dispositivos de audio desde las opciones del reproductor si es necesario.
+Descarga la [versión actual para Windows](https://github.com/valgaba/radit/releases/download/dev-2026-10-09/radit_1_0_0.zip) (`radit_1_0_0.zip`), extrae la carpeta `binaries` completa y ejecuta `radit.exe`. Conserva las bibliotecas y subcarpetas incluidas, especialmente `locution/es_latino.zip` para la locución de MeteoClock. El paquete es portable para Windows de 64 bits y no requiere Qt Creator. Selecciona los dispositivos de audio desde las opciones del reproductor si es necesario.
 
 Puedes seguir las mejoras en las notas de cada versión y comunicar problemas en [Issues](https://github.com/valgaba/radit/issues).
 

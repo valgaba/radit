@@ -53,6 +53,17 @@ bool isPlannerItem(AudioItemMaxi *item)
         || qobject_cast<AudioItemNetPlanner*>(item)
         || qobject_cast<AudioItemMeteoClockPlanner*>(item);
 }
+
+void refreshPlannerStandbyTitle(QWidget *widget, bool modified)
+{
+    while (widget && !qobject_cast<Planner*>(widget))
+        widget=widget->parentWidget();
+    if (auto *planner=qobject_cast<Planner*>(widget)) {
+        if (modified)
+            planner->markDocumentModified();
+        planner->refreshAfterContentLoad();
+    }
+}
 }
 
 PlannerContents::PlannerContents(QWidget *parent) : ContentsPlayer(parent)
@@ -73,6 +84,11 @@ AudioItemMaxi *PlannerContents::createItem(AudioItemMaxi *item)
         }
     }
     AudioItemMaxi *created=ContentsPlayer::createItem(item);
+    if (created) {
+        connect(created,&AudioItemMaxi::propertiesOpened,this,[this]() {
+            emit contentModified();
+        });
+    }
     if (auto *netItem=qobject_cast<AudioItemNetPlanner*>(created)) {
         connect(netItem,&AudioItemNetPlanner::connectionDurationChanged,this,[this]() {
             emit contentDurationsChanged();
@@ -132,10 +148,12 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     QAction *propertiesAction=menu.addAction(QIcon(":/icons/settings.svg"),tr("Properties"));
     QAction *loadListAction=nullptr;
     QAction *saveListAction=nullptr;
+    QAction *saveListAsAction=nullptr;
     if (m_listFileActionsEnabled) {
         menu.addSeparator();
         loadListAction=menu.addAction(tr("Load list"));
         saveListAction=menu.addAction(tr("Save list"));
+        saveListAsAction=menu.addAction(tr("Save as list"));
     }
 
     const bool hasTarget=contextItem!=nullptr;
@@ -161,12 +179,18 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
         else
             radio->deleteLater();
     }
-    else if (chosen==selectAllAction)
+    else if (chosen==selectAllAction) {
         selectAllItems();
-    else if (chosen==unselectAllAction)
+        emit contentModified();
+    }
+    else if (chosen==unselectAllAction) {
         unSelectAllItems();
-    else if (chosen==selectAction)
+        emit contentModified();
+    }
+    else if (chosen==selectAction) {
         selectItems();
+        emit contentModified();
+    }
     else if (chosen==copyAction)
         copySelected();
     else if (chosen==cutAction)
@@ -182,10 +206,22 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
         if (item)
             item->triggerProperties();
     }
-    else if (loadListAction && chosen==loadListAction)
+    else if (loadListAction && chosen==loadListAction) {
+        const int oldItemCount=findChildren<AudioItemMaxi*>().size();
+        const QString oldListFile=listFileName();
         loadItems();
-    else if (saveListAction && chosen==saveListAction)
+        refreshPlannerStandbyTitle(this,oldItemCount!=findChildren<AudioItemMaxi*>().size()
+                                      || oldListFile!=listFileName());
+    }
+    else if (saveListAction && chosen==saveListAction) {
         saveItems();
+        refreshPlannerStandbyTitle(this,false);
+    }
+    else if (saveListAsAction && chosen==saveListAsAction) {
+        const QString oldListFile=listFileName();
+        saveAsItems();
+        refreshPlannerStandbyTitle(this,oldListFile!=listFileName());
+    }
     event->accept();
 }
 

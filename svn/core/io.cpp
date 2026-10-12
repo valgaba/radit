@@ -32,11 +32,13 @@
 #include "core/io.h"
 #include "widgets/AudioItemMaxi.h"
 #include "widgets/AudioItemNetMaxi.h"
+#include "widgets/AudioItemNetPlanner.h"
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFilemaxi.h"
 #include "widgets/TabPlayer.h"
+#include "widgets/PlannerContents.h"
 #include "widgets/tabbar.h"
 #include "widgets/container.h"
 
@@ -81,13 +83,15 @@ QJsonArray saveItems(QLayout *layout)
             object["announceWeather"] = meteo->announcesWeather();
             object["useElevenLabs"] = meteo->usesElevenLabs();
         }
+        if (item->playbackLimitSeconds()>0.0)
+            object["playbackLimitSeconds"] = item->playbackLimitSeconds();
         items.append(object);
     }
     return items;
 }
 
-void loadItems(ContentsBase *contents, const QJsonArray &items,
-               LoadingDialog &loading, int &completed, int total)
+void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
+                   LoadingDialog &loading, int &completed, int total)
 {
     for (const auto &value : items) {
         if (!value.isObject()) continue;
@@ -99,8 +103,10 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
         const bool network = MediaManager::isNetworkUrl(path);
         const bool folder = object["type"].toString() == "folder";
         const bool meteo = object["type"].toString() == "meteo";
+        const bool plannerNet = network && qobject_cast<PlannerContents*>(contents);
         AudioItemMaxi *item = meteo ? static_cast<AudioItemMaxi*>(new AudioItemMeteoClockMaxi(contents)) :
             folder ? static_cast<AudioItemMaxi*>(new AudioItemFolderMaxi(contents)) :
+            plannerNet ? static_cast<AudioItemMaxi*>(new AudioItemNetPlanner(contents)) :
             network ? static_cast<AudioItemMaxi*>(new AudioItemNetMaxi(contents)) :
                       static_cast<AudioItemMaxi*>(new AudioItemFileMaxi(contents));
         if (folder) {
@@ -125,6 +131,8 @@ void loadItems(ContentsBase *contents, const QJsonArray &items,
         item->setFilePath(path);
         item->setToolTip(path);
         item->setNameFile(object["name"].toString());
+        if (object.value("playbackLimitSeconds").isDouble())
+            item->setPlaybackLimitSeconds(object.value("playbackLimitSeconds").toDouble());
         const double seconds = object["second"].toDouble();
         item->setSecond(seconds);
         if (!network && !folder && !meteo) item->setTiempoFile(seconds);
@@ -191,10 +199,10 @@ bool readJson(const QString &filename, QJsonObject &root, QString *error)
     return true;
 }
 
-bool validItems(const QJsonArray &items, LoadingDialog &loading)
+bool validItems(const QJsonArray &items, LoadingDialog *loading = nullptr)
 {
     for (const auto &value : items) {
-        loading.refresh();
+        if (loading) loading->refresh();
         if (!value.isObject()) return false;
         const auto item = value.toObject();
         if (item.contains("type") && (!item["type"].isString() ||
@@ -231,6 +239,10 @@ bool validItems(const QJsonArray &items, LoadingDialog &loading)
         if (item.contains("secondStart") && (!item["secondStart"].isDouble()
             || item["secondStart"].toDouble() < 0
             || !std::isfinite(item["secondStart"].toDouble()))) return false;
+        if (item.contains("playbackLimitSeconds") && (!item["playbackLimitSeconds"].isDouble()
+            || !std::isfinite(item["playbackLimitSeconds"].toDouble())
+            || item["playbackLimitSeconds"].toDouble()<0
+            || item["playbackLimitSeconds"].toDouble()>24*60*60)) return false;
     }
     return true;
 }
@@ -259,16 +271,43 @@ bool Io::LoadListPlayer(ContentsBase *contents, const QString &filename, QString
     if (!readJson(filename, root, error)) return false;
     if (root["version"].toDouble(1) != 1 || !root["items"].isArray())
         return fail(error, tr("Unsupported list format or version."));
-    if (!validItems(root["items"].toArray(), loading))
+    if (!validItems(root["items"].toArray(), &loading))
         return fail(error, tr("Invalid data in the list."));
     if (!target) return fail(error, tr("The destination list was closed."));
     const QJsonArray items = root["items"].toArray();
     int completed = 0;
     loading.setProgress(0, qMax(1, int(items.size())));
-    loadItems(contents, items, loading, completed, qMax(1, int(items.size())));
+    loadJsonItems(contents, items, loading, completed, qMax(1, int(items.size())));
     loading.setProgress(qMax(1, int(items.size())), qMax(1, int(items.size())));
     if (auto *list = qobject_cast<ContentsPlayer*>(contents))
         list->setListFileName(QFileInfo(filename).absoluteFilePath());
+    return true;
+}
+
+QJsonArray Io::serializeItems(QLayout *layout)
+{
+    return saveItems(layout);
+}
+
+bool Io::validateItems(const QJsonArray &items, QWidget *parent)
+{
+    Q_UNUSED(parent);
+    return validItems(items);
+}
+
+bool Io::loadItems(ContentsBase *contents, const QJsonArray &items, QString *error)
+{
+    if (error) error->clear();
+    if (!contents) return fail(error, tr("No list was selected."));
+    if (!validItems(items))
+        return fail(error, tr("Invalid data in the Planner file."));
+    if (importInProgress) return fail(error, tr("Another import is already in progress."));
+    QScopedValueRollback<bool> importing(importInProgress, true);
+    LoadingDialog loading(contents->window(), tr("Loading Planner…"));
+    int completed = 0;
+    loading.setProgress(0, qMax(1, int(items.size())));
+    loadJsonItems(contents, items, loading, completed, qMax(1, int(items.size())));
+    loading.setProgress(qMax(1, int(items.size())), qMax(1, int(items.size())));
     return true;
 }
 
@@ -324,7 +363,7 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         const auto tab = value.toObject();
         if (!tab["name"].isString() || !tab["items"].isArray()
             || (tab.contains("listFile") && !tab["listFile"].isString())
-            || !validItems(tab["items"].toArray(), loading)
+            || !validItems(tab["items"].toArray(), &loading)
             || (tab.contains("color") && !QColor(tab["color"].toString()).isValid()))
             return fail(error, tr("Invalid data in a player tab."));
     }
@@ -358,7 +397,7 @@ bool Io::LoadPlayer(TabPlayer *player, const QString &filename, QString *error)
         player->setTabToolTip(index, name);
         bar->setTabColor(index, QColor(tab["color"].toString()));
         auto *contents = qobject_cast<ContentsPlayer*>(container->widget());
-        loadItems(contents, tab["items"].toArray(), loading, completed, total);
+        loadJsonItems(contents, tab["items"].toArray(), loading, completed, total);
         contents->setListFileName(tab["listFile"].toString());
         loading.setProgress(++completed, total);
     }

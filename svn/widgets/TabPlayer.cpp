@@ -56,18 +56,22 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
 
     connect(menu, &TapPlayerMenu::colorRequested, this, [this, tabbar](const QColor &color) {
         const int index = m_colorTarget ? indexOf(m_colorTarget.data()) : currentIndex();
-        if (index >= 0)
+        if (index >= 0) {
             tabbar->setTabColor(index, color);
+            markModified();
+        }
     });
 
 
 
     connect(menu, &TapPlayerMenu::addListRequested, this, [=]() {
         Container *container = new Container;
+        connectContentsModified(container);
 
         int index = this->addTab(container, "noname");
         this->setTabToolTip(index, "noname"); //  el ToolTip
         this->setCurrentIndex(index);      // seleccionarla automáticamente
+        markModified();
     });
 
 
@@ -110,6 +114,7 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
                 QString newName = dialog.textValue().trimmed();
                 if (!newName.isEmpty()) {
                     this->setTabText(index, newName);
+                    markModified();
                 }
             }
     });
@@ -121,6 +126,7 @@ TabPlayer::TabPlayer(QWidget *parent):Tab(parent){
     Container *container = new Container;
     int index = this->addTab(container, "noname");
     this->setTabToolTip(index, "noname"); //  el ToolTip
+    connectContentsModified(container);
 
 
 }
@@ -135,6 +141,25 @@ void TabPlayer::setPlayerFileName(const QString &filename)
     emit playerFileNameChanged(filename);
 }
 
+void TabPlayer::markModified()
+{
+    if (m_modified)
+        return;
+    m_modified=true;
+    emit modifiedChanged(true);
+}
+
+void TabPlayer::connectContentsModified(QWidget *container)
+{
+    if (!container)
+        return;
+    if (auto *contents=container->findChild<ContentsPlayer*>()) {
+        connect(contents,&ContentsPlayer::contentsModified,this,[this]() {
+            markModified();
+        });
+    }
+}
+
 void TabPlayer::loadPlayer()
 {
     const QString filename = QFileDialog::getOpenFileName(
@@ -146,10 +171,18 @@ void TabPlayer::loadPlayer()
 
 void TabPlayer::loadPlayerFile(const QString &filename)
 {
+    if (!confirmSaveChanges())
+        return;
     Io io;
     QString error;
-    if (!io.LoadPlayer(this, filename, &error))
+    if (!io.LoadPlayer(this, filename, &error)) {
         QMessageBox::warning(this, tr("Load player"), error);
+        return;
+    }
+    for (int index=0; index<count(); ++index)
+        connectContentsModified(widget(index));
+    m_modified=false;
+    emit modifiedChanged(false);
 }
 
 bool TabPlayer::loadListFile(const QString &filename, QString *error)
@@ -161,9 +194,12 @@ bool TabPlayer::loadListFile(const QString &filename, QString *error)
     if (!io.LoadListPlayer(contents, filename, error))
         return false;
     const QString name = QFileInfo(filename).completeBaseName();
-    const int index = addTab(container.release(), name);
+    QWidget *newContainer=container.release();
+    connectContentsModified(newContainer);
+    const int index = addTab(newContainer, name);
     setTabToolTip(index, QFileInfo(filename).absoluteFilePath());
     setCurrentIndex(index);
+    markModified();
     return true;
 }
 
@@ -201,30 +237,52 @@ void TabPlayer::dropEvent(QDropEvent *event)
 
 void TabPlayer::savePlayer()
 {
-    if (m_playerFileName.isEmpty()) {
-        savePlayerAs();
-        return;
-    }
-    Io io;
-    QString error;
-    if (!io.SavePlayer(this, m_playerFileName, &error))
-        QMessageBox::warning(this, tr("Save player"), error);
+    savePlayerFile(false);
 }
 
 void TabPlayer::savePlayerAs()
 {
-    QFileDialog dialog(this, tr("Save player as"), m_playerFileName,
-                       tr("Radit Player (*.player);;All files (*)"));
-    dialog.setAcceptMode(QFileDialog::AcceptSave);
-    dialog.setFileMode(QFileDialog::AnyFile);
-    dialog.setDefaultSuffix("player");
-    if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
-        return;
-    const QString filename = dialog.selectedFiles().first();
+    savePlayerFile(true);
+}
+
+bool TabPlayer::savePlayerFile(bool saveAs)
+{
+    QString filename=m_playerFileName;
+    if (saveAs || filename.isEmpty()) {
+        QFileDialog dialog(this, tr("Save player as"), filename,
+                           tr("Radit Player (*.player);;All files (*)"));
+        dialog.setAcceptMode(QFileDialog::AcceptSave);
+        dialog.setFileMode(QFileDialog::AnyFile);
+        dialog.setDefaultSuffix("player");
+        if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
+            return false;
+        filename=dialog.selectedFiles().first();
+    }
     Io io;
     QString error;
-    if (!io.SavePlayer(this, filename, &error))
+    if (!io.SavePlayer(this, filename, &error)) {
         QMessageBox::warning(this, tr("Save player as"), error);
+        return false;
+    }
+    m_modified=false;
+    emit modifiedChanged(false);
+    return true;
+}
+
+bool TabPlayer::confirmSaveChanges()
+{
+    if (!m_modified)
+        return true;
+    QMessageBox prompt(QMessageBox::Warning,tr("Unsaved Player changes"),
+                       tr("Save the changes to this Player?"),QMessageBox::NoButton,this);
+    QPushButton *saveButton=prompt.addButton(tr("Save"),QMessageBox::AcceptRole);
+    QPushButton *discardButton=prompt.addButton(tr("Discard"),QMessageBox::DestructiveRole);
+    prompt.addButton(QMessageBox::Cancel);
+    prompt.setDefaultButton(saveButton);
+    prompt.exec();
+    if (prompt.clickedButton()==saveButton)
+        return savePlayerFile(false);
+    return prompt.clickedButton()==discardButton;
 }
 
 void TabPlayer::closeTab(int index){
@@ -232,6 +290,9 @@ void TabPlayer::closeTab(int index){
     if (index == -1) return;
 
     if (this->count() <= 1) return; // si solo queda una pestaña no se puede borrar
+
+    if (!confirmSaveChanges())
+        return;
 
 
 
@@ -278,6 +339,7 @@ void TabPlayer::closeTab(int index){
 
        this->removeTab(index);
        widgetToRemove->deleteLater();
+       markModified();
 
 }
 

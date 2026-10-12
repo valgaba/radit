@@ -108,6 +108,7 @@ public:
      virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
      virtual bool isLiveStream() const { return false; }
      virtual double playbackLimitSeconds() const { return 0.0; }
+     virtual void setPlaybackLimitSeconds(double) {}
      virtual bool advancesOnLoop() const { return false; }
      virtual bool preparePlayback() { return true; }
      virtual bool isPreparingPlayback() const { return false; }
@@ -119,6 +120,8 @@ public:
 
 
     void setIsPlayNext(bool isPlayNext) {
+        if (m_isPlayNext==isPlayNext)
+            return;
         m_isPlayNext = isPlayNext;
 
             btnnext->setProperty("nextcolor", m_isPlayNext);
@@ -133,7 +136,7 @@ public:
                    btnnext->setIconSize(QSize(18, 18));
 
                }
-
+            emit itemStateChanged();
        }
 
     bool isPlayNext() const {
@@ -143,6 +146,8 @@ public:
 
     void setIsPurge(bool isPurge) {
            if (isLiveStream()) isPurge = false;
+           if (m_isPurge==isPurge)
+               return;
            m_isPurge = isPurge;
            btnpurge->setProperty("purgecolor", m_isPurge); //active viene del css
            btnpurge->style()->polish(btnpurge);
@@ -156,8 +161,7 @@ public:
                   btnpurge->setIconSize(QSize(18, 18));
 
               }
-
-
+           emit itemStateChanged();
        }
 
     bool isPurge() const {
@@ -168,6 +172,8 @@ public:
 
     void setIsLoop(bool isLoop) {
            if (isLiveStream()) isLoop = false;
+           if (m_isLoop==isLoop)
+               return;
            m_isLoop = isLoop;
 
            btnloop->setProperty("loopcolor", m_isLoop); //active viene del css
@@ -193,9 +199,7 @@ public:
               if (btnnext) {
                   btnnext->setVisible(!m_isLoop);
               }
-
-
-
+           emit itemStateChanged();
 
        }
 
@@ -240,6 +244,8 @@ public:
       void requestAutoDelete(AudioItemMaxi* item); //no pregunta
       void requestPlay(AudioItemMaxi *item);
       void playbackPreparationReady(bool ready);
+      void propertiesOpened();
+      void itemStateChanged();
 
 
 

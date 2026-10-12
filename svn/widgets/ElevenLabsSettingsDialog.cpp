@@ -89,7 +89,7 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     setWindowIcon(QIcon(":/icons/radit.ico"));
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setWindowModality(Qt::WindowModal);
-    resize(510, 315);
+    resize(510, 335);
     m_network = new QNetworkAccessManager(this);
 
     auto *root = new QVBoxLayout(this);
@@ -146,6 +146,10 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     m_voiceId = new QLineEdit(content);
     m_voiceId->setPlaceholderText(tr("Voice ID from your ElevenLabs account"));
     form->addRow(tr("Voice ID"), m_voiceId);
+    m_voiceName = new QLabel(tr("Not checked"), content);
+    m_voiceName->setObjectName("ElevenLabsVoiceName");
+    m_voiceName->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    form->addRow(tr("Voice name"), m_voiceName);
 
     m_model = new QComboBox(content);
     m_model->setObjectName("Combo");
@@ -218,12 +222,17 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     connect(m_testButton, &Button::clicked, this, &ElevenLabsSettingsDialog::testVoice);
     connect(m_refreshAccountButton, &Button::clicked,
             this, &ElevenLabsSettingsDialog::refreshAccountInfo);
+    connect(m_voiceId, &QLineEdit::editingFinished,
+            this, &ElevenLabsSettingsDialog::refreshVoiceName);
+    connect(m_apiKey, &QLineEdit::editingFinished,
+            this, &ElevenLabsSettingsDialog::refreshVoiceName);
     connect(save, &Button::clicked, this, [this]() {
         if (saveSettings()) accept();
     });
     auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     connect(escape, &QShortcut::activated, this, &QDialog::reject);
     refreshAccountInfo();
+    refreshVoiceName();
 }
 
 ElevenLabsSettingsDialog::~ElevenLabsSettingsDialog()
@@ -430,6 +439,77 @@ void ElevenLabsSettingsDialog::refreshAccountInfo()
         } else {
             m_creditStatus->setText(tr("Usage information unavailable"));
             m_accountStatus->setText(tr("ElevenLabs did not include a character limit for this account."));
+        }
+    });
+}
+
+void ElevenLabsSettingsDialog::refreshVoiceName()
+{
+    const QString apiKey = m_apiKey->text().trimmed();
+    const QString voiceId = m_voiceId->text().trimmed();
+    const quint64 lookupSerial = ++m_voiceLookupSerial;
+    if (voiceId.isEmpty()) {
+        m_voiceName->setText(tr("Enter a Voice ID to look up its name."));
+        return;
+    }
+    if (apiKey.isEmpty()) {
+        m_voiceName->setText(tr("Enter an API key to look up the voice name."));
+        return;
+    }
+
+    m_voiceName->setText(tr("Looking up voice name…"));
+    const QUrl url(QStringLiteral("https://api.elevenlabs.io/v1/voices/")
+                   + QString::fromLatin1(QUrl::toPercentEncoding(voiceId)));
+    QNetworkRequest request(url);
+    request.setTransferTimeout(15000);
+    request.setRawHeader("xi-api-key", apiKey.toUtf8());
+    QNetworkReply *reply = m_network->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, voiceId, lookupSerial]() {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonDocument document = QJsonDocument::fromJson(reply->readAll());
+        const QString networkError = reply->errorString();
+        reply->deleteLater();
+        if (lookupSerial != m_voiceLookupSerial || voiceId != m_voiceId->text().trimmed())
+            return;
+
+        if (status >= 200 && status < 300 && document.isObject()) {
+            const QString name = document.object().value(QStringLiteral("name")).toString().trimmed();
+            m_voiceName->setText(name.isEmpty() ? tr("Voice name unavailable") : name);
+        } else if (status == 401 || status == 403) {
+            QString apiStatus;
+            QString apiMessage;
+            const QJsonValue detail = document.object().value(QStringLiteral("detail"));
+            if (detail.isObject()) {
+                const QJsonObject error = detail.toObject();
+                apiStatus = error.value(QStringLiteral("status")).toString();
+                apiMessage = error.value(QStringLiteral("message")).toString();
+            } else if (detail.isString()) {
+                apiMessage = detail.toString();
+            }
+
+            if (apiStatus == QLatin1String("invalid_api_key")) {
+                m_voiceName->setText(tr("ElevenLabs rejected the API key. Check that it is correct and active."));
+            } else if (apiStatus == QLatin1String("voice_not_found")) {
+                m_voiceName->setText(tr("ElevenLabs could not find this Voice ID. Check the ID in My Voices."));
+            } else if (!apiMessage.isEmpty()) {
+                m_voiceName->setText(tr("ElevenLabs rejected the voice lookup (HTTP %1): %2")
+                                         .arg(status).arg(apiMessage));
+            } else {
+                m_voiceName->setText(tr("ElevenLabs rejected the voice lookup (HTTP %1). Check the API key and enable Voices > Read access for this API key.")
+                                         .arg(status));
+            }
+        } else if (status) {
+            QString apiMessage;
+            const QJsonValue detail = document.object().value(QStringLiteral("detail"));
+            if (detail.isObject())
+                apiMessage = detail.toObject().value(QStringLiteral("message")).toString();
+            else if (detail.isString())
+                apiMessage = detail.toString();
+            m_voiceName->setText(apiMessage.isEmpty()
+                                     ? tr("Could not retrieve voice name (HTTP %1). Check the Voice ID and API key.").arg(status)
+                                     : tr("Could not retrieve voice name (HTTP %1): %2").arg(status).arg(apiMessage));
+        } else {
+            m_voiceName->setText(tr("Could not retrieve voice name: %1").arg(networkError));
         }
     });
 }

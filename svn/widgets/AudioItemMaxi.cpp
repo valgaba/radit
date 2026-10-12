@@ -115,6 +115,9 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnproperties->setIconSize(QSize(18, 18));
         btnproperties->setFixedSize(21, 21);  //Tamaño fijo
         btnproperties->setToolTip("Properties");
+        connect(btnproperties,&QPushButton::clicked,this,[this]() {
+            emit propertiesOpened();
+        });
 
         btndelete = new Button;
         btndelete->SetIcon("Remove.svg");
@@ -470,11 +473,14 @@ QString AudioItemMaxi::SecondToTime(double segundos){
 
 void AudioItemMaxi::setIsSelect(bool value)
 {
+    const bool changed=isSelect()!=value;
     AudioItem::setIsSelect(value); // guardar estado en la base
 
     btnselect->setProperty("selectcolor", isSelect());
     btnselect->style()->polish(btnselect);
     btnselect->update();
+    if (changed)
+        emit itemStateChanged();
 }
 
 

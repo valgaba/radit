@@ -42,7 +42,7 @@ public:
     QString resolvedOutroAnnouncement() const;
     AudioItemMaxi *copy(QWidget *newParent) const override;
     bool preparePlayback() override;
-    bool isPreparingPlayback() const override { return m_announcementPreparing; }
+    bool isPreparingPlayback() const override { return m_waitingForScan || m_announcementPreparing; }
     bool advancesOnLoop() const override { return true; }
     QString playbackPath() const override { return m_currentTrack; }
     QString playbackName() const override;
@@ -68,6 +68,7 @@ private:
     std::shared_ptr<Sequence> m_sequence;
     QString m_currentTrack;
     bool m_scanning = false;
+    bool m_waitingForScan = false;
     bool m_mixEnabled = true;
     double m_mixSeconds = 3.0;
     QString m_introAnnouncement = QStringLiteral("[excited] ¡Sigues en tu emisora favorita! Te dejamos con [artist] y su tema [title].");

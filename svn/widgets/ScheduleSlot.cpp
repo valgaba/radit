@@ -92,6 +92,12 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     m_upcomingBlinkTimer=new QTimer(this);
     m_upcomingBlinkTimer->setInterval(500);
     connect(m_upcomingBlinkTimer,&QTimer::timeout,this,[this]() {
+        if (!m_playing) {
+            m_upcomingBlinkTimer->stop();
+            m_blinkPhase=false;
+            updateHeaderAppearance();
+            return;
+        }
         m_blinkPhase=!m_blinkPhase;
         updateHeaderAppearance();
     });
@@ -157,7 +163,6 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
         });
 
         const QVector<QPair<QString,QColor>> colors={
-            {tr("Red"),QColor("#8F3545")},
             {tr("Orange"),QColor("#9A5A2E")},
             {tr("Green"),QColor("#4A714A")},
             {tr("Blue"),QColor("#3C5C8A")},
@@ -206,18 +211,22 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     m_scrollArea->setWidget(m_contents);
 
     connect(m_toggleContents,&QPushButton::clicked,this,[this]() {
-        m_contentsVisible=!m_contentsVisible;
-        m_scrollArea->setVisible(m_contentsVisible);
-        setFixedHeight(m_contentsVisible ? m_timelineHeight : m_header->height()+2);
-        m_toggleContents->setText(m_contentsVisible ? QStringLiteral("▼") : QStringLiteral("▶"));
-        m_toggleContents->setToolTip(m_contentsVisible
-                                         ? tr("Hide schedule contents")
-                                         : tr("Show schedule contents"));
-        m_toggleContents->setAccessibleName(m_toggleContents->toolTip());
+        setContentsVisible(!m_contentsVisible);
     });
 
     layout->addWidget(header);
     layout->addWidget(m_scrollArea,1);
+}
+
+void ScheduleSlot::setContentsVisible(bool visible)
+{
+    m_contentsVisible=visible;
+    m_scrollArea->setVisible(visible);
+    setFixedHeight(visible ? m_timelineHeight : m_header->height()+2);
+    m_toggleContents->setText(visible ? QStringLiteral("▼") : QStringLiteral("▶"));
+    m_toggleContents->setToolTip(visible ? tr("Hide schedule contents")
+                                         : tr("Show schedule contents"));
+    m_toggleContents->setAccessibleName(m_toggleContents->toolTip());
 }
 
 void ScheduleSlot::setTimeText(const QString &time)
@@ -322,7 +331,7 @@ void ScheduleSlot::updateHeaderAppearance()
         backgroundColor=m_accentColor.name(QColor::HexRgb);
     }
 
-    const bool alert=m_playing || (m_upcoming && m_blinkPhase);
+    const bool alert=m_playing && m_blinkPhase;
     if (alert && !m_disabled)
         backgroundColor=QStringLiteral("#e5484d");
     const QString alertTextStyle=alert && !m_disabled
@@ -391,12 +400,8 @@ void ScheduleSlot::setUpcoming(bool upcoming)
         return;
 
     m_upcoming=upcoming;
-    m_blinkPhase=upcoming;
-    if (m_upcoming) {
-        m_upcomingBlinkTimer->start();
-    } else {
-        m_upcomingBlinkTimer->stop();
-    }
+    if (!m_playing)
+        m_blinkPhase=false;
     updateHeaderAppearance();
 }
 
@@ -407,6 +412,13 @@ void ScheduleSlot::setPlaying(bool playing)
     m_playing=playing;
     if (m_playing)
         setUpcoming(false);
+    if (m_playing) {
+        m_blinkPhase=true;
+        m_upcomingBlinkTimer->start();
+    } else {
+        m_blinkPhase=false;
+        m_upcomingBlinkTimer->stop();
+    }
     updateHeaderAppearance();
 }
 

@@ -54,6 +54,29 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
 ContentsPlayer::~ContentsPlayer(){}
 
+AudioItemMaxi *ContentsPlayer::createItem(AudioItemMaxi *item)
+{
+    AudioItemMaxi *created=ContentsBase::createItem(item);
+    if (created) {
+        connect(created,&AudioItemMaxi::propertiesOpened,this,[this]() {
+            emit contentsModified();
+        });
+        connect(created,&AudioItemMaxi::itemStateChanged,this,[this]() {
+            emit contentsModified();
+        });
+        emit contentsModified();
+    }
+    return created;
+}
+
+void ContentsPlayer::deleteItem(AudioItemMaxi *item)
+{
+    if (!item)
+        return;
+    ContentsBase::deleteItem(item);
+    emit contentsModified();
+}
+
 
 
 
@@ -168,6 +191,12 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
                            player->playItem(item);
                        }
                    });
+                   connect(newItem,&AudioItemMaxi::propertiesOpened,this,[this]() {
+                       emit contentsModified();
+                   });
+                   connect(newItem,&AudioItemMaxi::itemStateChanged,this,[this]() {
+                       emit contentsModified();
+                   });
 
                    newItem->setIsSelect(false);
 
@@ -188,6 +217,9 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
               // oldItem->deleteLater();
                 deleteItem(oldItem);   //
            }
+
+           if (!draggedItems.isEmpty())
+               emit contentsModified();
 
            event->acceptProposedAction();
            return;
@@ -296,6 +328,7 @@ void ContentsPlayer::nextAllItems(){
                 // quitar selección
                  item->setIsSelect(false);
             }
+            emit contentsModified();
             return;
         }
 
@@ -308,6 +341,7 @@ void ContentsPlayer::nextAllItems(){
 
         if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
             item->setIsPlayNext(!item->isPlayNext());
+            emit contentsModified();
         }
 
 }
@@ -331,6 +365,7 @@ void ContentsPlayer::purgeAllItems(){
                 // quitar selección
                  item->setIsSelect(false);
             }
+            emit contentsModified();
             return;
         }
 
@@ -343,6 +378,7 @@ void ContentsPlayer::purgeAllItems(){
 
         if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
             item->setIsPurge(!item->isPurge());
+            emit contentsModified();
         }
 
 }
@@ -367,6 +403,7 @@ void ContentsPlayer::loopAllItems(){
                 // quitar selección
                  item->setIsSelect(false);
             }
+            emit contentsModified();
             return;
         }
 
@@ -379,6 +416,7 @@ void ContentsPlayer::loopAllItems(){
 
         if (auto *item = qobject_cast<AudioItemMaxi*>(widget)) {
              item->setIsLoop(!item->isLoop());
+             emit contentsModified();
         }
 
 }
@@ -615,6 +653,8 @@ void ContentsPlayer::applyColor(const QColor &color)
     for (AudioItemMaxi* item : items) {
         item->setIsSelect(false);
     }
+    if (hasSelection || childAt(mousePos))
+        emit contentsModified();
 }
 
 
@@ -658,6 +698,7 @@ bool ContentsPlayer::saveListFile(const QString &filename)
         return false;
     }
     m_listFileName = QFileInfo(filename).absoluteFilePath();
+    emit contentsModified();
     return true;
 }
 

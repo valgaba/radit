@@ -181,7 +181,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
 
 
       labeltitle =new Label(this);
-      labeltitle->setText("Player [noname]");
+      labeltitle->setText(tr("Player [noname]"));
       labeltitle->setStyleSheet("font-size: 14px;");
       btnclose = new Button(this);
       btnclose->setStyleSheet(
@@ -388,7 +388,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
      connect(tabplayer, &TabPlayer::playerFileNameChanged, this, [this](const QString &filename) {
          const QString name = filename.isEmpty() ? QStringLiteral("noname")
                                                  : QFileInfo(filename).completeBaseName();
-         labeltitle->setText(QStringLiteral("Player [%1]").arg(name));
+         labeltitle->setText(tr("Player [%1]").arg(name));
      });
      layout->addWidget(tabplayer);
 

@@ -63,6 +63,13 @@ public:
 
     void setPlayer(Player *player);
 
+signals:
+    void contentsModified();
+
+public:
+    AudioItemMaxi *createItem(AudioItemMaxi *item) override;
+    void deleteItem(AudioItemMaxi *item) override;
+
 
 
 

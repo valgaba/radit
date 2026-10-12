@@ -20,6 +20,11 @@
 #include "widgets/vumeter.h"
 #include "widgets/slider.h"
 #include "core/io.h"
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+#include <QSaveFile>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QSplitter>
@@ -52,7 +57,11 @@
 #include <QGridLayout>
 #include <QDialog>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
+#include <QSettings>
+#include <QDir>
+#include <QCoreApplication>
 #include <QLineEdit>
 #include <QTimeEdit>
 #include <QAbstractSpinBox>
@@ -64,6 +73,18 @@
 namespace {
 QPointer<ScheduleSlot> g_scheduleSlotClipboard;
 bool g_scheduleSlotClipboardIsCut = false;
+
+QString interfaceSettingsPath()
+{
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("interface.ini"));
+}
+
+void rememberPlannerFile(const QString &filename)
+{
+    QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
+    settings.setValue(QStringLiteral("Planner/lastFile"),filename);
+    settings.sync();
+}
 
 class ScheduleSlotPasteDialog final : public QDialog
 {
@@ -542,7 +563,17 @@ public:
             pasteSpecialAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),
                                               tr("Paste schedule slot special"));
         }
+        menu.addSeparator();
+        QAction *loadPlannerAction=menu.addAction(tr("Load Planner"));
+        QAction *savePlannerAction=menu.addAction(tr("Save Planner"));
+        QAction *savePlannerAsAction=menu.addAction(tr("Save as Planner"));
         QAction *chosen=menu.exec(globalPosition);
+        if (chosen==loadPlannerAction || chosen==savePlannerAction || chosen==savePlannerAsAction) {
+            if (m_plannerFileAction)
+                m_plannerFileAction(chosen==loadPlannerAction ? QStringLiteral("load")
+                    : chosen==savePlannerAction ? QStringLiteral("save") : QStringLiteral("saveAs"));
+            return;
+        }
         if (chosen==pasteSlotAction) {
             pasteScheduleSlot();
             return;
@@ -566,6 +597,7 @@ public:
             ScheduleSlot *event=addSlot(time.toString("HH:mm:ss"),second);
             event->setStandbyListPath(eventOptions.listPath());
             event->setAccentColor(QColor("#3C5C8A"));
+            markDocumentModified();
             if (m_focusSlot) m_focusSlot(event);
             return;
         }
@@ -583,6 +615,7 @@ public:
         ScheduleSlot *slot=addSlot(time.toString("HH:mm:ss"),secondsAfterMidnight);
         slot->setName(options.name());
         m_dayContents.append(slot->contents());
+        markDocumentModified();
         if (m_focusSlot)
             m_focusSlot(slot);
     }
@@ -627,23 +660,110 @@ public:
         return pages ? pages->indexOf(const_cast<PlannerDayPage*>(this)) : -1;
     }
 
+    void setPlannerFileAction(std::function<void(const QString &)> callback)
+    {
+        m_plannerFileAction=std::move(callback);
+    }
+
+    void setModifiedCallback(std::function<void()> callback)
+    {
+        m_documentModified=std::move(callback);
+    }
+
+    void markDocumentModified()
+    {
+        if (m_documentModified)
+            m_documentModified();
+    }
+
+    QJsonObject toJson() const
+    {
+        QJsonArray slotArray;
+        for (const TimedSlot &entry : m_slots) {
+            const ScheduleSlot *slot=entry.widget;
+            if (!slot) continue;
+            QJsonObject object{
+                {"entrySecond",slot->entrySecond()}, {"name",slot->name()},
+                {"accentColor",slot->accentColor().isValid()
+                    ? slot->accentColor().name(QColor::HexArgb) : QString()},
+                {"disabled",slot->isScheduleDisabled()}, {"priority",slot->isPriority()},
+                {"contentsVisible",slot->contentsVisible()},
+                {"standbyListPath",slot->standbyListPath()},
+                {"items",Io::serializeItems(slot->contents()->layout)}
+            };
+            slotArray.append(object);
+        }
+        return QJsonObject{{"slots",slotArray}};
+    }
+
+    void clearSlots()
+    {
+        for (const TimedSlot &entry : m_slots) {
+            if (!entry.widget) continue;
+            if (g_scheduleSlotClipboard==entry.widget) {
+                g_scheduleSlotClipboard.clear();
+                g_scheduleSlotClipboardIsCut=false;
+            }
+            m_dayContents.removeAll(entry.widget->contents());
+            entry.widget->hide();
+            delete entry.widget;
+        }
+        m_slots.clear();
+        updateSlotPositions();
+    }
+
+    bool loadSlots(const QJsonArray &slotArray, QString *error)
+    {
+        m_contentAutoFocusEnabled=false;
+        for (const QJsonValue &value : slotArray) {
+            const QJsonObject object=value.toObject();
+            const int second=object.value("entrySecond").toInt();
+            auto *slot=addSlot(QTime(0,0).addSecs(second).toString("HH:mm:ss"),second);
+            slot->setName(object.value("name").toString());
+            const QString colorText=object.value("accentColor").toString();
+            slot->setAccentColor(colorText.isEmpty() ? QColor() : QColor(colorText));
+            slot->setScheduleDisabled(object.value("disabled").toBool());
+            slot->setPriority(object.value("priority").toBool());
+            slot->setStandbyListPath(object.value("standbyListPath").toString());
+            if (!slot->isStandbyListChangeEvent()) {
+                m_dayContents.append(slot->contents());
+                if (!Io::loadItems(slot->contents(),object.value("items").toArray(),error)) {
+                    m_contentAutoFocusEnabled=true;
+                    return false;
+                }
+                slot->setContentsVisible(object.value("contentsVisible").toBool(true));
+            }
+        }
+        m_contentAutoFocusEnabled=true;
+        updateSlotPositions();
+        return true;
+    }
+
 private:
     void attachSlot(ScheduleSlot *slot)
     {
         m_slots.append({slot});
         connect(slot,&ScheduleSlot::entryTimeChanged,this,[this]() {
             updateSlotPositions();
+            markDocumentModified();
         });
         connect(slot,&ScheduleSlot::accentColorChanged,this,[this]() {
             updateSlotPositions();
+            markDocumentModified();
         });
         connect(slot,&ScheduleSlot::disabledChanged,this,[this]() {
             updateSlotPositions();
+            markDocumentModified();
         });
         connect(slot->contents(),&PlannerContents::contentDurationsChanged,this,[this]() {
             updateSlotPositions();
+            markDocumentModified();
+        });
+        connect(slot->contents(),&PlannerContents::contentModified,this,[this]() {
+            markDocumentModified();
         });
         connect(slot->contents(),&PlannerContents::contentAdded,this,[this,slot]() {
+            markDocumentModified();
             if (!m_contentAutoFocusEnabled)
                 return;
             QPointer<ScheduleSlot> pendingFocus=slot;
@@ -676,6 +796,7 @@ private:
             closingSlot->hide();
             closingSlot->deleteLater();
             updateSlotPositions();
+            markDocumentModified();
         });
         connect(slot,&ScheduleSlot::copyRequested,this,[this](ScheduleSlot *source) {
             if (g_scheduleSlotClipboard && !g_scheduleSlotClipboardIsCut)
@@ -703,6 +824,7 @@ private:
                     }
                     editedSlot->setEntryTime(second);
                     editedSlot->setStandbyListPath(options.listPath());
+                    markDocumentModified();
                 }
                 return;
             }
@@ -714,6 +836,7 @@ private:
                 editedSlot->setEntryTime(time.hour()*3600+time.minute()*60+time.second());
                 editedSlot->setName(options.name());
                 editedSlot->setScheduleDisabled(options.isDisabled());
+                markDocumentModified();
             }
         });
         connect(slot,&ScheduleSlot::focusRequested,this,[this](ScheduleSlot *focusedSlot) {
@@ -853,6 +976,7 @@ private:
             m_scrollArea->ensureVisible(0,(second*m_pixelsPerHour)/3600,0,0);
             if (m_focusSlot)
                 m_focusSlot(copy);
+            markDocumentModified();
             return;
         }
 
@@ -880,6 +1004,7 @@ private:
             m_focusSlot(movingSlot);
         g_scheduleSlotClipboard.clear();
         g_scheduleSlotClipboardIsCut=false;
+        markDocumentModified();
     }
 
     void pasteScheduleSlotSpecial()
@@ -995,6 +1120,8 @@ private:
                 tr("Pasted to %1 day(s). Skipped: %2, because a slot already exists at that time.")
                     .arg(pastedCount).arg(skippedDays.join(tr(", "))));
         }
+        if (pastedCount>0)
+            markDocumentModified();
     }
 
     void updateSlotPositions()
@@ -1098,14 +1225,18 @@ private:
     std::function<void()> m_intervalsChanged;
     std::function<void(ScheduleSlot *)> m_focusSlot;
     bool m_contentAutoFocusEnabled = true;
+    std::function<void(const QString &)> m_plannerFileAction;
+    std::function<void()> m_documentModified;
 };
 
 class PlannerWeekTabs final : public Frame
 {
 public:
-    explicit PlannerWeekTabs(QWidget *parent, QList<ContentsPlayer *> &dayContents)
+    explicit PlannerWeekTabs(QWidget *parent, QList<ContentsPlayer *> &dayContents,
+                             ContentsPlayer *standbyContents)
         : Frame(parent)
     {
+        m_standbyContents=standbyContents;
         auto *layout=new QVBoxLayout(this);
         layout->setContentsMargins(0,0,0,0);
         layout->setSpacing(0);
@@ -1164,8 +1295,8 @@ public:
             dayPage->showContextMenuAt(position,m_timeRuler->mapToGlobal(position));
         });
 
-        const QStringList days={tr("Lunes"),tr("Martes"),tr("Miércoles"),tr("Jueves"),
-                                tr("Viernes"),tr("Sábado"),tr("Domingo")};
+        const QStringList days={tr("Monday"),tr("Tuesday"),tr("Wednesday"),tr("Thursday"),
+                                tr("Friday"),tr("Saturday"),tr("Sunday")};
         for (int index=0; index<days.size(); ++index) {
             auto *button=new Button(this);
             button->setObjectName("PlannerDayTab");
@@ -1177,6 +1308,11 @@ public:
             tabRow->addWidget(button,1);
 
             auto *dayPage=new PlannerDayPage(m_pages,m_scrollArea,dayContents);
+            dayPage->setPlannerFileAction([this](const QString &action) {
+                if (action==QLatin1String("load")) loadPlanner();
+                else savePlanner(action==QLatin1String("saveAs"));
+            });
+            dayPage->setModifiedCallback([this]() { markDocumentModified(); });
             dayPage->setIntervalsChangedCallback([this,index,dayPage]() {
                 if (m_pages->currentIndex()==index)
                     m_timeRuler->setSlotIntervals(dayPage->slotIntervals());
@@ -1220,6 +1356,18 @@ public:
         m_timeRuler->setSlotIntervals(
             static_cast<PlannerDayPage*>(m_pages->widget(0))->slotIntervals());
 
+        if (auto *plannerContents=qobject_cast<PlannerContents*>(m_standbyContents)) {
+            connect(plannerContents,&PlannerContents::contentAdded,this,[this]() {
+                markDocumentModified();
+            });
+            connect(plannerContents,&PlannerContents::contentDurationsChanged,this,[this]() {
+                markDocumentModified();
+            });
+            connect(plannerContents,&PlannerContents::contentModified,this,[this]() {
+                markDocumentModified();
+            });
+        }
+
         layout->addLayout(tabRow);
         layout->addWidget(m_scrollArea,1);
         auto *zoomBarWidget=new QWidget(this);
@@ -1241,6 +1389,184 @@ public:
         connect(m_zoomOut,&QPushButton::clicked,this,[this]() {
             if (m_pixelsPerHour>25) setZoom(m_pixelsPerHour/2,true);
         });
+
+        QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
+        const QString lastPlanner=settings.value(QStringLiteral("Planner/lastFile")).toString();
+        if (!lastPlanner.isEmpty() && QFileInfo::exists(lastPlanner)) {
+            QTimer::singleShot(0,this,[this,lastPlanner]() {
+                loadPlannerFile(lastPlanner,false);
+            });
+        }
+    }
+
+    void markDocumentModified()
+    {
+        if (!m_loadingDocument)
+            m_documentModified=true;
+    }
+
+    bool confirmDocumentChanges()
+    {
+        return confirmReplaceCurrentPlanner();
+    }
+
+    bool savePlanner(bool saveAs)
+    {
+        if (saveAs || m_plannerFileName.isEmpty()) {
+            QFileDialog dialog(this,tr("Save Planner as"),m_plannerFileName);
+            dialog.setAcceptMode(QFileDialog::AcceptSave);
+            dialog.setFileMode(QFileDialog::AnyFile);
+            dialog.setNameFilters({tr("Radit Planner (*.planner)"),
+                                   tr("JSON files (*.json)"),tr("All files (*)")});
+            dialog.setDefaultSuffix(QStringLiteral("planner"));
+            if (dialog.exec()!=QDialog::Accepted || dialog.selectedFiles().isEmpty()) return false;
+            m_plannerFileName=dialog.selectedFiles().first();
+        }
+        QJsonArray days;
+        for (int index=0; index<m_pages->count(); ++index)
+            days.append(static_cast<PlannerDayPage*>(m_pages->widget(index))->toJson());
+        const QJsonObject root{
+            {"format",QStringLiteral("radit-planner")}, {"version",1},
+            {"standby",QJsonObject{{"listFile",m_standbyContents->listFileName()},
+                                    {"items",Io::serializeItems(m_standbyContents->layout)}}},
+            {"days",days}
+        };
+        QSaveFile file(m_plannerFileName);
+        const QByteArray data=QJsonDocument(root).toJson(QJsonDocument::Indented);
+        if (!file.open(QIODevice::WriteOnly) || file.write(data)!=data.size() || !file.commit()) {
+            QMessageBox::warning(this,tr("Save Planner"),
+                                 tr("Could not save Planner: %1").arg(file.errorString()));
+            return false;
+        }
+        m_documentModified=false;
+        rememberPlannerFile(m_plannerFileName);
+        QWidget *owner=this;
+        while (owner && !qobject_cast<Planner*>(owner)) owner=owner->parentWidget();
+        if (auto *planner=qobject_cast<Planner*>(owner))
+            planner->setDocumentFileName(m_plannerFileName);
+        return true;
+    }
+
+    void loadPlanner()
+    {
+        const QString filename=QFileDialog::getOpenFileName(
+            this,tr("Load Planner"),m_plannerFileName,
+            tr("Radit Planner (*.planner *.json);;All files (*)"));
+        if (filename.isEmpty()) return;
+        loadPlannerFile(filename,true);
+    }
+
+    void loadPlannerFile(const QString &filename, bool confirmChanges)
+    {
+        QFile file(filename);
+        if (!file.open(QIODevice::ReadOnly)) {
+            QMessageBox::warning(this,tr("Load Planner"),file.errorString());
+            return;
+        }
+        QJsonParseError parseError;
+        const QJsonDocument document=QJsonDocument::fromJson(file.readAll(),&parseError);
+        if (parseError.error!=QJsonParseError::NoError || !document.isObject()) {
+            QMessageBox::warning(this,tr("Load Planner"),tr("Invalid Planner file."));
+            return;
+        }
+        const QJsonObject root=document.object();
+        const QJsonObject standby=root.value("standby").toObject();
+        const QJsonArray days=root.value("days").toArray();
+        bool valid=root.value("format").toString()==QLatin1String("radit-planner")
+            && root.value("version").toInt()==1 && standby.value("items").isArray()
+            && standby.value("listFile").isString() && days.size()==7;
+        if (valid) valid=Io::validateItems(standby.value("items").toArray(),this);
+        for (const QJsonValue &dayValue : days) {
+            if (!valid || !dayValue.isObject()) { valid=false; break; }
+            const QJsonArray slotArray=dayValue.toObject().value("slots").toArray();
+            if (!dayValue.toObject().value("slots").isArray()) { valid=false; break; }
+            QSet<int> occupiedTimes;
+            for (const QJsonValue &slotValue : slotArray) {
+                if (!slotValue.isObject()) { valid=false; break; }
+                const QJsonObject slot=slotValue.toObject();
+                const int second=slot.value("entrySecond").toInt(-1);
+                const QString color=slot.value("accentColor").toString();
+                if (!slot.value("entrySecond").isDouble() || second<0 || second>=86400
+                    || occupiedTimes.contains(second) || !slot.value("name").isString()
+                    || !slot.value("disabled").isBool() || !slot.value("priority").isBool()
+                    || !slot.value("contentsVisible").isBool()
+                    || !slot.value("standbyListPath").isString() || !slot.value("items").isArray()
+                    || (!color.isEmpty() && !QColor(color).isValid())
+                    || !Io::validateItems(slot.value("items").toArray(),this)) {
+                    valid=false;
+                    break;
+                }
+                occupiedTimes.insert(second);
+            }
+        }
+        if (!valid) {
+            QMessageBox::warning(this,tr("Load Planner"),tr("Invalid data in the Planner file."));
+            return;
+        }
+
+        if (confirmChanges && !confirmDocumentChanges())
+            return;
+
+        m_loadingDocument=true;
+        QWidget *owner=this;
+        while (owner && !qobject_cast<Planner*>(owner)) owner=owner->parentWidget();
+        if (auto *planner=qobject_cast<Planner*>(owner))
+            planner->stopPlaybackForContentLoad();
+        if (g_scheduleSlotClipboard && !g_scheduleSlotClipboardIsCut)
+            delete g_scheduleSlotClipboard.data();
+        g_scheduleSlotClipboard.clear();
+        g_scheduleSlotClipboardIsCut=false;
+        for (int index=0; index<m_pages->count(); ++index)
+            static_cast<PlannerDayPage*>(m_pages->widget(index))->clearSlots();
+        while (m_standbyContents->layout->count()>0) {
+            auto *item=qobject_cast<AudioItemMaxi*>(m_standbyContents->layout->itemAt(0)->widget());
+            if (!item) break;
+            m_standbyContents->deleteItem(item);
+        }
+        QString error;
+        bool loaded=Io::loadItems(m_standbyContents,standby.value("items").toArray(),&error);
+        if (loaded) {
+            for (int index=0; index<7; ++index) {
+                if (!static_cast<PlannerDayPage*>(m_pages->widget(index))->loadSlots(
+                        days.at(index).toObject().value("slots").toArray(),&error)) {
+                    loaded=false;
+                    break;
+                }
+            }
+        }
+        if (!loaded) {
+            m_loadingDocument=false;
+            m_documentModified=true;
+            QMessageBox::warning(this,tr("Load Planner"),error);
+            return;
+        }
+        m_standbyContents->setListFileName(standby.value("listFile").toString());
+        m_plannerFileName=QFileInfo(filename).absoluteFilePath();
+        rememberPlannerFile(m_plannerFileName);
+        m_loadingDocument=false;
+        m_documentModified=false;
+        if (auto *planner=qobject_cast<Planner*>(owner))
+        {
+            planner->refreshAfterContentLoad();
+            planner->setDocumentFileName(m_plannerFileName);
+        }
+    }
+
+    bool confirmReplaceCurrentPlanner()
+    {
+        if (!m_documentModified)
+            return true;
+        QMessageBox prompt(QMessageBox::Warning,tr("Unsaved Planner changes"),
+                           tr("Save the changes to this Planner?"),
+                           QMessageBox::NoButton,this);
+        QPushButton *saveButton=prompt.addButton(tr("Save"),QMessageBox::AcceptRole);
+        QPushButton *discardButton=prompt.addButton(tr("Discard"),QMessageBox::DestructiveRole);
+        prompt.addButton(QMessageBox::Cancel);
+        prompt.setDefaultButton(saveButton);
+        prompt.exec();
+        if (prompt.clickedButton()==saveButton)
+            return savePlanner(false);
+        return prompt.clickedButton()==discardButton;
     }
 
     ScheduleSlot *slotStartingAt(const QDateTime &dateTime)
@@ -1441,6 +1767,10 @@ private:
     QScrollArea *m_scrollArea = nullptr;
     Button *m_zoomIn = nullptr;
     Button *m_zoomOut = nullptr;
+    ContentsPlayer *m_standbyContents = nullptr;
+    QString m_plannerFileName;
+    bool m_documentModified = false;
+    bool m_loadingDocument = false;
     QPointer<ScheduleSlot> m_upcomingSlot;
     int m_pixelsPerHour = 100;
     bool m_initialTimePositioned = false;
@@ -1464,8 +1794,9 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     titleLayout->setSpacing(0);
 
     auto *title=new Label(titleBar);
+    m_titleLabel=title;
     title->setObjectName("PanelTitle");
-    title->setText(tr("Planner"));
+    title->setText(tr("Planner [noname]"));
     titleLayout->addWidget(title);
     titleLayout->addStretch();
 
@@ -1599,7 +1930,7 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     fallbackLayout->addWidget(m_fallbackContents,1);
     listsSplitter->addWidget(fallbackPanel);
 
-    auto *weekTabs=new PlannerWeekTabs(contentZone,m_dayContents);
+    auto *weekTabs=new PlannerWeekTabs(contentZone,m_dayContents,m_fallbackContents);
     weekTabs->setObjectName("PlannerWeekTabs");
     m_weekTabs=weekTabs;
     listsSplitter->addWidget(weekTabs);
@@ -1850,6 +2181,42 @@ void Planner::stopPlayback()
     updatePlannerMeter();
 }
 
+void Planner::stopPlaybackForContentLoad()
+{
+    if (m_running)
+        stopPlayback();
+}
+
+void Planner::refreshAfterContentLoad()
+{
+    updateStandbyBarTitle();
+    updateStandbyBarAppearance();
+    updateRemainingTimeLabel();
+}
+
+void Planner::markDocumentModified()
+{
+    if (auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs))
+        weekTabs->markDocumentModified();
+}
+
+bool Planner::confirmSaveDocumentChanges()
+{
+    if (auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs))
+        return weekTabs->confirmDocumentChanges();
+    return true;
+}
+
+void Planner::setDocumentFileName(const QString &filename)
+{
+    if (!m_titleLabel)
+        return;
+    const QString baseName=QFileInfo(filename).completeBaseName();
+    m_titleLabel->setText(baseName.isEmpty() ? tr("Planner [noname]")
+                                             : tr("Planner [%1]").arg(baseName));
+    m_titleLabel->setToolTip(filename);
+}
+
 void Planner::checkSchedule()
 {
     auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
@@ -1912,7 +2279,7 @@ void Planner::checkSchedule()
 
     // Standby may have been empty when Play was pressed and filled while Planner is running.
     if (!m_activeScheduleEngine && !m_fadeTimer->isActive()
-        && !m_standbyEngine->getCurrentItem()) {
+        && !m_standbyEngine->sequentialContents()) {
         m_standbyEngine->setVolume(m_volume);
         m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
     }

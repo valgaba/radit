@@ -235,6 +235,14 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
         setToolTip(tr("%1\n%2 audio files — random playback without repeats")
                        .arg(folder).arg(m_tracks.size()));
         emit scanFinished();
+        if (m_waitingForScan) {
+            m_waitingForScan = false;
+            const bool ready = preparePlayback();
+            if (ready)
+                emit playbackPreparationReady(true);
+            else if (!isPreparingPlayback())
+                emit playbackPreparationReady(false);
+        }
         return;
     }
 
@@ -253,6 +261,14 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
         setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
         setToolTip(tr("%1\n%2 audio files — random playback without repeats").arg(folder).arg(m_tracks.size()));
         emit scanFinished();
+        if (m_waitingForScan) {
+            m_waitingForScan = false;
+            const bool ready = preparePlayback();
+            if (ready)
+                emit playbackPreparationReady(true);
+            else if (!isPreparingPlayback())
+                emit playbackPreparationReady(false);
+        }
     });
     watcher->setFuture(QtConcurrent::run([folder, filters, cancel]() {
         QVector<Track> tracks;
@@ -272,7 +288,11 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
 bool AudioItemFolderMaxi::preparePlayback()
 {
     if (m_trackPrepared) return !m_announcementPreparing;
-    if (m_scanning || !m_sequence || m_sequence->tracks.isEmpty()) return false;
+    if (m_scanning) {
+        m_waitingForScan = true;
+        return false;
+    }
+    if (!m_sequence || m_sequence->tracks.isEmpty()) return false;
     auto &sequence = *m_sequence;
     if (sequence.remaining.isEmpty()) {
         sequence.played.clear();

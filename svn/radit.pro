@@ -13,6 +13,7 @@ TARGET = radit
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    core/SpanishTranslator.cpp \
     core/LocutionPack.cpp \
     widgets/ElevenLabsSettingsDialog.cpp \
     widgets/Id3TagsDialog.cpp \
@@ -70,6 +71,7 @@ SOURCES += \
     widgets/tabbar.cpp
 
 HEADERS += \
+    core/SpanishTranslator.h \
     core/LocutionPack.h \
     widgets/ElevenLabsSettingsDialog.h \
     widgets/Id3TagsDialog.h \

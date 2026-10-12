@@ -36,6 +36,11 @@ public:
     void setDevicePlay(int device);
     void setDeviceCue(int device) { m_deviceCue=device; }
     bool setVolume(float volume);
+    void stopPlaybackForContentLoad();
+    void refreshAfterContentLoad();
+    void setDocumentFileName(const QString &filename);
+    void markDocumentModified();
+    bool confirmSaveDocumentChanges();
     void prepareForScheduleSlotRemoval(ScheduleSlot *slot);
     void prepareForContentRemoval(ContentsBase *contents, AudioItemMaxi *item);
 
@@ -49,6 +54,7 @@ private:
     ContentsPlayer *m_fallbackContents = nullptr;
     Frame *m_standbyBar = nullptr;
     Label *m_standbyTitle = nullptr;
+    Label *m_titleLabel = nullptr;
     QList<ContentsPlayer *> m_dayContents;
     FrameOptionsPlayer *m_optionsPanel = nullptr;
     Label *m_playbackNameLabel = nullptr;

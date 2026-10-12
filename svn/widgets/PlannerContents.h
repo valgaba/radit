@@ -16,6 +16,7 @@ public:
 signals:
     void contentDurationsChanged();
     void contentAdded();
+    void contentModified();
 
 private:
     bool m_listFileActionsEnabled = false;

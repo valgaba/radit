@@ -28,6 +28,7 @@ public:
     bool totalDurationKnown() const { return m_totalDurationKnown; }
     bool isScheduleDisabled() const { return m_disabled; }
     bool isPriority() const { return m_priority; }
+    bool contentsVisible() const { return m_contentsVisible; }
     QString standbyListPath() const { return m_standbyListPath; }
     bool isStandbyListChangeEvent() const { return !m_standbyListPath.isEmpty(); }
     void setEntryTime(int secondsAfterMidnight);
@@ -36,6 +37,7 @@ public:
     void setTimelineHeight(int height);
     void setScheduleDisabled(bool disabled);
     void setPriority(bool priority);
+    void setContentsVisible(bool visible);
     void setStandbyListPath(const QString &path);
     void setUpcoming(bool upcoming);
     void setPlaying(bool playing);

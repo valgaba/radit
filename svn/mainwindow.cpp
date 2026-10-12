@@ -38,6 +38,7 @@
 #include <QDir>
 #include <QSettings>
 #include <QKeySequence>
+#include <QActionGroup>
 #include "widgets/QuitDialog.h"
 
 
@@ -51,6 +52,7 @@
 #include "widgets/Cast.h"
 #include "widgets/MeteoClock.h"
 #include "widgets/Planner.h"
+#include "widgets/TabPlayer.h"
 #include "widgets/Player.h"
 #include "widgets/ElevenLabsSettingsDialog.h"
 
@@ -73,6 +75,34 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
        QMenu *fileMenu = menubar->addMenu(tr("&File"));
        fileMenu->setObjectName("FileMenu");
        fileMenu->setSeparatorsCollapsible(false);
+       const QString settingsFile=QDir(QCoreApplication::applicationDirPath())
+                                      .filePath(QStringLiteral("interface.ini"));
+       QSettings languageSettings(settingsFile,QSettings::IniFormat);
+       const QString uiLanguage=languageSettings.value(QStringLiteral("Interface/language"),
+                                                         QStringLiteral("en")).toString();
+       QMenu *languageMenu=fileMenu->addMenu(tr("Language"));
+       auto *languageGroup=new QActionGroup(languageMenu);
+       languageGroup->setExclusive(true);
+       QAction *englishAction=languageMenu->addAction(tr("English"));
+       englishAction->setCheckable(true);
+       englishAction->setChecked(uiLanguage!=QLatin1String("es"));
+       languageGroup->addAction(englishAction);
+       QAction *spanishAction=languageMenu->addAction(tr("Spanish"));
+       spanishAction->setCheckable(true);
+       spanishAction->setChecked(uiLanguage==QLatin1String("es"));
+       languageGroup->addAction(spanishAction);
+       const auto setLanguage=[this,settingsFile](const QString &language) {
+           QSettings settings(settingsFile,QSettings::IniFormat);
+           if (settings.value(QStringLiteral("Interface/language"),QStringLiteral("en")).toString()
+               ==language)
+               return;
+           settings.setValue(QStringLiteral("Interface/language"),language);
+           settings.sync();
+           QMessageBox::information(this,tr("Language"),
+                                    tr("Restart Radit to apply the language change."));
+       };
+       connect(englishAction,&QAction::triggered,this,[setLanguage]() { setLanguage(QStringLiteral("en")); });
+       connect(spanishAction,&QAction::triggered,this,[setLanguage]() { setLanguage(QStringLiteral("es")); });
        fileMenu->addSeparator();
        QAction *quitAction = fileMenu->addAction(tr("Quit"));
        quitAction->setObjectName("QuitAction");
@@ -374,6 +404,18 @@ void MainWindow::closeEvent(QCloseEvent *event)
         return;
     }
     QScopedValueRollback<bool> showing(m_quitDialogOpen, true);
+    for (Planner *planner : findChildren<Planner*>()) {
+        if (!planner->confirmSaveDocumentChanges()) {
+            event->ignore();
+            return;
+        }
+    }
+    for (TabPlayer *player : findChildren<TabPlayer*>()) {
+        if (!player->confirmSaveChanges()) {
+            event->ignore();
+            return;
+        }
+    }
     QuitDialog dialog(this);
     const int choice = dialog.exec();
     if (choice == QuitDialog::Cancel) {

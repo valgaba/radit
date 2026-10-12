@@ -26,10 +26,12 @@ private:
     bool saveSettings();
     void testVoice();
     void refreshAccountInfo();
+    void refreshVoiceName();
     void clearPreview();
 
     QLineEdit *m_apiKey = nullptr;
     QLineEdit *m_voiceId = nullptr;
+    QLabel *m_voiceName = nullptr;
     QComboBox *m_model = nullptr;
     QLabel *m_testStatus = nullptr;
     QLabel *m_accountName = nullptr;
@@ -43,6 +45,7 @@ private:
     Frame *m_titleBar = nullptr;
     bool m_dragging = false;
     QPoint m_dragOffset;
+    quint64 m_voiceLookupSerial = 0;
 };
 
 #endif // ELEVENLABSSETTINGSDIALOG_H

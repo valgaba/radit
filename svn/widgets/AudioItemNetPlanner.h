@@ -12,6 +12,8 @@ public:
     AudioItemNetPlanner(const AudioItemNetMaxi &source, QWidget *parent = nullptr);
     AudioItemMaxi *copy(QWidget *newParent) const override;
     double playbackLimitSeconds() const override { return m_connectionDurationSeconds; }
+    void setPlaybackLimitSeconds(double seconds) override
+    { setConnectionDurationSeconds(static_cast<int>(seconds+0.5)); }
     int connectionDurationSeconds() const { return m_connectionDurationSeconds; }
     void setConnectionDurationSeconds(int seconds);
     bool editStation() override;
