@@ -149,9 +149,9 @@ Cast::Cast(QWidget *parent) : Frame(parent)
     m_tls->setToolTip(tr("Use an encrypted connection to a TLS-enabled Icecast server"));
     m_mode = new QComboBox(m_settings);
     m_mode->setObjectName("Combo");
-    for (const auto &mode : MediaManager::mp3RecordingModes())
+    for (const auto &mode : MediaManager::castStreamingModes())
         m_mode->addItem(mode.label, mode.id);
-    m_mode->setToolTip(tr("MP3 streaming format"));
+    m_mode->setToolTip(tr("Audio streaming format"));
     const auto field = [grid, this](int row, int column, const QString &text, QWidget *widget) {
         auto *label = new QLabel(text, m_settings);
         label->setBuddy(widget);
@@ -212,7 +212,9 @@ Cast::Cast(QWidget *parent) : Frame(parent)
         if (!active && isHidden()) m_mediaManager->stopInput();
     });
     connect(m_mediaManager, &MediaManager::streamingConnected, this, [this]() {
-        m_status->setText(tr("Streaming — Icecast / MP3"));
+        const QString format=m_mode->currentData().toString().startsWith(QLatin1String("aac-"))
+            ? QStringLiteral("AAC") : QStringLiteral("MP3");
+        m_status->setText(tr("Streaming — Icecast / %1").arg(format));
     });
     connect(m_mediaManager, &MediaManager::streamingError, m_status, &QLabel::setText);
     connect(m_mediaManager, &MediaManager::streamingTimeChanged, this, [this](qint64 ms) {

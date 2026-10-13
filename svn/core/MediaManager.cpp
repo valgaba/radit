@@ -649,6 +649,30 @@ QList<Mp3RecordingMode> MediaManager::mp3RecordingModes()
     };
 }
 
+QList<CastStreamingMode> MediaManager::castStreamingModes()
+{
+    return {
+        {"mp3-44100-stereo-128", tr("MP3 44.1 kHz / Stereo / 128 kbps"),
+         "libmp3lame", "mp3", "audio/mpeg", 44100, 2, 128},
+        {"mp3-44100-stereo-192", tr("MP3 44.1 kHz / Stereo / 192 kbps"),
+         "libmp3lame", "mp3", "audio/mpeg", 44100, 2, 192},
+        {"mp3-44100-stereo-320", tr("MP3 44.1 kHz / Stereo / 320 kbps"),
+         "libmp3lame", "mp3", "audio/mpeg", 44100, 2, 320},
+        {"mp3-48000-stereo-192", tr("MP3 48 kHz / Stereo / 192 kbps"),
+         "libmp3lame", "mp3", "audio/mpeg", 48000, 2, 192},
+        {"mp3-48000-stereo-320", tr("MP3 48 kHz / Stereo / 320 kbps"),
+         "libmp3lame", "mp3", "audio/mpeg", 48000, 2, 320},
+        {"mp3-44100-mono-96", tr("MP3 44.1 kHz / Mono / 96 kbps"),
+         "libmp3lame", "mp3", "audio/mpeg", 44100, 1, 96},
+        {"aac-44100-stereo-128", tr("AAC 44.1 kHz / Stereo / 128 kbps"),
+         "aac", "adts", "audio/aac", 44100, 2, 128},
+        {"aac-44100-stereo-192", tr("AAC 44.1 kHz / Stereo / 192 kbps"),
+         "aac", "adts", "audio/aac", 44100, 2, 192},
+        {"aac-48000-stereo-192", tr("AAC 48 kHz / Stereo / 192 kbps"),
+         "aac", "adts", "audio/aac", 48000, 2, 192}
+    };
+}
+
 bool MediaManager::setRecordingMode(const QString &id)
 {
     if (isRecording()) return false;
@@ -846,12 +870,18 @@ bool MediaManager::startStreaming(const CastSettings &settings)
         settings.host.contains('@') || settings.host.contains('?') || settings.host.contains('#'))
         return fail(tr("Enter a server hostname, port, username and mount point such as /stream."));
     QStringList encoding;
-    for (const auto &mode : mp3RecordingModes()) {
-        if (mode.id == settings.mode)
+    QString muxer;
+    QString contentType;
+    for (const auto &mode : castStreamingModes()) {
+        if (mode.id == settings.mode) {
             encoding = {"-ar", QString::number(mode.sampleRate), "-ac", QString::number(mode.channels),
-                        "-c:a", "libmp3lame", "-b:a", QString::number(mode.bitrateKbps) + "k"};
+                        "-c:a", mode.codec, "-b:a", QString::number(mode.bitrateKbps) + "k"};
+            muxer = mode.muxer;
+            contentType = mode.contentType;
+            break;
+        }
     }
-    if (encoding.isEmpty()) return fail(tr("Select a supported MP3 streaming mode."));
+    if (encoding.isEmpty()) return fail(tr("Select a supported streaming format."));
     const QString program = QDir(QCoreApplication::applicationDirPath()).filePath("ffmpeg/ffmpeg.exe");
     if (!QFileInfo::exists(program)) return fail(tr("FFmpeg is missing from the ffmpeg folder."));
     QStringList arguments{
@@ -860,9 +890,9 @@ bool MediaManager::startStreaming(const CastSettings &settings)
         "-f", "f32le", "-ar", QString::number(m_backend->inputRate),
         "-ac", QString::number(m_backend->inputChannels), "-i", "pipe:0"
     };
-    arguments << encoding << "-content_type" << "audio/mpeg" << "-ice_name" << settings.name
+    arguments << encoding << "-content_type" << contentType << "-ice_name" << settings.name
               << "-tls" << (settings.tls ? "1" : "0") << "-rw_timeout" << "10000000"
-              << "-flush_packets" << "1" << "-f" << "mp3"
+              << "-flush_packets" << "1" << "-f" << muxer
               << QString::fromUtf8(url.toEncoded(QUrl::FullyEncoded));
     {
         const QMutexLocker lock(&m_backend->inputMutex);
