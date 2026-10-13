@@ -30,7 +30,7 @@ public:
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowTitle(tr("Audio folder properties"));
         setWindowIcon(QIcon(":/icons/properties.svg"));
-        resize(540, 450);
+        resize(540, 485);
         auto *root = new QVBoxLayout(this);
         root->setContentsMargins(0, 0, 0, 0);
         root->setSpacing(0);
@@ -76,6 +76,11 @@ public:
         folderRow->addWidget(folder, 1);
         folderRow->addWidget(browse);
         form->addRow(tr("Folder"), folderRow);
+        auto *songsPerTurn = new QLineEdit(QString::number(item->songsPerTurn()), this);
+        songsPerTurn->setObjectName("FolderSongsPerTurn");
+        songsPerTurn->setValidator(new QIntValidator(1, 999, songsPerTurn));
+        songsPerTurn->setToolTip(tr("Number of tracks to play from this folder before moving to the next item."));
+        form->addRow(tr("Songs per turn"), songsPerTurn);
         auto *enabled = new QCheckBox(tr("Mix before the audio ends"), this);
         enabled->setObjectName("MixEnabled");
         enabled->setChecked(item->mixEnabled());
@@ -213,6 +218,7 @@ public:
             outroText->setEnabled(speak);
             testVoice->setEnabled(speak);
             save->setEnabled(QFileInfo(folder->text()).isDir()
+                && songsPerTurn->hasAcceptableInput()
                 && (!enabled->isChecked() || seconds->hasAcceptableInput())
                 && (!speak || (introDelay->hasAcceptableInput()
                                && recovery->hasAcceptableInput())));
@@ -220,6 +226,7 @@ public:
         connect(enabled, &QCheckBox::toggled, this, validate);
         connect(announcementsEnabled, &QCheckBox::toggled, this, validate);
         connect(seconds, &QLineEdit::textChanged, this, validate);
+        connect(songsPerTurn, &QLineEdit::textChanged, this, validate);
         connect(introDelay, &QLineEdit::textChanged, this, validate);
         connect(recovery, &QLineEdit::textChanged, this, validate);
         connect(folder, &QLineEdit::textChanged, this, validate);
@@ -238,6 +245,7 @@ public:
                 item->setFolderPath(path);
             }
             item->setMixSettings(enabled->isChecked(), seconds->text().toDouble());
+            item->setSongsPerTurn(songsPerTurn->text().toInt());
             item->setAnnouncementsEnabled(announcementsEnabled->isChecked());
             item->setAnnouncementVolumePercent(voiceVolume->value());
             item->setAnnouncementMusicVolumePercent(musicVolume->value());
