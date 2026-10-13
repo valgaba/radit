@@ -455,6 +455,11 @@ void Player::bindMediaManager()
      });
      connect(mediamanager, &MediaManager::playbackError, this, [this, manager](const QString &message) {
          if (manager != mediamanager) return;
+         if (m_stopSequenceAtTrackEnd && m_sequenceContents) {
+             stopSequentialPlayback();
+             emit sequentialTrackFinished();
+             return;
+         }
          if (m_sequenceContents) {
              advanceSequence();
              return;
@@ -469,6 +474,12 @@ void Player::bindMediaManager()
                this, [this, manager]() {
            if (manager != mediamanager) return;
            finishMix(true);
+
+           if (m_stopSequenceAtTrackEnd && m_sequenceContents) {
+               stopSequentialPlayback();
+               emit sequentialTrackFinished();
+               return;
+           }
 
            if (m_sequenceContents) {
                if (auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem)) {
@@ -782,6 +793,7 @@ bool Player::startSequentialPlayback(ContentsBase *contents, bool repeat)
         stopMain();
     m_sequenceContents=contents;
     m_sequenceRepeat=repeat;
+    m_stopSequenceAtTrackEnd=false;
     m_sequenceIndex=-1;
     m_folderTurnItem.clear();
     m_folderTurnTracksStarted=0;
@@ -798,6 +810,7 @@ ContentsBase *Player::sequentialContents() const
 
 void Player::stopSequentialPlayback()
 {
+    m_stopSequenceAtTrackEnd=false;
     m_sequenceContents.clear();
     m_sequenceRepeat=false;
     m_sequenceIndex=-1;
@@ -805,6 +818,19 @@ void Player::stopSequentialPlayback()
     m_folderTurnTracksStarted=0;
     if (currentItem)
         stopMain();
+}
+
+bool Player::stopSequentialPlaybackAtTrackEnd()
+{
+    if (!m_sequenceContents || !currentItem)
+        return false;
+    m_stopSequenceAtTrackEnd=true;
+    return true;
+}
+
+void Player::cancelStopSequentialPlaybackAtTrackEnd()
+{
+    m_stopSequenceAtTrackEnd=false;
 }
 
 void Player::markFolderTrackStarted(AudioItemMaxi *item)
@@ -893,7 +919,11 @@ void Player::advanceSequence()
 bool Player::tryFolderMix(const AudioFrame &frame)
 {
     auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
-    if (!folder || !folder->mixEnabled() || m_outgoingManager || m_pendingMixManager || m_mixAttempted
+    // Once Planner has requested a clean track boundary, do not launch another
+    // overlapping track. Otherwise continuous folder mixing can keep moving the
+    // active manager forward before its natural end is reported.
+    if (m_stopSequenceAtTrackEnd || !folder || !folder->mixEnabled()
+        || m_outgoingManager || m_pendingMixManager || m_mixAttempted
         || !mediamanager->isPlaying()) return false;
     const double remaining = m_duration - frame.position;
     if (remaining <= 0.02) return false;
@@ -1172,6 +1202,7 @@ void Player::dropEvent(QDropEvent *event)
 
 void Player::stopMain()
 {
+    m_stopSequenceAtTrackEnd=false;
     m_folderTurnItem.clear();
     m_folderTurnTracksStarted=0;
     m_preparingPlaybackItem.clear();

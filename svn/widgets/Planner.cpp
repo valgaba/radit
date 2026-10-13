@@ -687,6 +687,7 @@ public:
                 {"accentColor",slot->accentColor().isValid()
                     ? slot->accentColor().name(QColor::HexArgb) : QString()},
                 {"disabled",slot->isScheduleDisabled()}, {"priority",slot->isPriority()},
+                {"waitForStandbyTrackEnd",slot->waitsForStandbyTrackEnd()},
                 {"contentsVisible",slot->contentsVisible()},
                 {"standbyListPath",slot->standbyListPath()},
                 {"items",Io::serializeItems(slot->contents()->layout)}
@@ -724,6 +725,7 @@ public:
             slot->setAccentColor(colorText.isEmpty() ? QColor() : QColor(colorText));
             slot->setScheduleDisabled(object.value("disabled").toBool());
             slot->setPriority(object.value("priority").toBool());
+            slot->setStandbyTrackWait(object.value("waitForStandbyTrackEnd").toBool());
             slot->setStandbyListPath(object.value("standbyListPath").toString());
             if (!slot->isStandbyListChangeEvent()) {
                 m_dayContents.append(slot->contents());
@@ -830,12 +832,14 @@ private:
             }
             ScheduleSlotOptionsDialog options(currentTime,window(),
                                                editedSlot->isScheduleDisabled(),true,
-                                               editedSlot->name());
+                                               editedSlot->name(),
+                                               editedSlot->waitsForStandbyTrackEnd());
             if (options.exec()==QDialog::Accepted) {
                 const QTime time=options.entryTime();
                 editedSlot->setEntryTime(time.hour()*3600+time.minute()*60+time.second());
                 editedSlot->setName(options.name());
                 editedSlot->setScheduleDisabled(options.isDisabled());
+                editedSlot->setStandbyTrackWait(options.waitsForStandbyTrackEnd());
                 markDocumentModified();
             }
         });
@@ -936,6 +940,7 @@ private:
         copy->setName(source->name());
         copy->setAccentColor(source->accentColor());
         copy->setScheduleDisabled(source->isScheduleDisabled());
+        copy->setStandbyTrackWait(source->waitsForStandbyTrackEnd());
         copy->setStandbyListPath(source->standbyListPath());
         QVBoxLayout *sourceLayout=source->contents()->layout;
         for (int index=0; index<sourceLayout->count(); ++index) {
@@ -1493,6 +1498,8 @@ public:
                 if (!slot.value("entrySecond").isDouble() || second<0 || second>=86400
                     || occupiedTimes.contains(second) || !slot.value("name").isString()
                     || !slot.value("disabled").isBool() || !slot.value("priority").isBool()
+                    || (slot.contains("waitForStandbyTrackEnd")
+                        && !slot.value("waitForStandbyTrackEnd").isBool())
                     || !slot.value("contentsVisible").isBool()
                     || !slot.value("standbyListPath").isString() || !slot.value("items").isArray()
                     || (!color.isEmpty() && !QColor(color).isValid())
@@ -2011,6 +2018,10 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     connect(m_standbyResumeTimer,&QTimer::timeout,
             this,&Planner::resumeStandbyAfterBoundaryCheck);
 
+    connect(m_standbyEngine,&Player::sequentialTrackFinished,this,[this]() {
+        finishStandbyTrackWait();
+    });
+
     m_standbyBlinkTimer=new QTimer(this);
     m_standbyBlinkTimer->setInterval(500);
     connect(m_standbyBlinkTimer,&QTimer::timeout,this,[this]() {
@@ -2075,6 +2086,8 @@ void Planner::prepareForScheduleSlotRemoval(ScheduleSlot *slot)
         g_scheduleSlotClipboard.clear();
         g_scheduleSlotClipboardIsCut=false;
     }
+    if (m_waitingForStandbySlot==slot)
+        cancelStandbyTrackWait();
     if (m_pendingStartSlot==slot)
         m_pendingStartSlot.clear();
     if (m_activeScheduleSlot==slot || m_pendingScheduleSlot==slot)
@@ -2147,6 +2160,7 @@ void Planner::stopPlayback()
 {
     if (!m_running) return;
     m_standbyResumeTimer->stop();
+    cancelStandbyTrackWait();
     if (m_activeScheduleSlot)
         m_activeScheduleSlot->setPlaying(false);
     if (m_pendingScheduleSlot)
@@ -2229,13 +2243,23 @@ void Planner::checkSchedule()
     const QString dayKey=now.date().toString("yyyyMMdd");
     const bool dateChanged=m_triggeredDate!=dayKey;
     if (dateChanged) {
+        cancelStandbyTrackWait();
         m_triggeredSlots.clear();
         m_triggeredDate=dayKey;
         m_pendingStartSlot.clear();
     }
-    if (ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now))
+    if (ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now)) {
+        if (m_waitingForStandbySlot && m_waitingForStandbySlot!=dueSlot)
+            cancelStandbyTrackWait();
         m_pendingStartSlot=dueSlot;
-    if (m_pendingStartSlot && !m_pendingStartSlot->isStandbyListChangeEvent()
+    }
+    if (m_waitingForStandbySlot && m_waitingForStandbySlot->isScheduleDisabled()) {
+        if (m_pendingStartSlot==m_waitingForStandbySlot)
+            m_pendingStartSlot.clear();
+        cancelStandbyTrackWait();
+    }
+    if (m_pendingStartSlot && m_waitingForStandbySlot!=m_pendingStartSlot
+        && !m_pendingStartSlot->isStandbyListChangeEvent()
         && weekTabs->slotContaining(now)!=m_pendingStartSlot)
         m_pendingStartSlot.clear();
 
@@ -2247,7 +2271,7 @@ void Planner::checkSchedule()
             .arg(dayKey)
             .arg(quintptr(slot),0,16)
             .arg(slot->entrySecond());
-        if (!m_triggeredSlots.contains(key)) {
+        if (!m_triggeredSlots.contains(key) && m_waitingForStandbySlot!=slot) {
             if (slot->isStandbyListChangeEvent()) {
                 QString error;
                 applyStandbyListChange(slot->standbyListPath(),&error);
@@ -2274,6 +2298,16 @@ void Planner::checkSchedule()
                 }
             }
             if (!voicePackLoading) {
+                const bool canWaitForStandbyTrack=slot->waitsForStandbyTrackEnd()
+                    && !m_activeScheduleEngine && !m_pendingScheduleSlot
+                    && !m_fadeTimer->isActive() && m_standbyEngine
+                    && m_standbyEngine->getCurrentItem()
+                    && m_standbyEngine->sequentialContents();
+                if (canWaitForStandbyTrack
+                    && m_standbyEngine->stopSequentialPlaybackAtTrackEnd()) {
+                    m_waitingForStandbySlot=slot;
+                    return;
+                }
                 m_triggeredSlots.insert(key);
                 m_pendingStartSlot.clear();
                 startScheduleSlot(slot);
@@ -2287,6 +2321,36 @@ void Planner::checkSchedule()
         m_standbyEngine->setVolume(m_volume);
         m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
     }
+}
+
+void Planner::cancelStandbyTrackWait()
+{
+    if (m_standbyEngine)
+        m_standbyEngine->cancelStopSequentialPlaybackAtTrackEnd();
+    m_waitingForStandbySlot.clear();
+}
+
+void Planner::finishStandbyTrackWait()
+{
+    QPointer<ScheduleSlot> slot=m_waitingForStandbySlot;
+    if (!slot)
+        return;
+    m_waitingForStandbySlot.clear();
+    if (!m_running || slot->isScheduleDisabled()) {
+        if (m_pendingStartSlot==slot)
+            m_pendingStartSlot.clear();
+        return;
+    }
+
+    const QString dayKey=QDate::currentDate().toString("yyyyMMdd");
+    const QString key=QStringLiteral("%1-%2-%3")
+        .arg(dayKey)
+        .arg(quintptr(slot.data()),0,16)
+        .arg(slot->entrySecond());
+    m_triggeredSlots.insert(key);
+    if (m_pendingStartSlot==slot)
+        m_pendingStartSlot.clear();
+    startScheduleSlot(slot);
 }
 
 void Planner::startScheduleSlot(ScheduleSlot *slot)
