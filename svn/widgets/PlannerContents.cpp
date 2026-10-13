@@ -4,6 +4,7 @@
 */
 #include "widgets/PlannerContents.h"
 #include "widgets/Planner.h"
+#include "widgets/ScheduleSlot.h"
 #include "widgets/AudioItem.h"
 #include "widgets/AudioItemFilePlanner.h"
 #include "widgets/AudioItemFileMaxi.h"
@@ -21,6 +22,7 @@
 #include <QDropEvent>
 #include <QIcon>
 #include <QMimeData>
+#include <utility>
 
 namespace {
 AudioItemMaxi *makePlannerItem(AudioItemMaxi *source, QWidget *parent)
@@ -34,6 +36,7 @@ AudioItemMaxi *makePlannerItem(AudioItemMaxi *source, QWidget *parent)
         item->setSecond(fileItem->second());
         item->setTiempoFile(fileItem->second());
         item->setSecondStart(fileItem->secondStart());
+        item->setEnabledForPlayback(fileItem->isEnabledForPlayback());
         item->setToolTip(fileItem->toolTip());
         return item;
     }
@@ -85,8 +88,18 @@ AudioItemMaxi *PlannerContents::createItem(AudioItemMaxi *item)
     }
     AudioItemMaxi *created=ContentsPlayer::createItem(item);
     if (created) {
+        QWidget *owner=parentWidget();
+        while (owner && !qobject_cast<ScheduleSlot*>(owner))
+            owner=owner->parentWidget();
+        created->setPlannerEnableControlVisible(owner!=nullptr);
+        if (!owner)
+            created->setEnabledForPlayback(true);
         connect(created,&AudioItemMaxi::propertiesOpened,this,[this]() {
             emit contentModified();
+        });
+        connect(created,&AudioItemMaxi::playbackEnabledChanged,this,[this]() {
+            emit contentModified();
+            emit contentDurationsChanged();
         });
     }
     if (auto *netItem=qobject_cast<AudioItemNetPlanner*>(created)) {
@@ -260,6 +273,19 @@ void PlannerContents::dropEvent(QDropEvent *event)
     if (!draggedItems.isEmpty() && allFromPlannerLists) {
         // Reorder within a slot or move between Planner slots without duplicating.
         ContentsPlayer::dropEvent(event);
+        QList<PlannerContents*> affectedLists=sourceLists;
+        if (!affectedLists.contains(this))
+            affectedLists.append(this);
+        for (PlannerContents *list : std::as_const(affectedLists)) {
+            QWidget *slot=list;
+            while (slot && !qobject_cast<ScheduleSlot*>(slot))
+                slot=slot->parentWidget();
+            for (AudioItemMaxi *item : list->findChildren<AudioItemMaxi*>()) {
+                item->setPlannerEnableControlVisible(slot!=nullptr);
+                if (!slot)
+                    item->setEnabledForPlayback(true);
+            }
+        }
         for (PlannerContents *sourceList : sourceLists) {
             if (sourceList!=this)
                 emit sourceList->contentDurationsChanged();

@@ -362,7 +362,7 @@ AudioItemMaxi* ContentsBase::findNextPlayItem(AudioItemMaxi* current)
         for (int i = index; i < layout->count(); ++i) {
             QWidget* w = layout->itemAt(i)->widget();
             if (auto *item = qobject_cast<AudioItemMaxi*>(w)) {
-                if (item->isPlayNext())
+                if (item->isEnabledForPlayback() && item->isPlayNext())
                     return item;
             }
         }
@@ -371,7 +371,7 @@ AudioItemMaxi* ContentsBase::findNextPlayItem(AudioItemMaxi* current)
         for (int i = 0; i < index; ++i) {
             QWidget* w = layout->itemAt(i)->widget();
             if (auto *item = qobject_cast<AudioItemMaxi*>(w)) {
-                if (item->isPlayNext())
+                if (item->isEnabledForPlayback() && item->isPlayNext())
                     return item;
             }
         }

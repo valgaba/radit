@@ -10,6 +10,7 @@
 #include <QMimeData>
 #include <QPointer>
 #include <QTimer>
+#include <QThreadPool>
 #include <QUrl>
 #include <QtConcurrent>
 #include <algorithm>
@@ -29,7 +30,6 @@ class FileExploreModel : public QAbstractItemModel
         QDateTime date;
     };
     struct Scan {
-        std::vector<Entry> entries;
         QDateTime stamp;
         QFile::Permissions permissions;
         QString error;
@@ -39,6 +39,7 @@ class FileExploreModel : public QAbstractItemModel
         Node *parent = nullptr;
         int row = 0;
         bool attached = true, loaded = false, loading = false;
+        bool scanPublishedRows = false;
         QDateTime stamp;
         std::vector<std::shared_ptr<Node>> children;
         std::shared_ptr<std::atomic_bool> cancel;
@@ -188,101 +189,144 @@ private:
         const auto cancel = std::make_shared<std::atomic_bool>(false);
         node->cancel = cancel;
         node->loading = true;
+        node->scanPublishedRows = false;
         if (node == m_root && rootProgress) rootProgress(0, 0);
         const QString path = node->entry.path;
         const auto filters = m_filters;
         const bool created = m_created;
-        auto *watcher = new QFutureWatcher<Scan>(this);
         const std::weak_ptr<Node> weak = node;
-        connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, weak, cancel]() {
-            const auto node = weak.lock();
-            if (!node || !node->attached || cancel->load() || node->cancel != cancel) {
-                watcher->deleteLater();
-                return;
-            }
-            auto scan = std::make_shared<Scan>(watcher->result());
-            watcher->deleteLater();
-            if (!scan->error.isEmpty()) {
-                node->loading = false;
-                node->loaded = true;
-                if (node == m_root) {
-                    if (rootProgress) rootProgress(-1, 0);
-                    if (rootError) rootError(scan->error);
-                }
-                return;
-            }
-            node->stamp = scan->stamp;
-            const QModelIndex parent = nodeIndex(node);
-            if (!node->children.empty()) {
-                beginRemoveRows(parent, 0, int(node->children.size())-1);
-                for (const auto &child : node->children) detach(child);
-                node->children.clear();
-                endRemoveRows();
-            }
-            node->entry.permissions = scan->permissions;
-            appendBatch(node, scan, 0, cancel);
-        });
-        watcher->setFuture(QtConcurrent::run([path, filters, created, cancel]() {
-            Scan result;
+        const QPointer<FileExploreModel> guardedModel(this);
+        QThreadPool::globalInstance()->start([guardedModel, weak, cancel, path, filters, created]() {
+            Scan scan;
+            QVector<Entry> batch;
+            batch.reserve(32);
+            const auto publishBatch = [&]() {
+                if (batch.isEmpty() || cancel->load()) return;
+                QVector<Entry> published;
+                published.swap(batch);
+                batch.reserve(32);
+                QMetaObject::invokeMethod(guardedModel.data(), [guardedModel, weak, cancel,
+                                                         published = std::move(published)]() mutable {
+                    if (!guardedModel) return;
+                    const auto node = weak.lock();
+                    if (!node || !node->attached || cancel->load() || node->cancel != cancel)
+                        return;
+                    guardedModel->appendBatch(node, std::move(published), cancel);
+                }, Qt::QueuedConnection);
+            };
+
             const QFileInfo directory(path);
             if (!directory.isDir() || !directory.isReadable()) {
-                result.error = QStringLiteral("Folder does not exist or is not accessible: %1").arg(path);
-                return result;
-            }
-            result.stamp = directory.lastModified();
-            result.permissions = directory.permissions();
-            QDirIterator iterator(path, QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
-            while (!cancel->load() && iterator.hasNext()) {
-                iterator.next();
-                const QFileInfo info = iterator.fileInfo();
-                const bool isDir = info.isDir();
-                if (!isDir && !QDir::match(filters, info.fileName())) continue;
-                Entry entry;
-                entry.path = info.absoluteFilePath();
-                entry.name = info.fileName();
-                entry.directory = isDir;
-                entry.permissions = info.permissions();
-                if (created && !isDir) {
-                    entry.date = info.birthTime();
-                    if (!entry.date.isValid()) entry.date = info.lastModified();
+                scan.error = QStringLiteral("Folder does not exist or is not accessible: %1").arg(path);
+            } else {
+                scan.stamp = directory.lastModified();
+                scan.permissions = directory.permissions();
+                QDirIterator iterator(path, QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
+                while (!cancel->load() && iterator.hasNext()) {
+                    iterator.next();
+                    const QFileInfo info = iterator.fileInfo();
+                    const bool isDir = info.isDir();
+                    if (!isDir && !QDir::match(filters, info.fileName())) continue;
+                    Entry entry;
+                    entry.path = info.absoluteFilePath();
+                    entry.name = info.fileName();
+                    entry.directory = isDir;
+                    // File permissions are not used by the browser. Avoid an
+                    // extra metadata query for every audio file on network shares.
+                    if (isDir) entry.permissions = info.permissions();
+                    if (created && !isDir) {
+                        entry.date = info.birthTime();
+                        if (!entry.date.isValid()) entry.date = info.lastModified();
+                    }
+                    batch.push_back(std::move(entry));
+                    if (batch.size() >= 32) publishBatch();
                 }
-                result.entries.push_back(std::move(entry));
+                publishBatch();
             }
-            if (!cancel->load()) std::sort(result.entries.begin(), result.entries.end(), [created](const Entry &a, const Entry &b) {
-                if (a.directory != b.directory) return a.directory;
-                if (created && !a.directory && a.date != b.date) return a.date > b.date;
-                const int cmp = QString::compare(a.name, b.name, Qt::CaseInsensitive);
-                return cmp ? cmp < 0 : a.name < b.name;
-            });
-            return result;
-        }));
+
+            QMetaObject::invokeMethod(guardedModel.data(), [guardedModel, weak, cancel,
+                                                             scan = std::move(scan), created]() {
+                if (!guardedModel) return;
+                const auto node = weak.lock();
+                if (!node || !node->attached || cancel->load() || node->cancel != cancel)
+                    return;
+                if (!scan.error.isEmpty()) {
+                    node->loading = false;
+                    node->loaded = true;
+                    if (node == guardedModel->m_root) {
+                        if (guardedModel->rootProgress) guardedModel->rootProgress(-1, 0);
+                        if (guardedModel->rootError) guardedModel->rootError(scan.error);
+                    }
+                    return;
+                }
+                if (!node->scanPublishedRows)
+                    guardedModel->clearChildren(node);
+                node->stamp = scan.stamp;
+                node->entry.permissions = scan.permissions;
+                guardedModel->sortChildren(node, created);
+                node->loading = false;
+                node->loaded = true;
+                if (node == guardedModel->m_root && guardedModel->rootProgress)
+                    guardedModel->rootProgress(-1, 0);
+            }, Qt::QueuedConnection);
+        });
     }
 
-    void appendBatch(const std::shared_ptr<Node> &node, const std::shared_ptr<Scan> &scan,
-                     int offset, const std::shared_ptr<std::atomic_bool> &cancel)
+    void clearChildren(const std::shared_ptr<Node> &node)
     {
-        if (!node->attached || cancel->load() || node->cancel != cancel) return;
-        const int total = int(scan->entries.size());
-        const int end = qMin(offset + 64, total);
-        if (end > offset) {
-            beginInsertRows(nodeIndex(node), offset, end-1);
-            for (int row = offset; row < end; ++row) {
-                auto child = std::make_shared<Node>();
-                child->entry = std::move(scan->entries[row]);
-                child->parent = node.get();
-                child->row = row;
-                node->children.push_back(std::move(child));
-            }
-            endInsertRows();
+        if (node->children.empty()) return;
+        const QModelIndex parent = nodeIndex(node);
+        beginRemoveRows(parent, 0, int(node->children.size())-1);
+        for (const auto &child : node->children) detach(child);
+        node->children.clear();
+        endRemoveRows();
+    }
+
+    void appendBatch(const std::shared_ptr<Node> &node, QVector<Entry> entries,
+                     const std::shared_ptr<std::atomic_bool> &cancel)
+    {
+        if (!node->attached || cancel->load() || node->cancel != cancel || entries.isEmpty()) return;
+        if (!node->scanPublishedRows) {
+            clearChildren(node);
+            node->scanPublishedRows = true;
         }
-        if (end < total) {
-            if (node == m_root && rootProgress) rootProgress(end, total);
-            QTimer::singleShot(10, this, [this, node, scan, end, cancel]() { appendBatch(node, scan, end, cancel); });
-        } else {
-            node->loading = false;
-            node->loaded = true;
-            if (node == m_root && rootProgress) rootProgress(-1, 0);
+        const int first = int(node->children.size());
+        const int last = first + entries.size() - 1;
+        beginInsertRows(nodeIndex(node), first, last);
+        for (Entry &entry : entries) {
+            auto child = std::make_shared<Node>();
+            child->entry = std::move(entry);
+            child->parent = node.get();
+            child->row = int(node->children.size());
+            node->children.push_back(std::move(child));
         }
+        endInsertRows();
+    }
+
+    void sortChildren(const std::shared_ptr<Node> &node, bool created)
+    {
+        if (node->children.size() < 2) return;
+        const QModelIndexList oldIndexes = persistentIndexList();
+        emit layoutAboutToBeChanged();
+        std::stable_sort(node->children.begin(), node->children.end(), [created](const auto &a, const auto &b) {
+            if (a->entry.directory != b->entry.directory) return a->entry.directory;
+            if (created && !a->entry.directory && a->entry.date != b->entry.date)
+                return a->entry.date > b->entry.date;
+            const int cmp = QString::compare(a->entry.name, b->entry.name, Qt::CaseInsensitive);
+            return cmp ? cmp < 0 : a->entry.name < b->entry.name;
+        });
+        for (int row=0; row<int(node->children.size()); ++row)
+            node->children[row]->row = row;
+        QModelIndexList newIndexes;
+        newIndexes.reserve(oldIndexes.size());
+        for (const QModelIndex &oldIndex : oldIndexes) {
+            auto *persistentNode = static_cast<Node *>(oldIndex.internalPointer());
+            newIndexes.append(persistentNode && persistentNode->attached
+                ? createIndex(persistentNode->row, oldIndex.column(), persistentNode)
+                : QModelIndex());
+        }
+        changePersistentIndexList(oldIndexes, newIndexes);
+        emit layoutChanged();
     }
 
     void pollFolders()

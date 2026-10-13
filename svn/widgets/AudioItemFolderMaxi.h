@@ -69,12 +69,12 @@ private:
     QString m_currentTrack;
     bool m_scanning = false;
     bool m_waitingForScan = false;
-    bool m_mixEnabled = true;
+    bool m_mixEnabled = false;
     double m_mixSeconds = 3.0;
     QString m_introAnnouncement = QStringLiteral("[excited] ¡Sigues en tu emisora favorita! Te dejamos con [artist] y su tema [title].");
     QString m_outroAnnouncement;
     int m_announcementDelaySeconds = 5;
-    bool m_announcementsEnabled = true;
+    bool m_announcementsEnabled = false;
     int m_announcementVolumePercent = 140;
     int m_announcementMusicVolumePercent = 8;
     double m_announcementRecoverySeconds = 1.0;

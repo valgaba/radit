@@ -22,6 +22,7 @@ AudioItemNetPlanner::AudioItemNetPlanner(const AudioItemNetMaxi &source, QWidget
     setUrl(source.url());
     setNameFile(source.nameFile());
     setIsSelect(source.isSelect());
+    setEnabledForPlayback(source.isEnabledForPlayback());
     setIsPlayNext(source.isPlayNext());
     setIsPurge(source.isPurge());
     setColor(source.color());

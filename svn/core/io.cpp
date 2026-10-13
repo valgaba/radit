@@ -41,6 +41,7 @@
 #include "widgets/PlannerContents.h"
 #include "widgets/tabbar.h"
 #include "widgets/container.h"
+#include "widgets/ScheduleSlot.h"
 
 namespace {
 bool importInProgress = false;
@@ -49,6 +50,13 @@ bool fail(QString *error, const QString &message)
 {
     if (error) *error = message;
     return false;
+}
+
+bool belongsToScheduleSlot(QWidget *widget)
+{
+    while (widget && !qobject_cast<ScheduleSlot*>(widget))
+        widget=widget->parentWidget();
+    return widget!=nullptr;
 }
 
 QJsonArray saveItems(QLayout *layout)
@@ -67,6 +75,8 @@ QJsonArray saveItems(QLayout *layout)
             {"purge", item->isPurge()}, {"loop", item->isLoop()},
             {"color", item->color().name(QColor::HexArgb)}
         };
+        if (belongsToScheduleSlot(item))
+            object["enabled"] = item->isEnabledForPlayback();
         if (auto *folder = qobject_cast<AudioItemFolderMaxi*>(item)) {
             object["mixEnabled"] = folder->mixEnabled();
             object["mixSeconds"] = folder->mixSeconds();
@@ -116,7 +126,7 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             folderItem->setAnnouncementTexts(object["introAnnouncement"].toString(),
                                              object["outroAnnouncement"].toString(),
                                              object["announcementDelaySeconds"].toInt(5));
-            folderItem->setAnnouncementsEnabled(object["announcementsEnabled"].toBool(true));
+            folderItem->setAnnouncementsEnabled(object["announcementsEnabled"].toBool(false));
             folderItem->setAnnouncementVolumePercent(object["announcementVolumePercent"].toInt(140));
             folderItem->setAnnouncementMusicVolumePercent(object["announcementMusicVolumePercent"].toInt(8));
             folderItem->setAnnouncementRecoverySeconds(object["announcementRecoverySeconds"].toDouble(1.0));
@@ -138,6 +148,8 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
         if (!network && !folder && !meteo) item->setTiempoFile(seconds);
         if (!folder && !meteo) item->setSecondStart(object["secondStart"].toDouble());
         item->setIsSelect(object["select"].toBool());
+        if (belongsToScheduleSlot(contents))
+            item->setEnabledForPlayback(object["enabled"].toBool(true));
         item->setIsPlayNext(object["playNext"].toBool());
         item->setIsPurge(object["purge"].toBool());
         if (!network) item->setIsLoop(object["loop"].toBool());
@@ -212,7 +224,7 @@ bool validItems(const QJsonArray &items, LoadingDialog *loading = nullptr)
             || !item["name"].isString() || !item["second"].isDouble()
             || item["second"].toDouble() < 0 || !std::isfinite(item["second"].toDouble()))
             return false;
-        for (const auto *key : {"select", "playNext", "purge", "loop"})
+        for (const auto *key : {"select", "playNext", "purge", "loop", "enabled"})
             if (item.contains(key) && !item[key].isBool()) return false;
         if (item.contains("color") && !QColor(item["color"].toString()).isValid()) return false;
         if (item.contains("mixEnabled") && !item["mixEnabled"].isBool()) return false;

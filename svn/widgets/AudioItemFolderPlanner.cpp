@@ -25,6 +25,7 @@ AudioItemFolderPlanner::AudioItemFolderPlanner(const AudioItemFolderMaxi &source
     setIsPlayNext(source.isPlayNext());
     setIsLoop(source.isLoop());
     setIsSelect(source.isSelect());
+    setEnabledForPlayback(source.isEnabledForPlayback());
     setColor(source.color());
     setToolTip(source.toolTip());
     if (!source.folderPath().isEmpty())

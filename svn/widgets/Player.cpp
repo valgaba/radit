@@ -42,7 +42,7 @@ AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
                                       int sequenceIndex,
                                       bool sequenceRepeat)
 {
-    if (folder->isLoop()) return folder;
+    if (folder->isLoop()) return folder->isEnabledForPlayback() ? folder : nullptr;
     if (sequenceContents && sequenceContents->layout) {
         const int count=sequenceContents->layout->count();
         if (sequenceIndex>=0 && sequenceIndex<count) {
@@ -55,7 +55,7 @@ AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
                 }
                 auto *item=qobject_cast<AudioItemMaxi*>(
                     sequenceContents->layout->itemAt(candidate)->widget());
-                if (item)
+                if (item && item->isEnabledForPlayback())
                     return item;
             }
             return nullptr;
@@ -70,7 +70,7 @@ AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
     for (int offset = 1; offset < contents->layout->count(); ++offset) {
         const int row = (index + offset) % contents->layout->count();
         auto *item = qobject_cast<AudioItemMaxi*>(contents->layout->itemAt(row)->widget());
-        if (item && item->isPlayNext()) return item;
+        if (item && item->isEnabledForPlayback() && item->isPlayNext()) return item;
     }
     return nullptr;
 }
@@ -543,7 +543,7 @@ void Player::bindMediaManager()
 
 void Player::playItem(AudioItemMaxi *item)
 {
-    if (!item)
+    if (!item || !item->isEnabledForPlayback())
            return;
     m_preparingPlaybackItem.clear();
     finishMix(false);
@@ -595,7 +595,12 @@ void Player::playItem(AudioItemMaxi *item)
 
 void Player::startPreparedItem(AudioItemMaxi *item)
 {
-       if (!item || !mediamanager->setDevice(this->devicePlay()))
+       if (!item || !item->isEnabledForPlayback()) {
+           if (m_sequenceContents)
+               advanceSequence();
+           return;
+       }
+       if (!mediamanager->setDevice(this->devicePlay()))
            return;
        m_folderIntroAnnounced=false;
        m_folderOutroAnnounced=false;
@@ -794,7 +799,7 @@ bool Player::playSequenceFrom(int index)
             candidate%=count;
         }
         auto *item=qobject_cast<AudioItemMaxi*>(contents->layout->itemAt(candidate)->widget());
-        if (!item)
+        if (!item || !item->isEnabledForPlayback())
             continue;
         playItem(item);
         if (currentItem==item) {
@@ -1015,7 +1020,7 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
 void Player::finishPendingMix()
 {
     auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
-    if (!folder || !m_pendingMixItem || !folder->mixEnabled()
+    if (!folder || !m_pendingMixItem || !m_pendingMixItem->isEnabledForPlayback() || !folder->mixEnabled()
         || folderTransitionTarget(folder,m_sequenceContents.data(),m_sequenceIndex,
                                   m_sequenceRepeat) != m_pendingMixItem) {
         cancelPendingMix();

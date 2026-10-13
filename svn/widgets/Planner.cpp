@@ -1143,10 +1143,14 @@ private:
                 continue;
             }
             double durationSeconds=0.0;
-            const bool hasContents=entry.widget->contents()->layout->count()>0;
-            bool durationIsKnown=hasContents;
+            bool hasContents=false;
+            bool durationIsKnown=true;
             for (int index=0; durationIsKnown && index<entry.widget->contents()->layout->count(); ++index) {
                 QWidget *content=entry.widget->contents()->layout->itemAt(index)->widget();
+                auto *scheduledItem=qobject_cast<AudioItemMaxi*>(content);
+                if (!scheduledItem || !scheduledItem->isEnabledForPlayback())
+                    continue;
+                hasContents=true;
                 double itemDuration=0.0;
                 if (auto *audio=qobject_cast<AudioItemFilePlanner*>(content))
                     itemDuration=audio->second();
@@ -2257,7 +2261,7 @@ void Planner::checkSchedule()
             for (int index=0; index<slot->contents()->layout->count(); ++index) {
                 auto *item=qobject_cast<AudioItemMeteoClockMaxi*>(
                     slot->contents()->layout->itemAt(index)->widget());
-                if (!item || !item->announcesWeather())
+                if (!item || !item->isEnabledForPlayback() || !item->announcesWeather())
                     continue;
                 if (item->isLoading()) {
                     voicePackLoading=true;
@@ -2288,6 +2292,16 @@ void Planner::checkSchedule()
 void Planner::startScheduleSlot(ScheduleSlot *slot)
 {
     if (!slot || slot->contents()->layout->count()==0)
+        return;
+    bool hasEnabledItem=false;
+    for (int index=0; index<slot->contents()->layout->count(); ++index) {
+        auto *item=qobject_cast<AudioItemMaxi*>(slot->contents()->layout->itemAt(index)->widget());
+        if (item && item->isEnabledForPlayback()) {
+            hasEnabledItem=true;
+            break;
+        }
+    }
+    if (!hasEnabledItem)
         return;
     m_standbyResumeTimer->stop();
     if (m_fadeTimer->isActive()) {
@@ -2581,7 +2595,7 @@ void Planner::updateRemainingTimeLabel()
         && currentIndex>=0 && currentIndex<contents->layout->count()) {
         for (int index=currentIndex+1; index<contents->layout->count(); ++index) {
             auto *item=qobject_cast<AudioItemMaxi*>(contents->layout->itemAt(index)->widget());
-            if (!item)
+            if (!item || !item->isEnabledForPlayback())
                 continue;
             double itemDuration=item->playbackLimitSeconds();
             if (!std::isfinite(itemDuration) || itemDuration<=0.0)

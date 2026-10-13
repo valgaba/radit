@@ -20,6 +20,7 @@
 #include <QSpacerItem>
 #include <QTimer>
 #include <QGraphicsOpacityEffect>
+#include <QIcon>
 #include <cmath>
 
 
@@ -117,6 +118,16 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
         btnproperties->setToolTip("Properties");
         connect(btnproperties,&QPushButton::clicked,this,[this]() {
             emit propertiesOpened();
+        });
+
+        btnPlannerEnabled = new Button(this);
+        btnPlannerEnabled->setIconSize(QSize(18,18));
+        btnPlannerEnabled->setFixedSize(23,23);
+        btnPlannerEnabled->setToolTip(tr("Disable this scheduled item"));
+        btnPlannerEnabled->setAccessibleName(btnPlannerEnabled->toolTip());
+        btnPlannerEnabled->setVisible(false);
+        connect(btnPlannerEnabled,&QPushButton::clicked,this,[this]() {
+            setEnabledForPlayback(!m_isEnabled);
         });
 
         btndelete = new Button;
@@ -338,6 +349,7 @@ void AudioItemMaxi::setCompactPresentation(bool showProperties)
     labelnombre->setFixedHeight(26);
     labeltiempo->setFixedHeight(26);
     labeltiempo->setFixedWidth(78);
+    labeltiempo->setWordWrap(false);
 
     QFont compactNameFont=labelnombre->font();
     compactNameFont.setPointSize(10);
@@ -359,6 +371,10 @@ void AudioItemMaxi::setCompactPresentation(bool showProperties)
         btnproperties->hide();
     }
 
+    btnPlannerEnabled->setParent(framecenterright);
+    layoutcenterright->addWidget(btnPlannerEnabled);
+    updatePlannerEnabledAppearance();
+
     layouttop->removeWidget(btnselect);
     btnselect->setParent(framecenterright);
     btnselect->setFixedSize(23,23);
@@ -367,10 +383,48 @@ void AudioItemMaxi::setCompactPresentation(bool showProperties)
     setIsSelect(isSelect());
 }
 
+void AudioItemMaxi::setPlannerEnableControlVisible(bool visible)
+{
+    if (!btnPlannerEnabled) return;
+    if (visible && btnPlannerEnabled->parentWidget()!=framecenterright) {
+        btnPlannerEnabled->setParent(framecenterright);
+        layoutcenterright->insertWidget(qMax(0,layoutcenterright->indexOf(btnselect)),btnPlannerEnabled);
+    }
+    btnPlannerEnabled->setVisible(visible);
+}
+
+void AudioItemMaxi::setEnabledForPlayback(bool enabled)
+{
+    if (m_isEnabled==enabled) return;
+    m_isEnabled=enabled;
+    updatePlannerEnabledAppearance();
+    emit itemStateChanged();
+    emit playbackEnabledChanged();
+}
+
+void AudioItemMaxi::updatePlannerEnabledAppearance()
+{
+    if (!btnPlannerEnabled) return;
+    btnPlannerEnabled->setIcon(QIcon(m_isEnabled ? ":/icons/CheckBox.svg" : ":/icons/Disabled.svg"));
+    btnPlannerEnabled->setToolTip(m_isEnabled ? tr("Disable this scheduled item")
+                                              : tr("Enable this scheduled item"));
+    btnPlannerEnabled->setAccessibleName(btnPlannerEnabled->toolTip());
+    btnPlannerEnabled->setProperty("plannerItemEnabled",m_isEnabled);
+    btnPlannerEnabled->style()->unpolish(btnPlannerEnabled);
+    btnPlannerEnabled->style()->polish(btnPlannerEnabled);
+    setProperty("plannerItemEnabled",m_isEnabled);
+    style()->unpolish(this);
+    style()->polish(this);
+    update();
+}
+
 void AudioItemMaxi::setFolderPresentation(const QString &status, bool ready)
 {
     m_cueButton->hide();
     btnplay->setEnabled(ready);
+    const int requiredWidth=labeltiempo->fontMetrics().horizontalAdvance(status)+12;
+    if (requiredWidth>labeltiempo->width())
+        labeltiempo->setFixedWidth(requiredWidth);
     labeltiempo->setText(status);
 }
 

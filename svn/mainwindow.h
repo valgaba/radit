@@ -14,6 +14,7 @@ class Capture;
 class Cast;
 class MeteoClock;
 class Planner;
+class QAction;
 
 class MainWindow : public QMainWindow
 {
@@ -39,6 +40,8 @@ private:
     void restoreWindowInterface();
     bool m_quitDialogOpen = false;
     void restoreInterface();
+    void applyWorkspacePreset(bool plannerView);
+    void clearWorkspacePresetSelection();
 
     QWidget *centralwidget;
     QSplitter *splitterprincipal;
@@ -52,6 +55,8 @@ private:
     Cast *m_cast = nullptr;
     MeteoClock *m_meteoClock = nullptr;
     Planner *m_planner = nullptr;
+    QAction *m_studioViewAction = nullptr;
+    QAction *m_plannerViewAction = nullptr;
 
 
 };

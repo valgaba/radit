@@ -263,21 +263,43 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splittertop->setStretchFactor(2, 2);
     splittertop->setStretchFactor(3, 2);
     splittertop->setStretchFactor(4, 3);
-    splittertop->setStretchFactor(5, 3);
     QList<int> sizesTop;
-    sizesTop << 400 << 400 << 400 << 400 << 600 << 600;
+    sizesTop << 400 << 400 << 400 << 400 << 600;
     splittertop->setSizes(sizesTop);
 
     QAction *resetInterface = vistasMenu->addAction(tr("Reset User Interface"));
     connect(resetInterface, &QAction::triggered, this, &MainWindow::restoreInterface);
     vistasMenu->addSeparator();
 
+    m_studioViewAction=vistasMenu->addAction(tr("Studio view"));
+    m_studioViewAction->setCheckable(true);
+    connect(m_studioViewAction,&QAction::triggered,this,[this]() {
+        applyWorkspacePreset(false);
+    });
+    m_plannerViewAction=vistasMenu->addAction(tr("Planner view"));
+    m_plannerViewAction->setCheckable(true);
+    connect(m_plannerViewAction,&QAction::triggered,this,[this]() {
+        applyWorkspacePreset(true);
+    });
+    vistasMenu->addSeparator();
+
     const auto addPanelAction = [this, vistasMenu](const QString &text, QWidget *panel) {
         QAction *action = vistasMenu->addAction(text);
         action->setCheckable(true);
         action->setChecked(!panel->isHidden());
-        connect(action, &QAction::triggered, this, [panel](bool visible) {
+        connect(action, &QAction::triggered, this, [this,panel](bool visible) {
+            clearWorkspacePresetSelection();
             panel->setVisible(visible);
+            if (panel->parentWidget()==splitterdown) {
+                bool anyPlayerVisible=false;
+                for (int index=0; index<splitterdown->count(); ++index)
+                    anyPlayerVisible=anyPlayerVisible || !splitterdown->widget(index)->isHidden();
+                const int height=qMax(2,splitterprincipal->height()-splitterprincipal->handleWidth());
+                if (anyPlayerVisible)
+                    splitterprincipal->setSizes({height/3,height-height/3});
+                else
+                    splitterprincipal->setSizes({height,0});
+            }
         });
         // Sincronizar también después de ocultar el panel con su botón X.
         connect(vistasMenu, &QMenu::aboutToShow, this, [action, panel]() {
@@ -331,6 +353,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
 void MainWindow::restoreInterface()
 {
+    clearWorkspacePresetSelection();
     // Recuperar los mismos paneles y su estado, sin crear nuevas instancias.
     for (int i = 0; i < splittertop->count(); ++i)
         splittertop->widget(i)->show();
@@ -339,10 +362,44 @@ void MainWindow::restoreInterface()
     splittertop->show();
     splitterdown->show();
 
-    splittertop->setSizes({400, 400, 400, 400, 600, 600});
+    splittertop->setSizes({400, 400, 400, 400, 600});
     splitterdown->setSizes({400, 400, 400});
     const int height = qMax(3, splitterprincipal->height() - splitterprincipal->handleWidth());
     splitterprincipal->setSizes({height / 3, height - height / 3});
+}
+
+void MainWindow::clearWorkspacePresetSelection()
+{
+    if (m_studioViewAction) m_studioViewAction->setChecked(false);
+    if (m_plannerViewAction) m_plannerViewAction->setChecked(false);
+}
+
+void MainWindow::applyWorkspacePreset(bool plannerView)
+{
+    m_studioViewAction->setChecked(!plannerView);
+    m_plannerViewAction->setChecked(plannerView);
+
+    m_fileExplore->show();
+    m_meteoClock->show();
+    m_cast->hide();
+    m_capture->setVisible(!plannerView);
+    m_planner->setVisible(plannerView);
+
+    for (int index=0; index<splitterdown->count(); ++index)
+        splitterdown->widget(index)->setVisible(!plannerView);
+
+    splittertop->show();
+    splitterdown->show();
+    const int width=qMax(5,splittertop->width());
+    const int height=qMax(2,splitterprincipal->height()-splitterprincipal->handleWidth());
+    if (plannerView) {
+        splittertop->setSizes({width/4,0,0,width/4,width/2});
+        splitterprincipal->setSizes({height,0});
+    } else {
+        splittertop->setSizes({width/3,width/3,0,width/3,0});
+        splitterdown->setSizes({1,1,1});
+        splitterprincipal->setSizes({height/3,height-height/3});
+    }
 }
 
 void MainWindow::saveWindowInterface() const
@@ -353,6 +410,10 @@ void MainWindow::saveWindowInterface() const
     settings.setValue("splitterPrincipal", splitterprincipal->saveState());
     settings.setValue("splitterTop", splittertop->saveState());
     settings.setValue("splitterDown", splitterdown->saveState());
+    settings.setValue("workspacePreset",m_plannerViewAction && m_plannerViewAction->isChecked()
+                      ? QStringLiteral("planner")
+                      : m_studioViewAction && m_studioViewAction->isChecked()
+                            ? QStringLiteral("studio") : QString());
 
     const auto saveVisibility = [&settings](const QSplitter *splitter) {
         for (int index = 0; index < splitter->count(); ++index) {
@@ -389,6 +450,11 @@ void MainWindow::restoreWindowInterface()
     };
     restoreVisibility(splittertop);
     restoreVisibility(splitterdown);
+    const QString workspacePreset=settings.value("workspacePreset").toString();
+    if (workspacePreset==QLatin1String("planner"))
+        m_plannerViewAction->setChecked(true);
+    else if (workspacePreset==QLatin1String("studio"))
+        m_studioViewAction->setChecked(true);
     settings.endGroup();
 }
 

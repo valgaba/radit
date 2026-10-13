@@ -22,6 +22,7 @@ AudioItemMeteoClockPlanner::AudioItemMeteoClockPlanner(const AudioItemMeteoClock
     setIsPurge(source.isPurge());
     setIsPlayNext(source.isPlayNext());
     setIsSelect(source.isSelect());
+    setEnabledForPlayback(source.isEnabledForPlayback());
     setColor(source.color());
     setToolTip(source.toolTip());
     setAnnouncementOptions(source.announcesTime(),source.announcesWeather());
