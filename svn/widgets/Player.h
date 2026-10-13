@@ -20,6 +20,7 @@
 
 class VuMeter;
 class ContentsBase;
+class AudioItemFolderMaxi;
 
 
 
@@ -91,6 +92,8 @@ private:
     QPointer<ContentsBase> m_sequenceContents;
     bool m_sequenceRepeat = false;
     int m_sequenceIndex = -1;
+    QPointer<AudioItemFolderMaxi> m_folderTurnItem;
+    int m_folderTurnTracksStarted = 0;
     float m_outgoingLeft = -120.0f, m_outgoingRight = -120.0f;
     void bindMediaManager();
     void startPreparedItem(AudioItemMaxi *item);
@@ -111,6 +114,7 @@ private:
     void resumePlaybackLimit();
     bool playSequenceFrom(int index);
     void advanceSequence();
+    void markFolderTrackStarted(AudioItemMaxi *item);
 
 
 

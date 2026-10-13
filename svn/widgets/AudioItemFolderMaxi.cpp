@@ -340,6 +340,7 @@ AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
 {
     auto *item = new AudioItemFolderMaxi(newParent);
     item->setMixSettings(m_mixEnabled, m_mixSeconds);
+    item->setSongsPerTurn(m_songsPerTurn);
     item->setAnnouncementTexts(m_introAnnouncement, m_outroAnnouncement,
                                m_announcementDelaySeconds);
     item->setAnnouncementsEnabled(m_announcementsEnabled);

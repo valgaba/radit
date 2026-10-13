@@ -80,6 +80,7 @@ QJsonArray saveItems(QLayout *layout)
         if (auto *folder = qobject_cast<AudioItemFolderMaxi*>(item)) {
             object["mixEnabled"] = folder->mixEnabled();
             object["mixSeconds"] = folder->mixSeconds();
+            object["songsPerTurn"] = folder->songsPerTurn();
             object["introAnnouncement"] = folder->introAnnouncement();
             object["outroAnnouncement"] = folder->outroAnnouncement();
             object["announcementDelaySeconds"] = folder->announcementDelaySeconds();
@@ -123,6 +124,7 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             auto *folderItem = static_cast<AudioItemFolderMaxi*>(item);
             folderItem->setFolderPath(path);
             folderItem->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
+            folderItem->setSongsPerTurn(object["songsPerTurn"].toInt(1));
             folderItem->setAnnouncementTexts(object["introAnnouncement"].toString(),
                                              object["outroAnnouncement"].toString(),
                                              object["announcementDelaySeconds"].toInt(5));
@@ -231,6 +233,9 @@ bool validItems(const QJsonArray &items, LoadingDialog *loading = nullptr)
         if (item.contains("mixSeconds") && (!item["mixSeconds"].isDouble()
             || !std::isfinite(item["mixSeconds"].toDouble()) || item["mixSeconds"].toDouble() < 0.1
             || item["mixSeconds"].toDouble() > 30)) return false;
+        if (item.contains("songsPerTurn") && (!item["songsPerTurn"].isDouble()
+            || item["songsPerTurn"].toInt(-1) < 1
+            || item["songsPerTurn"].toInt(-1) > 999)) return false;
         if (item.contains("introAnnouncement") && !item["introAnnouncement"].isString()) return false;
         if (item.contains("outroAnnouncement") && !item["outroAnnouncement"].isString()) return false;
         if (item.contains("announcementsEnabled") && !item["announcementsEnabled"].isBool()) return false;

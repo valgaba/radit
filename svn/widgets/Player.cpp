@@ -40,9 +40,11 @@ MixGains equalPowerGains(float progress)
 AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
                                       ContentsBase *sequenceContents,
                                       int sequenceIndex,
-                                      bool sequenceRepeat)
+                                      bool sequenceRepeat,
+                                      bool continueFolderTurn)
 {
-    if (folder->isLoop()) return folder->isEnabledForPlayback() ? folder : nullptr;
+    if (folder->isLoop() || continueFolderTurn)
+        return folder->isEnabledForPlayback() ? folder : nullptr;
     if (sequenceContents && sequenceContents->layout) {
         const int count=sequenceContents->layout->count();
         if (sequenceIndex>=0 && sequenceIndex<count) {
@@ -469,12 +471,29 @@ void Player::bindMediaManager()
            finishMix(true);
 
            if (m_sequenceContents) {
+               if (auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem)) {
+                   if (!folder->isLoop() && m_folderTurnItem==folder
+                       && m_folderTurnTracksStarted < folder->songsPerTurn()) {
+                       playItem(folder);
+                       return;
+                   }
+               }
+               m_folderTurnItem.clear();
+               m_folderTurnTracksStarted=0;
                advanceSequence();
                return;
            }
 
            if (!currentItem)
                return;
+
+           if (auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem)) {
+               if (!folder->isLoop() && m_folderTurnItem==folder
+                   && m_folderTurnTracksStarted < folder->songsPerTurn()) {
+                   playItem(folder);
+                   return;
+               }
+           }
 
            if (currentItem->isLoop()) {
 
@@ -622,6 +641,7 @@ void Player::startPreparedItem(AudioItemMaxi *item)
            }
 
        currentItem = item;
+       markFolderTrackStarted(item);
 
 
        const double loadedDuration=mediamanager->getDuration();
@@ -763,6 +783,8 @@ bool Player::startSequentialPlayback(ContentsBase *contents, bool repeat)
     m_sequenceContents=contents;
     m_sequenceRepeat=repeat;
     m_sequenceIndex=-1;
+    m_folderTurnItem.clear();
+    m_folderTurnTracksStarted=0;
     if (playSequenceFrom(0))
         return true;
     m_sequenceContents.clear();
@@ -779,8 +801,26 @@ void Player::stopSequentialPlayback()
     m_sequenceContents.clear();
     m_sequenceRepeat=false;
     m_sequenceIndex=-1;
+    m_folderTurnItem.clear();
+    m_folderTurnTracksStarted=0;
     if (currentItem)
         stopMain();
+}
+
+void Player::markFolderTrackStarted(AudioItemMaxi *item)
+{
+    auto *folder=qobject_cast<AudioItemFolderMaxi*>(item);
+    if (!folder) {
+        m_folderTurnItem.clear();
+        m_folderTurnTracksStarted=0;
+        return;
+    }
+    if (m_folderTurnItem!=folder) {
+        m_folderTurnItem=folder;
+        m_folderTurnTracksStarted=1;
+    } else if (m_folderTurnTracksStarted<999) {
+        ++m_folderTurnTracksStarted;
+    }
 }
 
 bool Player::playSequenceFrom(int index)
@@ -901,8 +941,10 @@ bool Player::tryFolderMix(const AudioFrame &frame)
     const bool fixedFallback = remaining <= folder->mixSeconds();
     if (!sustainedQuiet && !naturalFade && !fixedFallback)
         return false;
+    const bool moreFolderTracks=m_folderTurnItem==folder
+        && m_folderTurnTracksStarted<folder->songsPerTurn();
     AudioItemMaxi *next = folderTransitionTarget(
-        folder,m_sequenceContents.data(),m_sequenceIndex,m_sequenceRepeat);
+        folder,m_sequenceContents.data(),m_sequenceIndex,m_sequenceRepeat,moreFolderTracks);
     if (!next) return false;
     m_mixAttempted = true;
     auto *nextFolder = qobject_cast<AudioItemFolderMaxi*>(next);
@@ -997,6 +1039,7 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
             m_outgoingLeft = frame.left; m_outgoingRight = frame.right;
         });
     currentItem = next;
+    markFolderTrackStarted(next);
     m_folderIntroAnnounced=false;
     m_folderOutroAnnounced=false;
     m_mixSearchStartPosition = -1.0;
@@ -1022,7 +1065,9 @@ void Player::finishPendingMix()
     auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
     if (!folder || !m_pendingMixItem || !m_pendingMixItem->isEnabledForPlayback() || !folder->mixEnabled()
         || folderTransitionTarget(folder,m_sequenceContents.data(),m_sequenceIndex,
-                                  m_sequenceRepeat) != m_pendingMixItem) {
+                                  m_sequenceRepeat,m_folderTurnItem==folder
+                                      && m_folderTurnTracksStarted<folder->songsPerTurn())
+            != m_pendingMixItem) {
         cancelPendingMix();
         return;
     }
@@ -1127,6 +1172,8 @@ void Player::dropEvent(QDropEvent *event)
 
 void Player::stopMain()
 {
+    m_folderTurnItem.clear();
+    m_folderTurnTracksStarted=0;
     m_preparingPlaybackItem.clear();
     stopFolderAnnouncement();
     if (m_playbackLimitTimer)

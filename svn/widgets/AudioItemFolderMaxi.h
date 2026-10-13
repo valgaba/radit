@@ -22,6 +22,8 @@ public:
     bool mixEnabled() const { return m_mixEnabled; }
     double mixSeconds() const { return m_mixSeconds; }
     void setMixSettings(bool enabled, double seconds);
+    int songsPerTurn() const { return m_songsPerTurn; }
+    void setSongsPerTurn(int count) { m_songsPerTurn = qBound(1, count, 999); }
     QString introAnnouncement() const { return m_introAnnouncement; }
     QString outroAnnouncement() const { return m_outroAnnouncement; }
     int announcementDelaySeconds() const { return m_announcementDelaySeconds; }
@@ -71,6 +73,7 @@ private:
     bool m_waitingForScan = false;
     bool m_mixEnabled = false;
     double m_mixSeconds = 3.0;
+    int m_songsPerTurn = 1;
     QString m_introAnnouncement = QStringLiteral("[excited] ¡Sigues en tu emisora favorita! Te dejamos con [artist] y su tema [title].");
     QString m_outroAnnouncement;
     int m_announcementDelaySeconds = 5;

@@ -15,6 +15,7 @@ AudioItemFolderPlanner::AudioItemFolderPlanner(const AudioItemFolderMaxi &source
     : AudioItemFolderPlanner(parent)
 {
     setMixSettings(source.mixEnabled(), source.mixSeconds());
+    setSongsPerTurn(source.songsPerTurn());
     setAnnouncementTexts(source.introAnnouncement(), source.outroAnnouncement(),
                          source.announcementDelaySeconds());
     setAnnouncementsEnabled(source.announcementsEnabled());

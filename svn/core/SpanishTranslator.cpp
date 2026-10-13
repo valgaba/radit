@@ -143,6 +143,8 @@ QString SpanishTranslator::translate(const char *context, const char *sourceText
         {QStringLiteral("Mix duration (seconds)"),QStringLiteral("Duración de la mezcla (segundos)")},
         {QStringLiteral("Model"),QStringLiteral("Modelo")},
         {QStringLiteral("Name"),QStringLiteral("Nombre")},
+        {QStringLiteral("Songs per turn"),QStringLiteral("Canciones por turno")},
+        {QStringLiteral("Number of tracks to play from this folder before moving to the next item."),QStringLiteral("Número de pistas que se reproducirán de esta carpeta antes de pasar al siguiente elemento.")},
         {QStringLiteral("No color"),QStringLiteral("Sin color")},
         {QStringLiteral("No files"),QStringLiteral("No hay archivos")},
         {QStringLiteral("No input devices available"),QStringLiteral("No hay dispositivos de entrada disponibles")},
