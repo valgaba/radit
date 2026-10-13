@@ -56,6 +56,17 @@ struct Mp3RecordingMode
     int channels;
     int bitrateKbps;
 };
+struct CastStreamingMode
+{
+    QString id;
+    QString label;
+    QString codec;
+    QString muxer;
+    QString contentType;
+    int sampleRate;
+    int channels;
+    int bitrateKbps;
+};
 struct AudioFrame
 {
     double position;
@@ -134,6 +145,7 @@ public:
     void setInputVolume(float volume);
     float inputVolume() const;
     static QList<Mp3RecordingMode> mp3RecordingModes();
+    static QList<CastStreamingMode> castStreamingModes();
     bool setRecordingMode(const QString &id);
     QString recordingMode() const;
     QStringList mp3EncodingOptions() const;
