@@ -76,6 +76,7 @@ private:
     QPointer<ScheduleSlot> m_activeScheduleSlot;
     QPointer<ScheduleSlot> m_pendingScheduleSlot;
     QPointer<ScheduleSlot> m_pendingStartSlot;
+    QPointer<ScheduleSlot> m_waitingForStandbySlot;
     QTimer *m_clockTimer = nullptr;
     QTimer *m_fadeTimer = nullptr;
     QTimer *m_standbyResumeTimer = nullptr;
@@ -99,6 +100,8 @@ private:
     void startPlayback();
     void stopPlayback();
     void checkSchedule();
+    void cancelStandbyTrackWait();
+    void finishStandbyTrackWait();
     void startScheduleSlot(ScheduleSlot *slot);
     void returnToStandby();
     void resumeStandbyAfterBoundaryCheck();

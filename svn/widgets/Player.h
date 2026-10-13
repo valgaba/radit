@@ -91,6 +91,7 @@ private:
     double m_mixSmoothedLevel = -120.0;
     QPointer<ContentsBase> m_sequenceContents;
     bool m_sequenceRepeat = false;
+    bool m_stopSequenceAtTrackEnd = false;
     int m_sequenceIndex = -1;
     QPointer<AudioItemFolderMaxi> m_folderTurnItem;
     int m_folderTurnTracksStarted = 0;
@@ -149,6 +150,8 @@ public:
     void playItem(AudioItemMaxi *item);
     bool startSequentialPlayback(ContentsBase *contents, bool repeat);
     void stopSequentialPlayback();
+    bool stopSequentialPlaybackAtTrackEnd();
+    void cancelStopSequentialPlaybackAtTrackEnd();
     void pauseMain();
     void stopMain();
     bool seekPlaybackPosition(double seconds);
@@ -186,6 +189,7 @@ public:
     signals:
     void configurationChanged();
     void sequentialPlaybackFinished();
+    void sequentialTrackFinished();
     void audioLevelsChanged(float left, float right);
     void playbackProgressChanged(double position, double duration, bool seekable);
     void currentPlaybackNameChanged(const QString &name);

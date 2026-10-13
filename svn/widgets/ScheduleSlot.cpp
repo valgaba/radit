@@ -394,6 +394,11 @@ void ScheduleSlot::setPriority(bool priority)
     m_priorityIndicator->setVisible(m_priority);
 }
 
+void ScheduleSlot::setStandbyTrackWait(bool enabled)
+{
+    m_waitForStandbyTrackEnd=enabled;
+}
+
 void ScheduleSlot::setUpcoming(bool upcoming)
 {
     if (m_upcoming==upcoming)

@@ -18,7 +18,8 @@
 
 ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent,
                                                      bool disabled, bool editing,
-                                                     const QString &name)
+                                                     const QString &name,
+                                                     bool waitForStandbyTrackEnd)
     : QDialog(parent)
 {
     setObjectName("ScheduleSlotOptionsDialog");
@@ -26,7 +27,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     setWindowModality(Qt::WindowModal);
     setModal(true);
     setWindowTitle(tr("Schedule slot options"));
-    resize(360, 195);
+    resize(400, 220);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -77,6 +78,12 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     m_disabled->setObjectName("ScheduleSlotDisabledCheckBox");
     m_disabled->setChecked(disabled);
     form->addRow(QString(), m_disabled);
+    m_waitForStandbyTrackEnd=new QCheckBox(
+        tr("Wait for the current Standby track to finish"),content);
+    m_waitForStandbyTrackEnd->setObjectName("ScheduleSlotWaitForStandbyTrack");
+    m_waitForStandbyTrackEnd->setChecked(waitForStandbyTrackEnd);
+    m_waitForStandbyTrackEnd->setToolTip(tr("Wait only while Standby is playing. An active ScheduleSlot is never delayed."));
+    form->addRow(QString(),m_waitForStandbyTrackEnd);
     contentLayout->addLayout(form);
 
     auto *buttons = new QHBoxLayout;
@@ -111,4 +118,9 @@ QString ScheduleSlotOptionsDialog::name() const
 bool ScheduleSlotOptionsDialog::isDisabled() const
 {
     return m_disabled->isChecked();
+}
+
+bool ScheduleSlotOptionsDialog::waitsForStandbyTrackEnd() const
+{
+    return m_waitForStandbyTrackEnd->isChecked();
 }
