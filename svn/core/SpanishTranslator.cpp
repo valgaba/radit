@@ -37,6 +37,8 @@ QString SpanishTranslator::translate(const char *context, const char *sourceText
         {QStringLiteral("Show MeteoClock"),QStringLiteral("Mostrar MeteoClock")},
         {QStringLiteral("Show Planner"),QStringLiteral("Mostrar Planner")},
         {QStringLiteral("Reset User Interface"),QStringLiteral("Restablecer interfaz")},
+        {QStringLiteral("Studio view"),QStringLiteral("Estudio")},
+        {QStringLiteral("Planner view"),QStringLiteral("Planner")},
         {QStringLiteral("Monday"),QStringLiteral("Lunes")},
         {QStringLiteral("Tuesday"),QStringLiteral("Martes")},
         {QStringLiteral("Wednesday"),QStringLiteral("Miércoles")},

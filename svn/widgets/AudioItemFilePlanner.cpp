@@ -19,6 +19,7 @@ AudioItemMaxi *AudioItemFilePlanner::copy(QWidget *newParent) const
     item->setSecond(second());
     item->setTiempoFile(second());
     item->setSecondStart(secondStart());
+    item->setEnabledForPlayback(isEnabledForPlayback());
     item->setToolTip(toolTip());
     return item;
 }

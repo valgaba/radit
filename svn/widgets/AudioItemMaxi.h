@@ -52,6 +52,7 @@ private:
     Button * btnloop;
     Button * btnpurge;
     Button * btnnext;
+    Button *btnPlannerEnabled = nullptr;
 
 
 
@@ -71,6 +72,7 @@ private:
      bool m_isPlayNext=false;
      bool m_isPurge=false;
      bool m_isLoop=false;
+     bool m_isEnabled=true;
     // bool m_isSelect=false;
      QString m_NameFile;
 
@@ -89,6 +91,7 @@ private:
      bool m_isPlaying = false;
 
      int devicePlay() const;
+    void updatePlannerEnabledAppearance();
 
 public:
 
@@ -116,6 +119,9 @@ public:
      virtual QString playbackPath() const { return filePath(); }
      virtual QString playbackName() const { return nameFile(); }
      void setIsSelect(bool value) override;
+    bool isEnabledForPlayback() const { return m_isEnabled; }
+    void setEnabledForPlayback(bool enabled);
+    void setPlannerEnableControlVisible(bool visible);
     void triggerProperties() { if (btnproperties) btnproperties->click(); }
 
 
@@ -246,6 +252,7 @@ public:
       void playbackPreparationReady(bool ready);
       void propertiesOpened();
       void itemStateChanged();
+      void playbackEnabledChanged();
 
 
 

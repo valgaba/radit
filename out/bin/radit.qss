@@ -619,7 +619,9 @@ VuMeter LevelMeter {
 #PlayerVolumeSlider::groove:horizontal,
 #CaptureVolumeSlider::groove:horizontal,
 #CastVolumeSlider::groove:horizontal,
-#CueWaveformVolumeSlider::groove:horizontal {
+#CueWaveformVolumeSlider::groove:horizontal,
+#FolderAnnouncementVolume::groove:horizontal,
+#FolderAnnouncementMusicVolume::groove:horizontal {
     border: 1px solid #686b74;
     height: 6px;
     background: #181e2c;
@@ -629,7 +631,9 @@ VuMeter LevelMeter {
 #PlayerVolumeSlider::sub-page:horizontal,
 #CaptureVolumeSlider::sub-page:horizontal,
 #CastVolumeSlider::sub-page:horizontal,
-#CueWaveformVolumeSlider::sub-page:horizontal {
+#CueWaveformVolumeSlider::sub-page:horizontal,
+#FolderAnnouncementVolume::sub-page:horizontal,
+#FolderAnnouncementMusicVolume::sub-page:horizontal {
     background: #80A4AE;
     border-radius: 3px;
 }
@@ -637,7 +641,9 @@ VuMeter LevelMeter {
 #PlayerVolumeSlider::handle:horizontal,
 #CaptureVolumeSlider::handle:horizontal,
 #CastVolumeSlider::handle:horizontal,
-#CueWaveformVolumeSlider::handle:horizontal {
+#CueWaveformVolumeSlider::handle:horizontal,
+#FolderAnnouncementVolume::handle:horizontal,
+#FolderAnnouncementMusicVolume::handle:horizontal {
     background: #80A4AE;
     border: 1px solid #80A4AE;
     width: 12px;
@@ -647,6 +653,13 @@ VuMeter LevelMeter {
 
 #PlayerVolumeValue,
 #CaptureVolumeValue {
+    color: #8a8d96;
+    background: transparent;
+    border: none;
+}
+
+#FolderAnnouncementVolumeValue,
+#FolderAnnouncementMusicVolumeValue {
     color: #8a8d96;
     background: transparent;
     border: none;
@@ -1638,6 +1651,20 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
 #Planner AudioItemMeteoClockPlanner[playing="true"] {
     border: 2px solid #3ad5ff;
 }
+#Planner AudioItemFilePlanner[plannerItemEnabled="false"],
+#Planner AudioItemFolderPlanner[plannerItemEnabled="false"],
+#Planner AudioItemNetPlanner[plannerItemEnabled="false"],
+#Planner AudioItemMeteoClockPlanner[plannerItemEnabled="false"] {
+    background-color: #20242e;
+    border-color: #454955;
+}
+#Planner AudioItemFilePlanner[plannerItemEnabled="false"] Label,
+#Planner AudioItemFolderPlanner[plannerItemEnabled="false"] Label,
+#Planner AudioItemNetPlanner[plannerItemEnabled="false"] Label,
+#Planner AudioItemMeteoClockPlanner[plannerItemEnabled="false"] Label {
+    color: #686b74;
+}
+#Planner Button[plannerItemEnabled="false"] { background-color: #20242e; }
 #Planner QWidget#PlannerFallbackContents { background-color: #181e2c; border: none; }
 #ScheduleSlotOptionsDialog {
     background-color: #181e2c; color: #8a8d96; border: 1px solid #333b4f;
@@ -1687,6 +1714,32 @@ QDialog#QuitDialog QPushButton#SaveAndQuit:hover { background-color: #a0efcb; }
 #Cast QLineEdit:focus, #Cast QSpinBox:focus { border-color: #80A4AE; }
 
 /* Online radio item properties. */
+QDialog#Id3TagsDialog {
+    background-color: #181e2c;
+    border: 1px solid #333b4f;
+}
+#Id3TagsDialog Frame#framebarra { background-color: #4e4d7a; border: none; }
+#Id3TagsDialog QLabel#PanelTitle {
+    color: #8a8d96; font-size: 12px; font-weight: bold;
+}
+#Id3TagsDialog QLabel {
+    background: transparent; border: none; color: #8a8d96; font-size: 12px;
+}
+#Id3TagsDialog QLineEdit {
+    background-color: #252b39; border: 1px solid #535b6a; border-radius: 3px;
+    padding: 2px 6px; color: #80A4AE; font-size: 12px;
+    selection-background-color: #4e4d7a; selection-color: #ffffff;
+}
+#Id3TagsDialog QLineEdit:focus { border-color: #80A4AE; }
+#Id3TagsDialog QLabel#Id3FilePath { color: #8a8d96; font-size: 10px; }
+#Id3TagsDialog QLabel#Id3Status[error="true"] { color: #ef6d6d; }
+#Id3TagsDialog Button {
+    padding: 2px 6px; border: 1px solid #686b74; border-radius: 3px;
+    background-color: #262c3b; color: #80A4AE; font-size: 12px;
+}
+#Id3TagsDialog Button:hover { border-color: #80A4AE; background-color: #30384b; }
+#Id3TagsDialog Button:pressed { background-color: #1d2230; }
+
 QDialog#OnlineRadioDialog {
     background-color: #181e2c;
     border: 1px solid #333b4f;
