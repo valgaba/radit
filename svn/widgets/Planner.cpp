@@ -10,6 +10,7 @@
 #include "widgets/AudioItemFilePlanner.h"
 #include "widgets/AudioItemNetPlanner.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
+#include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/MeteoClock.h"
 #include "widgets/PlannerContents.h"
 #include "widgets/ScheduleSlot.h"
@@ -1978,6 +1979,19 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         });
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
+            if (engine==m_standbyEngine && m_waitingForStandbySlot
+                && seekable && duration>0.0) {
+                auto *folder=qobject_cast<AudioItemFolderMaxi*>(
+                    m_standbyEngine->getCurrentItem());
+                if (folder && folder->mixEnabled()) {
+                    const double remaining=duration-position;
+                    if (remaining<=folder->mixSeconds()) {
+                        const int configuredMixMs=qMax(100,qRound(folder->mixSeconds()*1000.0));
+                        const int remainingMs=qMax(100,qRound(remaining*1000.0));
+                        startWaitingSlotCrossfade(qMin(configuredMixMs,remainingMs));
+                    }
+                }
+            }
             if (engine!=positionEngine()) return;
             m_currentPlaybackPosition=position;
             m_currentPlaybackDuration=duration;
@@ -2353,7 +2367,7 @@ void Planner::finishStandbyTrackWait()
     startScheduleSlot(slot);
 }
 
-void Planner::startScheduleSlot(ScheduleSlot *slot)
+void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
 {
     if (!slot || slot->contents()->layout->count()==0)
         return;
@@ -2388,7 +2402,27 @@ void Planner::startScheduleSlot(ScheduleSlot *slot)
     m_pendingScheduleSlot=slot;
     slot->setUpcoming(false);
     slot->setPlaying(true);
-    beginCrossfade(outgoing,incoming,m_activeScheduleEngine ? 2 : 1);
+    beginCrossfade(outgoing,incoming,m_activeScheduleEngine ? 2 : 1,
+                   crossfadeDurationMs);
+}
+
+void Planner::startWaitingSlotCrossfade(int crossfadeDurationMs)
+{
+    QPointer<ScheduleSlot> slot=m_waitingForStandbySlot;
+    if (!slot || !m_running || slot->isScheduleDisabled()
+        || m_activeScheduleEngine || m_fadeTimer->isActive())
+        return;
+
+    const QString dayKey=QDate::currentDate().toString("yyyyMMdd");
+    const QString key=QStringLiteral("%1-%2-%3")
+        .arg(dayKey)
+        .arg(quintptr(slot.data()),0,16)
+        .arg(slot->entrySecond());
+    m_triggeredSlots.insert(key);
+    m_waitingForStandbySlot.clear();
+    if (m_pendingStartSlot==slot)
+        m_pendingStartSlot.clear();
+    startScheduleSlot(slot,crossfadeDurationMs);
 }
 
 void Planner::returnToStandby()
@@ -2435,7 +2469,7 @@ void Planner::resumeStandbyAfterBoundaryCheck()
     returnToStandby();
 }
 
-void Planner::beginCrossfade(Player *from, Player *to, int action)
+void Planner::beginCrossfade(Player *from, Player *to, int action, int durationMs)
 {
     if (m_fadeTimer->isActive()) {
         m_fadeTimer->stop();
@@ -2444,6 +2478,7 @@ void Planner::beginCrossfade(Player *from, Player *to, int action)
     m_fadeFrom=from;
     m_fadeTo=to;
     m_fadeAction=action;
+    m_fadeDurationMs=durationMs>0 ? durationMs : 1800;
     m_fadeClock.restart();
     m_fadeTimer->start();
     if (!from && to) to->setVolume(0.0f);
