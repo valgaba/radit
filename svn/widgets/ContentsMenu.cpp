@@ -52,6 +52,7 @@ void ContentsMenu::setPasteVisible(bool visible) { if (pasteAction) pasteAction-
 void ContentsMenu::setLoadVisible(bool visible) { if (loadAction) loadAction->setVisible(visible); }
 void ContentsMenu::setSaveVisible(bool visible) { if (saveAction) saveAction->setVisible(visible); }
 void ContentsMenu::setSaveAsVisible(bool visible) { if (saveasAction) saveasAction->setVisible(visible); }
+void ContentsMenu::setRefreshDurationsVisible(bool visible) { if (refreshDurationsAction) refreshDurationsAction->setVisible(visible); }
 
 
 void ContentsMenu::setnextVisible(bool visible) { if (nextItemAction) nextItemAction->setVisible(visible); }
@@ -101,6 +102,7 @@ void ContentsMenu::setupActions() {
     loadAction = new QAction("Load list", this);
     saveAction = new QAction("Save list", this);
     saveasAction = new QAction("Save list as", this);
+    refreshDurationsAction = new QAction(tr("Update audio times"), this);
 
     loadAction->setIcon(QIcon(":/icons/Load.svg"));
     saveAction->setIcon(QIcon(":/icons/Save.svg"));
@@ -130,6 +132,9 @@ void ContentsMenu::setupActions() {
     Menu::addAction(saveasAction); // Puedes añadirlo luego
 
     addSeparator();
+    Menu::addAction(refreshDurationsAction);
+
+    addSeparator();
     Menu::addAction(propertiesAction);
 
     addSeparator();
@@ -156,6 +161,8 @@ void ContentsMenu::connectActions() {
     connect(loadAction, &QAction::triggered, player, &ContentsPlayer::loadItems);
     connect(saveAction, &QAction::triggered, player, &ContentsPlayer::saveItems);
     connect(saveasAction, &QAction::triggered, player, &ContentsPlayer::saveAsItems);
+    connect(refreshDurationsAction, &QAction::triggered,
+            player, &ContentsPlayer::refreshAudioDurations);
 
 
 

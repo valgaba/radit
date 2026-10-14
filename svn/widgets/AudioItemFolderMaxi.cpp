@@ -247,7 +247,8 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
     }
 
     m_scanning = true;
-    setFolderPresentation(tr("Loading..."), false);
+    setFolderPresentation(QString(), false);
+    setLoadingPresentation(true);
     const QStringList filters = MediaManager::supportedAudioNameFilters();
     auto *watcher = new QFutureWatcher<QVector<Track>>(this);
     connect(watcher, &QFutureWatcher<QVector<Track>>::finished, this, [this, watcher, cancel, folder]() {

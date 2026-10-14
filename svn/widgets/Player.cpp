@@ -601,17 +601,20 @@ void Player::playItem(AudioItemMaxi *item)
                    if (!guarded || m_preparingPlaybackItem != guarded)
                        return;
                    m_preparingPlaybackItem.clear();
-                   if (ready)
-                       startPreparedItem(guarded);
-                   else {
+                   const int sequenceIndex=m_sequenceIndex;
+                   bool started=false;
+                   if (ready) {
+                       started=startPreparedItem(guarded);
+                   } else {
                        if (auto *meteo=qobject_cast<AudioItemMeteoClockMaxi*>(guarded.data()))
                            labelnombre->setText(meteo->error());
-                       // A sequential playlist must continue from this item if
-                       // asynchronous preparation fails, rather than leaving
-                       // playback stuck with an empty current item.
-                       if (m_sequenceContents)
-                           advanceSequence();
                    }
+                   // Async preparation runs outside playSequenceFrom(). If it
+                   // fails, advance here so Planner cannot remain stuck on the
+                   // failed item. Avoid advancing twice if the sequence changed.
+                   if (!started && m_sequenceContents && !currentItem
+                       && m_sequenceIndex==sequenceIndex)
+                       advanceSequence();
                });
                return;
            }
@@ -623,15 +626,17 @@ void Player::playItem(AudioItemMaxi *item)
        startPreparedItem(item);
 }
 
-void Player::startPreparedItem(AudioItemMaxi *item)
+bool Player::startPreparedItem(AudioItemMaxi *item)
 {
        if (!item || !item->isEnabledForPlayback()) {
            if (m_sequenceContents)
                advanceSequence();
-           return;
+           return false;
        }
-       if (!mediamanager->setDevice(this->devicePlay()))
-           return;
+       if (!mediamanager->setDevice(this->devicePlay())) {
+           qWarning() << "No se pudo abrir el dispositivo de audio para:" << item->playbackName();
+           return false;
+       }
        m_folderIntroAnnounced=false;
        m_folderOutroAnnounced=false;
        m_queuedAnnouncementPath.clear();
@@ -639,7 +644,7 @@ void Player::startPreparedItem(AudioItemMaxi *item)
            const auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(item);
            qWarning().noquote() << "No se pudo cargar el audio:" << item->playbackName()
                                 << (meteoItem ? meteoItem->error() : item->playbackPath());
-           return;
+           return false;
        }
        mediamanager->seek(item->secondStart());
        mediamanager->play();
@@ -672,6 +677,7 @@ void Player::startPreparedItem(AudioItemMaxi *item)
        labelnombre->setText(item->playbackName());
        emit currentPlaybackNameChanged(labelnombre->text());
        btnpause->SetIcon("Pausemini.svg");
+       return true;
 }
 
 void Player::checkFolderAnnouncement(const AudioFrame &frame)
@@ -808,6 +814,25 @@ ContentsBase *Player::sequentialContents() const
     return m_sequenceContents.data();
 }
 
+bool Player::isCurrentFolderTrackLastInSequence() const
+{
+    auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    if (!folder || folder->isLoop() || m_sequenceRepeat
+        || m_folderTurnItem!=folder
+        || m_folderTurnTracksStarted<folder->songsPerTurn()
+        || !m_sequenceContents || !m_sequenceContents->layout)
+        return false;
+
+    const int count=m_sequenceContents->layout->count();
+    for (int index=m_sequenceIndex+1; index<count; ++index) {
+        auto *item=qobject_cast<AudioItemMaxi*>(
+            m_sequenceContents->layout->itemAt(index)->widget());
+        if (item && item->isEnabledForPlayback())
+            return false;
+    }
+    return true;
+}
+
 void Player::stopSequentialPlayback()
 {
     m_stopSequenceAtTrackEnd=false;
@@ -816,6 +841,10 @@ void Player::stopSequentialPlayback()
     m_sequenceIndex=-1;
     m_folderTurnItem.clear();
     m_folderTurnTracksStarted=0;
+    // A sequence can be stopped while its first item is still preparing and
+    // currentItem is null. Invalidate its callback as well, or it may start
+    // playing after Planner has already moved on.
+    m_preparingPlaybackItem.clear();
     if (currentItem)
         stopMain();
 }

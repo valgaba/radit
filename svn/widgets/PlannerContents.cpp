@@ -71,6 +71,12 @@ void refreshPlannerStandbyTitle(QWidget *widget, bool modified)
 
 PlannerContents::PlannerContents(QWidget *parent) : ContentsPlayer(parent)
 {
+    connect(this,&ContentsPlayer::audioDurationsRefreshed,this,[this](int updated,int) {
+        if (updated<=0)
+            return;
+        emit contentDurationsChanged();
+        emit contentModified();
+    });
 }
 
 AudioItemMaxi *PlannerContents::createFolderItem()
@@ -145,7 +151,7 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     const bool hasActionTarget=contextItem!=nullptr;
 
     Menu menu(this);
-    menu.setFixedWidth(190);
+    menu.setFixedWidth(240);
     QAction *addOnlineRadioAction=menu.addAction(QIcon(":/icons/net.svg"),tr("Add online radio"));
     menu.addSeparator();
     QAction *selectAllAction=menu.addAction(QIcon(":/icons/Selectall.svg"),tr("Select All"));

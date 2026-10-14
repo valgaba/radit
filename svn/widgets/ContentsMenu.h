@@ -37,6 +37,7 @@ public:
     void setLoadVisible(bool visible);
     void setSaveVisible(bool visible);
     void setSaveAsVisible(bool visible);
+    void setRefreshDurationsVisible(bool visible);
 
     void setnextVisible(bool visible);
     void setpurgeVisible(bool visible);
@@ -72,6 +73,7 @@ private:
     QAction *loadAction;
     QAction *saveAction;
     QAction *saveasAction;
+    QAction *refreshDurationsAction;
 
 
 

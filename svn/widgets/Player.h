@@ -97,7 +97,7 @@ private:
     int m_folderTurnTracksStarted = 0;
     float m_outgoingLeft = -120.0f, m_outgoingRight = -120.0f;
     void bindMediaManager();
-    void startPreparedItem(AudioItemMaxi *item);
+    bool startPreparedItem(AudioItemMaxi *item);
     void checkFolderAnnouncement(const AudioFrame &frame);
     float folderAnnouncementMusicGain() const;
     void startFolderAnnouncement(const QString &audioPath, int voiceVolumePercent = -1,
@@ -173,6 +173,7 @@ public:
     }
     ContentsBase *sequentialContents() const;
     int sequentialIndex() const { return m_sequenceIndex; }
+    bool isCurrentFolderTrackLastInSequence() const;
 
 
     protected:

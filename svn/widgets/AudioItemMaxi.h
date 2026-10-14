@@ -14,6 +14,7 @@
 #include "core/MediaManager.h"
 
 class CueWaveformFrame;
+class LoadingSpinner;
 class QTimer;
 class QGraphicsOpacityEffect;
 
@@ -59,6 +60,7 @@ private:
     Button * btnplay;
     Label *labelnombre;
     Label *labeltiempo;
+    LoadingSpinner *m_loadingSpinner = nullptr;
 
 
 
@@ -232,6 +234,7 @@ public:
     protected:
     void setLiveStreamPresentation();
     void setFolderPresentation(const QString &status, bool ready);
+    void setLoadingPresentation(bool loading);
     void setCompactPresentation(bool showProperties = false);
     Button *propertiesButton() const { return btnproperties; }
     void showEvent(QShowEvent *event) override;

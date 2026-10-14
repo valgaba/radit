@@ -36,6 +36,7 @@ public:
     void setDevicePlay(int device);
     void setDeviceCue(int device) { m_deviceCue=device; }
     bool setVolume(float volume);
+    void refreshAudioDurations();
     void stopPlaybackForContentLoad();
     void refreshAfterContentLoad();
     void setDocumentFileName(const QString &filename);
@@ -70,6 +71,8 @@ private:
     Player *m_scheduleEngineA = nullptr;
     Player *m_scheduleEngineB = nullptr;
     Player *m_activeScheduleEngine = nullptr;
+    QPointer<Player> m_pendingScheduleEngine;
+    QPointer<Player> m_pendingScheduleFrom;
     Player *m_fadeFrom = nullptr;
     Player *m_fadeTo = nullptr;
     QHash<Player *, QString> m_enginePlaybackNames;
@@ -77,6 +80,7 @@ private:
     QPointer<ScheduleSlot> m_pendingScheduleSlot;
     QPointer<ScheduleSlot> m_pendingStartSlot;
     QPointer<ScheduleSlot> m_waitingForStandbySlot;
+    int m_waitingStandbyEntrySecond = -1;
     QTimer *m_clockTimer = nullptr;
     QTimer *m_fadeTimer = nullptr;
     QTimer *m_standbyResumeTimer = nullptr;
@@ -85,7 +89,10 @@ private:
     QString m_pendingStandbyListPath;
     QString m_triggeredDate;
     QDate m_lastObservedDate;
+    QDateTime m_lastScheduleCheckTime;
     bool m_running = false;
+    bool m_refreshingAudioDurations = false;
+    bool m_standbyStartAttempted = false;
     bool m_userIsSeeking = false;
     bool m_standbyBlinkPhase = false;
     double m_positionDuration = 0.0;
@@ -93,17 +100,24 @@ private:
     double m_currentPlaybackDuration = 0.0;
     int m_fadeAction = 0;
     int m_fadeDurationMs = 1800;
+    int m_pendingScheduleFadeAction = 0;
+    int m_pendingScheduleFadeDurationMs = -1;
     float m_lastStandbyLeft = -120.0f;
     float m_lastStandbyRight = -120.0f;
     float m_lastScheduleLeft = -120.0f;
     float m_lastScheduleRight = -120.0f;
     void startPlayback();
     void stopPlayback();
+    void startStandbyIfNeeded();
     void checkSchedule();
     void cancelStandbyTrackWait();
     void finishStandbyTrackWait();
     void startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs = -1);
+    void startPendingScheduleCrossfade(Player *engine);
+    void cancelPendingScheduleStart();
+    bool continuePendingScheduleFromStandby(Player *finishedEngine);
     void startWaitingSlotCrossfade(int crossfadeDurationMs);
+    void startStandbyCrossfadeForActiveSlot(int crossfadeDurationMs);
     void returnToStandby();
     void resumeStandbyAfterBoundaryCheck();
     void beginCrossfade(Player *from, Player *to, int action,
