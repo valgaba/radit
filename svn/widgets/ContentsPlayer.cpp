@@ -32,11 +32,21 @@
 #include <QMessageBox>
 #include <QWidgetAction>
 #include <QFileDialog>
+#include <QFutureWatcher>
+#include <QProgressDialog>
+#include <QPointer>
+#include <QVector>
+#include <QHash>
+#include <QSet>
+#include <QtConcurrent/QtConcurrentRun>
+#include <cmath>
 
 
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItem.h"
+#include "widgets/AudioItemFileMaxi.h"
 #include "core/io.h"
+#include "core/MediaManager.h"
 
 
 ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
@@ -53,6 +63,86 @@ ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
 
 
 ContentsPlayer::~ContentsPlayer(){}
+
+void ContentsPlayer::refreshAudioDurations()
+{
+    if (m_refreshingAudioDurations)
+        return;
+
+    const QList<AudioItemFileMaxi*> fileItems=findChildren<AudioItemFileMaxi*>();
+    QVector<QPointer<AudioItemFileMaxi>> targets;
+    QStringList paths;
+    QSet<QString> uniquePaths;
+    for (AudioItemFileMaxi *item : fileItems) {
+        if (!item || item->filePath().isEmpty())
+            continue;
+        targets.append(item);
+        if (!uniquePaths.contains(item->filePath())) {
+            uniquePaths.insert(item->filePath());
+            paths.append(item->filePath());
+        }
+    }
+    if (targets.isEmpty()) {
+        QMessageBox::information(this,tr("Update audio times"),
+                                 tr("There are no audio files to update."));
+        return;
+    }
+
+    m_refreshingAudioDurations=true;
+    auto *progress=new QProgressDialog(tr("Reading audio file durations..."),QString(),0,0,this);
+    progress->setWindowTitle(tr("Update audio times"));
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setCancelButton(nullptr);
+    progress->setMinimumDuration(0);
+    progress->show();
+
+    auto *watcher=new QFutureWatcher<QVector<QPair<QString,double>>>(this);
+    connect(watcher,&QFutureWatcher<QVector<QPair<QString,double>>>::finished,
+            this,[this,watcher,progress,targets]() {
+        const auto results=watcher->result();
+        QHash<QString,double> durations;
+        for (const auto &result : results)
+            durations.insert(result.first,result.second);
+
+        int updated=0;
+        int refreshed=0;
+        int failed=0;
+        for (const QPointer<AudioItemFileMaxi> &item : targets) {
+            if (!item)
+                continue;
+            const auto found=durations.constFind(item->filePath());
+            if (found==durations.cend() || found.value()<=0.0) {
+                ++failed;
+                continue;
+            }
+            const double duration=found.value();
+            ++refreshed;
+            if (std::abs(item->second()-duration)>0.01) {
+                item->setSecond(duration);
+                item->setTiempoFile(duration);
+                ++updated;
+            }
+        }
+
+        m_refreshingAudioDurations=false;
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        if (updated>0)
+            emit contentsModified();
+        emit audioDurationsRefreshed(updated,failed);
+        QMessageBox::information(this,tr("Update audio times"),
+            tr("Updated %1 audio item(s). Could not read %2.").arg(refreshed).arg(failed));
+    });
+
+    watcher->setFuture(QtConcurrent::run([paths]() {
+        QVector<QPair<QString,double>> results;
+        results.reserve(paths.size());
+        for (const QString &path : paths)
+            results.append({path,MediaManager::readFileDuration(path)});
+        return results;
+    }));
+}
 
 AudioItemMaxi *ContentsPlayer::createItem(AudioItemMaxi *item)
 {
@@ -239,6 +329,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         // Si no hay widget, ocultar acciones específicas
         if (!widget) {
             const bool showListOptions=supportsListOptionsInContextMenu();
+            const bool hasAudioFiles=!findChildren<AudioItemFileMaxi*>().isEmpty();
             contentsMenu->setColorVisible(false);
             contentsMenu->setSelectAllVisible(false);
             contentsMenu->setUnselectAllVisible(false);
@@ -257,6 +348,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             contentsMenu->setLoadVisible(showListOptions);
             contentsMenu->setSaveVisible(showListOptions);
             contentsMenu->setSaveAsVisible(showListOptions);
+            contentsMenu->setRefreshDurationsVisible(showListOptions && hasAudioFiles);
 
             contentsMenu->exec(mapToGlobal(mousePos));
             return;
@@ -294,9 +386,11 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         contentsMenu->setpurgeVisible(showPlaybackOptions && canPurge);
 
         const bool showListOptions=supportsListOptionsInContextMenu();
+        const bool hasAudioFiles=!findChildren<AudioItemFileMaxi*>().isEmpty();
         contentsMenu->setLoadVisible(showListOptions);
         contentsMenu->setSaveVisible(showListOptions);
         contentsMenu->setSaveAsVisible(showListOptions);
+        contentsMenu->setRefreshDurationsVisible(showListOptions && hasAudioFiles);
 
 
 

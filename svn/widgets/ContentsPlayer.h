@@ -32,6 +32,7 @@ private:
     bool isCut;  //para las operaciones de cortar pegar
     ContentsMenu *contentsMenu = nullptr;
     QString m_listFileName;
+    bool m_refreshingAudioDurations = false;
     bool saveListFile(const QString &filename);
     //Player *m_player = nullptr;
 
@@ -58,6 +59,7 @@ public:
     void loadItems();
     void saveItems();
     void saveAsItems();
+    void refreshAudioDurations();
     QString listFileName() const { return m_listFileName; }
     void setListFileName(const QString &filename) { m_listFileName = filename; }
 
@@ -65,6 +67,7 @@ public:
 
 signals:
     void contentsModified();
+    void audioDurationsRefreshed(int updated, int failed);
 
 public:
     AudioItemMaxi *createItem(AudioItemMaxi *item) override;

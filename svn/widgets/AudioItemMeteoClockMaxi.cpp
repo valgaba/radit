@@ -62,7 +62,7 @@ void AudioItemMeteoClockMaxi::setVoicePackPath(const QString &path)
 }
 void AudioItemMeteoClockMaxi::updatePackState()
 {
-    if (!m_pack || m_pack->isLoading()) {setFolderPresentation(tr("Loading..."),false);return;}
+    if (!m_pack || m_pack->isLoading()) {setFolderPresentation(QString(),false);setLoadingPresentation(true);return;}
     m_error=m_pack->error();setToolTip(m_error.isEmpty()?filePath():filePath()+"\n"+m_error);
     setFolderPresentation(m_pack->isReady()?tr("METEO"):tr("Invalid ZIP"),m_pack->isReady());
 }

@@ -8,6 +8,7 @@
 #include "widgets/label.h"
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItemFilePlanner.h"
+#include "widgets/AudioItemFileMaxi.h"
 #include "widgets/AudioItemNetPlanner.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include "widgets/AudioItemFolderMaxi.h"
@@ -43,6 +44,11 @@
 #include <QWheelEvent>
 #include <QToolTip>
 #include <QTimer>
+#include <QFutureWatcher>
+#include <QProgressDialog>
+#include <QSet>
+#include <QtConcurrent/QtConcurrentRun>
+#include <cmath>
 #include <QAction>
 #include <QIcon>
 #include <QTime>
@@ -568,11 +574,16 @@ public:
         QAction *loadPlannerAction=menu.addAction(tr("Load Planner"));
         QAction *savePlannerAction=menu.addAction(tr("Save Planner"));
         QAction *savePlannerAsAction=menu.addAction(tr("Save as Planner"));
+        QAction *updateAudioTimesAction=menu.addAction(QIcon(":/icons/recon.svg"),
+                                                       tr("Update audio times"));
         QAction *chosen=menu.exec(globalPosition);
-        if (chosen==loadPlannerAction || chosen==savePlannerAction || chosen==savePlannerAsAction) {
+        if (chosen==loadPlannerAction || chosen==savePlannerAction
+            || chosen==savePlannerAsAction || chosen==updateAudioTimesAction) {
             if (m_plannerFileAction)
                 m_plannerFileAction(chosen==loadPlannerAction ? QStringLiteral("load")
-                    : chosen==savePlannerAction ? QStringLiteral("save") : QStringLiteral("saveAs"));
+                    : chosen==savePlannerAction ? QStringLiteral("save")
+                    : chosen==savePlannerAsAction ? QStringLiteral("saveAs")
+                    : QStringLiteral("updateAudioTimes"));
             return;
         }
         if (chosen==pasteSlotAction) {
@@ -653,6 +664,24 @@ public:
                 return true;
         }
         return false;
+    }
+
+    ScheduleSlot *slotStartingBetween(int previousMilliseconds, int nowMilliseconds,
+                                      int maximumLatenessMilliseconds) const
+    {
+        if (nowMilliseconds<previousMilliseconds)
+            return nullptr;
+        for (const TimedSlot &entry : m_slots) {
+            ScheduleSlot *slot=entry.widget;
+            if (!slot || slot->isScheduleDisabled()
+                || (slot->contents()->layout->count()==0 && !slot->isStandbyListChangeEvent()))
+                continue;
+            const int start=slot->entrySecond()*1000;
+            if (start>previousMilliseconds && start<=nowMilliseconds
+                && nowMilliseconds-start<=maximumLatenessMilliseconds)
+                return slot;
+        }
+        return nullptr;
     }
 
     int dayIndex() const
@@ -1319,8 +1348,18 @@ public:
 
             auto *dayPage=new PlannerDayPage(m_pages,m_scrollArea,dayContents);
             dayPage->setPlannerFileAction([this](const QString &action) {
-                if (action==QLatin1String("load")) loadPlanner();
-                else savePlanner(action==QLatin1String("saveAs"));
+                if (action==QLatin1String("load")) {
+                    loadPlanner();
+                } else if (action==QLatin1String("save")
+                           || action==QLatin1String("saveAs")) {
+                    savePlanner(action==QLatin1String("saveAs"));
+                } else if (action==QLatin1String("updateAudioTimes")) {
+                    QWidget *owner=this;
+                    while (owner && !qobject_cast<Planner*>(owner))
+                        owner=owner->parentWidget();
+                    if (auto *planner=qobject_cast<Planner*>(owner))
+                        planner->refreshAudioDurations();
+                }
             });
             dayPage->setModifiedCallback([this]() { markDocumentModified(); });
             dayPage->setIntervalsChangedCallback([this,index,dayPage]() {
@@ -1387,6 +1426,22 @@ public:
         auto *zoomBar=new QHBoxLayout(zoomBarWidget);
         zoomBar->setContentsMargins(0,0,3,3);
         zoomBar->setSpacing(7);
+        m_centerTimeToggle=new QCheckBox(tr("Center time"),zoomBarWidget);
+        m_centerTimeToggle->setObjectName("PlannerCenterTime");
+        m_centerTimeToggle->setToolTip(tr("Keep the current time centered while Planner plays"));
+        m_centerTimeToggle->setStyleSheet(
+            "QCheckBox { color:#8a8d96; spacing:6px; }"
+            "QCheckBox::indicator { width:13px; height:13px; border:1px solid #5b6070; background:#202635; }"
+            "QCheckBox::indicator:checked { background:#4e4d7a; border:1px solid #8a8d96; }");
+        QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
+        m_centerTimeToggle->setChecked(settings.value(QStringLiteral("Planner/centerTime"),false).toBool());
+        connect(m_centerTimeToggle,&QCheckBox::toggled,this,[this](bool enabled) {
+            QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
+            settings.setValue(QStringLiteral("Planner/centerTime"),enabled);
+            if (enabled)
+                updateCurrentTime(QDateTime::currentDateTime(),m_playbackActive,true);
+        });
+        zoomBar->addWidget(m_centerTimeToggle);
         zoomBar->addStretch(1);
         zoomBar->addWidget(m_zoomOut);
         zoomBar->addWidget(m_zoomIn);
@@ -1400,7 +1455,6 @@ public:
             if (m_pixelsPerHour>25) setZoom(m_pixelsPerHour/2,true);
         });
 
-        QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
         const QString lastPlanner=settings.value(QStringLiteral("Planner/lastFile")).toString();
         if (!lastPlanner.isEmpty() && QFileInfo::exists(lastPlanner)) {
             QTimer::singleShot(0,this,[this,lastPlanner]() {
@@ -1598,6 +1652,33 @@ public:
         return nullptr;
     }
 
+    ScheduleSlot *slotStartingBetween(const QDateTime &previous,
+                                      const QDateTime &now,
+                                      int maximumLatenessMilliseconds)
+    {
+        if (!previous.isValid())
+            return nullptr;
+        if (previous.date()!=now.date()) {
+            const int previousDayEnd=24*60*60*1000;
+            const int nowMilliseconds=now.time().msecsSinceStartOfDay();
+            if (previous.date().addDays(1)!=now.date()
+                || previousDayEnd-previous.time().msecsSinceStartOfDay()
+                    +nowMilliseconds>maximumLatenessMilliseconds)
+                return nullptr;
+            const int nextDayIndex=qBound(0,now.date().dayOfWeek()-1,6);
+            auto *nextDay=static_cast<PlannerDayPage*>(m_pages->widget(nextDayIndex));
+            return nextDay ? nextDay->slotStartingBetween(-1,nowMilliseconds,
+                                                           maximumLatenessMilliseconds)
+                           : nullptr;
+        }
+        const int dayIndex=qBound(0,now.date().dayOfWeek()-1,6);
+        auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+        return day ? day->slotStartingBetween(previous.time().msecsSinceStartOfDay(),
+                                               now.time().msecsSinceStartOfDay(),
+                                               maximumLatenessMilliseconds)
+                   : nullptr;
+    }
+
     bool hasSlotStartingWithin(const QDateTime &dateTime, int windowMilliseconds) const
     {
         const int dayIndex=qBound(0,dateTime.date().dayOfWeek()-1,6);
@@ -1684,6 +1765,7 @@ public:
     {
         if (!m_currentTimeLine)
             return;
+        m_playbackActive=playbackActive;
         const qint64 elapsedMilliseconds=now.time().msecsSinceStartOfDay();
         const qreal y=static_cast<qreal>(elapsedMilliseconds)*m_pixelsPerHour/3600000.0;
         m_currentTimeLine->setTimePosition(y);
@@ -1695,6 +1777,11 @@ public:
                 scrollBar->setValue(qBound(0,target,scrollBar->maximum()));
             });
         }
+    }
+
+    bool centerTimeEnabled() const
+    {
+        return m_centerTimeToggle && m_centerTimeToggle->isChecked();
     }
 
 protected:
@@ -1779,6 +1866,7 @@ private:
     QScrollArea *m_scrollArea = nullptr;
     Button *m_zoomIn = nullptr;
     Button *m_zoomOut = nullptr;
+    QCheckBox *m_centerTimeToggle = nullptr;
     ContentsPlayer *m_standbyContents = nullptr;
     QString m_plannerFileName;
     bool m_documentModified = false;
@@ -1786,6 +1874,7 @@ private:
     QPointer<ScheduleSlot> m_upcomingSlot;
     int m_pixelsPerHour = 100;
     bool m_initialTimePositioned = false;
+    bool m_playbackActive = false;
 };
 }
 
@@ -1940,6 +2029,12 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     m_fallbackContents=fallbackContents;
     m_fallbackContents->setObjectName("PlannerFallbackContents");
     fallbackLayout->addWidget(m_fallbackContents,1);
+    connect(fallbackContents,&PlannerContents::contentAdded,this,[this]() {
+        m_standbyStartAttempted=false;
+    });
+    connect(fallbackContents,&PlannerContents::contentModified,this,[this]() {
+        m_standbyStartAttempted=false;
+    });
     listsSplitter->addWidget(fallbackPanel);
 
     auto *weekTabs=new PlannerWeekTabs(contentZone,m_dayContents,m_fallbackContents);
@@ -1976,6 +2071,8 @@ Planner::Planner(QWidget *parent) : Frame(parent)
                 updatePlaybackNameLabel();
             if (engine==m_standbyEngine)
                 updateStandbyBarAppearance();
+            if (engine==m_pendingScheduleEngine && engine->getCurrentItem())
+                startPendingScheduleCrossfade(engine);
         });
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
@@ -1989,6 +2086,20 @@ Planner::Planner(QWidget *parent) : Frame(parent)
                         const int configuredMixMs=qMax(100,qRound(folder->mixSeconds()*1000.0));
                         const int remainingMs=qMax(100,qRound(remaining*1000.0));
                         startWaitingSlotCrossfade(qMin(configuredMixMs,remainingMs));
+                    }
+                }
+            }
+            if (engine==m_activeScheduleEngine && m_activeScheduleSlot
+                && !m_pendingScheduleSlot && !m_fadeTimer->isActive()
+                && seekable && duration>0.0
+                && engine->isCurrentFolderTrackLastInSequence()) {
+                auto *folder=qobject_cast<AudioItemFolderMaxi*>(engine->getCurrentItem());
+                if (folder && folder->mixEnabled()) {
+                    const double remaining=duration-position;
+                    if (remaining<=folder->mixSeconds()) {
+                        const int configuredMixMs=qMax(100,qRound(folder->mixSeconds()*1000.0));
+                        const int remainingMs=qMax(100,qRound(remaining*1000.0));
+                        startStandbyCrossfadeForActiveSlot(qMin(configuredMixMs,remainingMs));
                     }
                 }
             }
@@ -2009,6 +2120,12 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         });
     }
     connect(m_scheduleEngineA,&Player::sequentialPlaybackFinished,this,[this]() {
+        if (m_pendingScheduleEngine==m_scheduleEngineA) {
+            cancelPendingScheduleStart();
+            return;
+        }
+        if (continuePendingScheduleFromStandby(m_scheduleEngineA))
+            return;
         if (m_scheduleEngineA!=m_activeScheduleEngine || m_fadeAction==2)
             return;
         const auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
@@ -2018,6 +2135,12 @@ Planner::Planner(QWidget *parent) : Frame(parent)
             returnToStandby();
     });
     connect(m_scheduleEngineB,&Player::sequentialPlaybackFinished,this,[this]() {
+        if (m_pendingScheduleEngine==m_scheduleEngineB) {
+            cancelPendingScheduleStart();
+            return;
+        }
+        if (continuePendingScheduleFromStandby(m_scheduleEngineB))
+            return;
         if (m_scheduleEngineB!=m_activeScheduleEngine || m_fadeAction==2)
             return;
         const auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
@@ -2055,7 +2178,9 @@ Planner::Planner(QWidget *parent) : Frame(parent)
             static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(now.date());
         }
         if (m_running) checkSchedule();
-        static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(now,m_running);
+        auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
+        weekTabs->updateCurrentTime(now,m_running,
+                                    m_running && weekTabs->centerTimeEnabled());
         static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
             now,m_running);
     });
@@ -2090,6 +2215,93 @@ bool Planner::setVolume(float volume)
             m_standbyEngine->setVolume(m_volume);
     }
     return true;
+}
+
+void Planner::refreshAudioDurations()
+{
+    if (m_refreshingAudioDurations)
+        return;
+
+    const QList<AudioItemFileMaxi*> fileItems=findChildren<AudioItemFileMaxi*>();
+    QVector<QPointer<AudioItemFileMaxi>> targets;
+    QStringList paths;
+    QSet<QString> uniquePaths;
+    for (AudioItemFileMaxi *item : fileItems) {
+        if (!item || item->filePath().isEmpty())
+            continue;
+        targets.append(item);
+        if (!uniquePaths.contains(item->filePath())) {
+            uniquePaths.insert(item->filePath());
+            paths.append(item->filePath());
+        }
+    }
+    if (targets.isEmpty()) {
+        QMessageBox::information(this,tr("Update audio times"),
+                                 tr("There are no audio files to update."));
+        return;
+    }
+
+    m_refreshingAudioDurations=true;
+    auto *progress=new QProgressDialog(tr("Reading audio file durations..."),QString(),0,0,this);
+    progress->setWindowTitle(tr("Update audio times"));
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setCancelButton(nullptr);
+    progress->setMinimumDuration(0);
+    progress->show();
+
+    auto *watcher=new QFutureWatcher<QVector<QPair<QString,double>>>(this);
+    connect(watcher,&QFutureWatcher<QVector<QPair<QString,double>>>::finished,
+            this,[this,watcher,progress,targets]() {
+        const auto results=watcher->result();
+        QHash<QString,double> durations;
+        for (const auto &result : results)
+            durations.insert(result.first,result.second);
+
+        int refreshed=0;
+        int failed=0;
+        QSet<PlannerContents*> changedContents;
+        for (const QPointer<AudioItemFileMaxi> &item : targets) {
+            if (!item)
+                continue;
+            const auto found=durations.constFind(item->filePath());
+            if (found==durations.cend() || found.value()<=0.0) {
+                ++failed;
+                continue;
+            }
+            ++refreshed;
+            const double duration=found.value();
+            if (std::abs(item->second()-duration)<=0.01)
+                continue;
+
+            item->setSecond(duration);
+            item->setTiempoFile(duration);
+            QWidget *owner=item->parentWidget();
+            while (owner && !qobject_cast<PlannerContents*>(owner))
+                owner=owner->parentWidget();
+            if (auto *contents=qobject_cast<PlannerContents*>(owner))
+                changedContents.insert(contents);
+        }
+
+        for (PlannerContents *contents : changedContents) {
+            emit contents->contentDurationsChanged();
+            emit contents->contentModified();
+        }
+
+        m_refreshingAudioDurations=false;
+        progress->close();
+        progress->deleteLater();
+        watcher->deleteLater();
+        QMessageBox::information(this,tr("Update audio times"),
+            tr("Updated %1 audio item(s). Could not read %2.").arg(refreshed).arg(failed));
+    });
+
+    watcher->setFuture(QtConcurrent::run([paths]() {
+        QVector<QPair<QString,double>> results;
+        results.reserve(paths.size());
+        for (const QString &path : paths)
+            results.append({path,MediaManager::readFileDuration(path)});
+        return results;
+    }));
 }
 
 void Planner::prepareForScheduleSlotRemoval(ScheduleSlot *slot)
@@ -2146,6 +2358,7 @@ void Planner::startPlayback()
     m_lastObservedDate=today;
     static_cast<PlannerWeekTabs*>(m_weekTabs)->showDate(today);
     m_running=true;
+    m_lastScheduleCheckTime=QDateTime::currentDateTime();
     m_standbyBlinkPhase=false;
     m_standbyBlinkTimer->start();
     updateStandbyBarAppearance();
@@ -2164,7 +2377,8 @@ void Planner::startPlayback()
     m_standbyEngine->setVolume(m_volume);
     m_scheduleEngineA->setVolume(0.0f);
     m_scheduleEngineB->setVolume(0.0f);
-    m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    m_standbyStartAttempted=false;
+    startStandbyIfNeeded();
     checkSchedule();
     static_cast<PlannerWeekTabs*>(m_weekTabs)->updateUpcomingSlot(
         QDateTime::currentDateTime(),true);
@@ -2191,7 +2405,10 @@ void Planner::stopPlayback()
     m_activeScheduleSlot.clear();
     m_pendingScheduleSlot.clear();
     m_pendingStartSlot.clear();
+    cancelPendingScheduleStart();
     m_running=false;
+    m_standbyStartAttempted=false;
+    m_lastScheduleCheckTime=QDateTime();
     m_standbyBlinkTimer->stop();
     updateStandbyBarAppearance();
     static_cast<PlannerWeekTabs*>(m_weekTabs)->updateCurrentTime(
@@ -2217,6 +2434,18 @@ void Planner::stopPlaybackForContentLoad()
 {
     if (m_running)
         stopPlayback();
+}
+
+void Planner::startStandbyIfNeeded()
+{
+    if (!m_running || !m_standbyEngine || m_standbyStartAttempted
+        || m_activeScheduleEngine || m_fadeTimer->isActive()
+        || m_standbyEngine->sequentialContents())
+        return;
+    m_standbyStartAttempted=true;
+    m_standbyEngine->setDevicePlay(m_devicePlay);
+    m_standbyEngine->setVolume(m_volume);
+    m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
 }
 
 void Planner::refreshAfterContentLoad()
@@ -2254,6 +2483,8 @@ void Planner::checkSchedule()
     auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
     if (!weekTabs || !m_running) return;
     const QDateTime now=QDateTime::currentDateTime();
+    const QDateTime previousCheck=m_lastScheduleCheckTime;
+    m_lastScheduleCheckTime=now;
     const QString dayKey=now.date().toString("yyyyMMdd");
     const bool dateChanged=m_triggeredDate!=dayKey;
     if (dateChanged) {
@@ -2262,12 +2493,20 @@ void Planner::checkSchedule()
         m_triggeredDate=dayKey;
         m_pendingStartSlot.clear();
     }
-    if (ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now)) {
+    ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now);
+    // The 250 ms timer can be delayed briefly by audio decoding or a busy UI.
+    // Catch a just-crossed start second, but never catch up an old event when
+    // Play is pressed late: the previous check is initialized at Play time.
+    if (!dueSlot)
+        dueSlot=weekTabs->slotStartingBetween(previousCheck,now,1500);
+    if (dueSlot) {
         if (m_waitingForStandbySlot && m_waitingForStandbySlot!=dueSlot)
             cancelStandbyTrackWait();
         m_pendingStartSlot=dueSlot;
     }
-    if (m_waitingForStandbySlot && m_waitingForStandbySlot->isScheduleDisabled()) {
+    if (m_waitingForStandbySlot
+        && (m_waitingForStandbySlot->isScheduleDisabled()
+            || m_waitingForStandbySlot->entrySecond()!=m_waitingStandbyEntrySecond)) {
         if (m_pendingStartSlot==m_waitingForStandbySlot)
             m_pendingStartSlot.clear();
         cancelStandbyTrackWait();
@@ -2320,6 +2559,7 @@ void Planner::checkSchedule()
                 if (canWaitForStandbyTrack
                     && m_standbyEngine->stopSequentialPlaybackAtTrackEnd()) {
                     m_waitingForStandbySlot=slot;
+                    m_waitingStandbyEntrySecond=slot->entrySecond();
                     return;
                 }
                 m_triggeredSlots.insert(key);
@@ -2330,11 +2570,7 @@ void Planner::checkSchedule()
     }
 
     // Standby may have been empty when Play was pressed and filled while Planner is running.
-    if (!m_activeScheduleEngine && !m_fadeTimer->isActive()
-        && !m_standbyEngine->sequentialContents()) {
-        m_standbyEngine->setVolume(m_volume);
-        m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
-    }
+    startStandbyIfNeeded();
 }
 
 void Planner::cancelStandbyTrackWait()
@@ -2342,6 +2578,7 @@ void Planner::cancelStandbyTrackWait()
     if (m_standbyEngine)
         m_standbyEngine->cancelStopSequentialPlaybackAtTrackEnd();
     m_waitingForStandbySlot.clear();
+    m_waitingStandbyEntrySecond=-1;
 }
 
 void Planner::finishStandbyTrackWait()
@@ -2350,6 +2587,7 @@ void Planner::finishStandbyTrackWait()
     if (!slot)
         return;
     m_waitingForStandbySlot.clear();
+    m_waitingStandbyEntrySecond=-1;
     if (!m_running || slot->isScheduleDisabled()) {
         if (m_pendingStartSlot==slot)
             m_pendingStartSlot.clear();
@@ -2387,6 +2625,8 @@ void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
         finishCrossfade();
     }
     if (slot==m_activeScheduleSlot || slot==m_pendingScheduleSlot) return;
+    if (m_pendingScheduleEngine)
+        cancelPendingScheduleStart();
 
     Player *incoming = m_activeScheduleEngine==m_scheduleEngineA
         ? m_scheduleEngineB : m_scheduleEngineA;
@@ -2402,8 +2642,75 @@ void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
     m_pendingScheduleSlot=slot;
     slot->setUpcoming(false);
     slot->setPlaying(true);
-    beginCrossfade(outgoing,incoming,m_activeScheduleEngine ? 2 : 1,
-                   crossfadeDurationMs);
+    if (incoming->getCurrentItem()) {
+        beginCrossfade(outgoing,incoming,m_activeScheduleEngine ? 2 : 1,
+                       crossfadeDurationMs);
+    } else {
+        // Some items (notably MeteoClock with an online voice) prepare
+        // asynchronously. Keep the current source audible until the first
+        // playable item is ready, then begin the transition.
+        m_pendingScheduleEngine=incoming;
+        m_pendingScheduleFrom=outgoing;
+        m_pendingScheduleFadeAction=m_activeScheduleEngine ? 2 : 1;
+        m_pendingScheduleFadeDurationMs=crossfadeDurationMs;
+    }
+}
+
+void Planner::startPendingScheduleCrossfade(Player *engine)
+{
+    if (!engine || m_pendingScheduleEngine!=engine || !m_running)
+        return;
+    if (!m_pendingScheduleSlot || m_pendingScheduleSlot->isScheduleDisabled()) {
+        cancelPendingScheduleStart();
+        return;
+    }
+    if (!engine->getCurrentItem())
+        return;
+    Player *from=m_pendingScheduleFrom;
+    const int action=m_pendingScheduleFadeAction;
+    const int duration=m_pendingScheduleFadeDurationMs;
+    m_pendingScheduleEngine.clear();
+    m_pendingScheduleFrom.clear();
+    m_pendingScheduleFadeAction=0;
+    m_pendingScheduleFadeDurationMs=-1;
+    beginCrossfade(from,engine,action,duration);
+}
+
+void Planner::cancelPendingScheduleStart()
+{
+    Player *engine=m_pendingScheduleEngine;
+    m_pendingScheduleEngine.clear();
+    m_pendingScheduleFrom.clear();
+    m_pendingScheduleFadeAction=0;
+    m_pendingScheduleFadeDurationMs=-1;
+    if (m_pendingScheduleSlot)
+        m_pendingScheduleSlot->setPlaying(false);
+    m_pendingScheduleSlot.clear();
+    if (engine)
+        engine->stopSequentialPlayback();
+}
+
+bool Planner::continuePendingScheduleFromStandby(Player *finishedEngine)
+{
+    if (!finishedEngine || !m_pendingScheduleEngine
+        || m_pendingScheduleFrom!=finishedEngine)
+        return false;
+
+    if (m_activeScheduleEngine==finishedEngine) {
+        if (m_activeScheduleSlot)
+            m_activeScheduleSlot->setPlaying(false);
+        m_activeScheduleEngine=nullptr;
+        m_activeScheduleSlot.clear();
+    }
+    if (m_running && !m_standbyEngine->getCurrentItem()) {
+        m_standbyEngine->setDevicePlay(m_devicePlay);
+        m_standbyEngine->setVolume(m_volume);
+        m_standbyStartAttempted=true;
+        m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    }
+    m_pendingScheduleFrom=m_standbyEngine;
+    m_pendingScheduleFadeAction=1;
+    return true;
 }
 
 void Planner::startWaitingSlotCrossfade(int crossfadeDurationMs)
@@ -2420,9 +2727,24 @@ void Planner::startWaitingSlotCrossfade(int crossfadeDurationMs)
         .arg(slot->entrySecond());
     m_triggeredSlots.insert(key);
     m_waitingForStandbySlot.clear();
+    m_waitingStandbyEntrySecond=-1;
     if (m_pendingStartSlot==slot)
         m_pendingStartSlot.clear();
     startScheduleSlot(slot,crossfadeDurationMs);
+}
+
+void Planner::startStandbyCrossfadeForActiveSlot(int crossfadeDurationMs)
+{
+    if (!m_running || !m_activeScheduleEngine || !m_activeScheduleSlot
+        || m_pendingScheduleSlot || m_fadeTimer->isActive())
+        return;
+
+    m_standbyEngine->setDevicePlay(m_devicePlay);
+    m_standbyEngine->setVolume(0.0f);
+    m_standbyStartAttempted=true;
+    if (!m_standbyEngine->startSequentialPlayback(m_fallbackContents,true))
+        return;
+    beginCrossfade(m_activeScheduleEngine,m_standbyEngine,3,crossfadeDurationMs);
 }
 
 void Planner::returnToStandby()
@@ -2446,6 +2768,7 @@ void Planner::returnToStandby()
     m_standbyEngine->setVolume(0.0f);
     if (m_standbyEngine->getCurrentItem())
         m_standbyEngine->stopSequentialPlayback();
+    m_standbyStartAttempted=true;
     m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
     beginCrossfade(outgoing,m_standbyEngine,3);
 }
@@ -2646,6 +2969,7 @@ bool Planner::applyStandbyListChange(const QString &path, QString *error)
     if (standbyWasPlaying && !scheduleOwnsPlayback && m_running) {
         m_standbyEngine->setDevicePlay(m_devicePlay);
         m_standbyEngine->setVolume(m_volume);
+        m_standbyStartAttempted=true;
         m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
     }
     updateStandbyBarAppearance();

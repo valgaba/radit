@@ -28,6 +28,7 @@
 #include "widgets/AudioItemMaxi.h"
 #include "widgets/Player.h"
 #include "widgets/CueWaveformFrame.h"
+#include "widgets/LoadingSpinner.h"
 
 
 AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
@@ -240,6 +241,8 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         layoutcenterleft->addWidget(btnplay);
         layoutcenterright->addWidget(labelnombre);
+        m_loadingSpinner = new LoadingSpinner(framecenterright);
+        layoutcenterright->addWidget(m_loadingSpinner, 0, Qt::AlignVCenter);
         layoutcenterright->addWidget(labeltiempo);
 
 
@@ -420,12 +423,25 @@ void AudioItemMaxi::updatePlannerEnabledAppearance()
 
 void AudioItemMaxi::setFolderPresentation(const QString &status, bool ready)
 {
+    setLoadingPresentation(false);
     m_cueButton->hide();
     btnplay->setEnabled(ready);
     const int requiredWidth=labeltiempo->fontMetrics().horizontalAdvance(status)+12;
     if (requiredWidth>labeltiempo->width())
         labeltiempo->setFixedWidth(requiredWidth);
     labeltiempo->setText(status);
+}
+
+void AudioItemMaxi::setLoadingPresentation(bool loading)
+{
+    if (!m_loadingSpinner || !labeltiempo) return;
+    if (loading) {
+        labeltiempo->hide();
+        m_loadingSpinner->start();
+    } else {
+        m_loadingSpinner->stop();
+        labeltiempo->show();
+    }
 }
 
 void AudioItemMaxi::setLiveStreamPresentation()

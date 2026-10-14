@@ -105,6 +105,7 @@ HEADERS += \
     widgets/MeteoClock.h \
     widgets/CueWaveformFrame.h \
     widgets/LoadingProgress.h \
+    widgets/LoadingSpinner.h \
     widgets/FileExploreModel.h \
     widgets/LoadingDialog.h \
     widgets/QuitDialog.h \
