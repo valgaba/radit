@@ -14,6 +14,8 @@ class Capture;
 class Cast;
 class MeteoClock;
 class Planner;
+class EmissionLog;
+class EmissionLogFrame;
 class QAction;
 
 class MainWindow : public QMainWindow
@@ -55,6 +57,8 @@ private:
     Cast *m_cast = nullptr;
     MeteoClock *m_meteoClock = nullptr;
     Planner *m_planner = nullptr;
+    EmissionLog *m_emissionLog = nullptr;
+    EmissionLogFrame *m_emissionLogFrame = nullptr;
     QAction *m_studioViewAction = nullptr;
     QAction *m_plannerViewAction = nullptr;
 

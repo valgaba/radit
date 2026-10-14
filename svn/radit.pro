@@ -16,8 +16,10 @@ SOURCES += \
     core/SpanishTranslator.cpp \
     core/LocutionPack.cpp \
     widgets/ElevenLabsSettingsDialog.cpp \
+    widgets/EmissionLogFrame.cpp \
     widgets/Id3TagsDialog.cpp \
     core/ElevenLabsTts.cpp \
+    core/EmissionLog.cpp \
     widgets/AudioItemMeteoClockMaxi.cpp \
     widgets/Planner.cpp \
     widgets/PlannerContents.cpp \
@@ -74,8 +76,10 @@ HEADERS += \
     core/SpanishTranslator.h \
     core/LocutionPack.h \
     widgets/ElevenLabsSettingsDialog.h \
+    widgets/EmissionLogFrame.h \
     widgets/Id3TagsDialog.h \
     core/ElevenLabsTts.h \
+    core/EmissionLog.h \
     widgets/AudioItemMeteoClockMaxi.h \
     widgets/Planner.h \
     widgets/PlannerContents.h \

@@ -49,6 +49,10 @@ signals:
     void propertiesRequested();
     void playRequested();
     void configurationChanged();
+    void emissionPlaybackStarted(QObject *engine, const QString &source,
+                                 const QString &name, const QString &path);
+    void emissionPlaybackFinished(QObject *engine, const QString &result,
+                                  const QString &details);
 
 private:
     QWidget *m_weekTabs = nullptr;

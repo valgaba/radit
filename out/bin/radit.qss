@@ -1858,3 +1858,31 @@ Frame#MeteoClockPropertiesFrame { background-color: #181e2c; border: 1px solid #
 }
 #MeteoClockPropertiesFrame QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
 #MeteoClockPropertiesFrame QPushButton:pressed { background-color: #1d2230; }
+
+/* Emission log module. */
+#EmissionLogFrame { background-color: #181e2c; border: 1px solid #333b4f; }
+#EmissionLogFrame Frame#framebarra { background-color: #4e4d7a; border: none; }
+#EmissionLogFrame QLabel { color: #8a8d96; background: transparent; border: none; }
+#EmissionLogFrame QDateEdit, #EmissionLogFrame QLineEdit {
+    background-color: #252b39; color: #80A4AE; border: 1px solid #535b6a;
+    min-height: 20px; padding: 2px 5px; selection-background-color: #4e4d7a;
+}
+#EmissionLogFrame QDateEdit:focus, #EmissionLogFrame QLineEdit:focus { border-color: #80A4AE; }
+#EmissionLogFrame QTableWidget {
+    background-color: #181e2c; alternate-background-color: #20283a;
+    color: #8a8d96; gridline-color: #333b4f; border: 1px solid #333b4f;
+    selection-background-color: #4e4d7a; selection-color: white;
+}
+#EmissionLogFrame QHeaderView::section {
+    background-color: #262c3b; color: #80A4AE; border: 1px solid #333b4f; padding: 4px;
+}
+#EmissionLogFrame QPushButton {
+    padding: 2px 6px; border: 1px solid #686b74;
+    background-color: #262c3b; color: #80A4AE; font-size: 12px;
+}
+#EmissionLogFrame QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
+#EmissionLogFrame QPushButton:pressed { background-color: #1d2230; }
+#RaditModuleCloseButton {
+    border: none; background: transparent; padding: 0;
+}
+#RaditModuleCloseButton:hover { background: transparent; }

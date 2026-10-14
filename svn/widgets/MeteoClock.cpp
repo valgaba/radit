@@ -44,7 +44,7 @@ MeteoClock::MeteoClock(QWidget *parent) : Frame(parent)
     auto *barLayout = new QHBoxLayout(bar); barLayout->setContentsMargins(0, 0, 0, 0); barLayout->setSpacing(0);
     auto *title = new Label(bar); title->setObjectName("PanelTitle"); title->setText(tr("MeteoClock"));
     barLayout->addWidget(title); barLayout->addStretch();
-    auto *close = new Button(bar); close->setObjectName("MeteoCloseButton");
+    auto *close = new Button(bar); close->setObjectName("RaditModuleCloseButton");
     close->SetIcon("Close-hover.svg"); close->setIconSize(QSize(15, 15)); close->setFixedSize(15, 15);
     close->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
     close->setToolTip(tr("Close MeteoClock")); close->setAccessibleName(close->toolTip());

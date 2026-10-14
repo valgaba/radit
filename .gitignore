@@ -54,3 +54,7 @@ backups/
 qrc_*.cpp
 ui_*.h
 *.res
+
+# Radit local runtime data and credentials
+/out/bin/log/
+/out/bin/config.json

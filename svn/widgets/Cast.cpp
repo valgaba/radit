@@ -48,6 +48,7 @@ Cast::Cast(QWidget *parent) : Frame(parent)
     barLayout->addWidget(title);
     barLayout->addStretch();
     auto *close = new Button(bar);
+    close->setObjectName("RaditModuleCloseButton");
     close->SetIcon("Close-hover.svg");
     close->setFixedSize(15, 15);
     close->setIconSize(QSize(15, 15));
