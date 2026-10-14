@@ -57,6 +57,7 @@ signals:
 private:
     Frame *m_header = nullptr;
     Button *m_toggleContents = nullptr;
+    Label *m_timingIndicator = nullptr;
     Label *m_time = nullptr;
     Label *m_nameLabel = nullptr;
     Label *m_priorityIndicator = nullptr;
@@ -82,6 +83,7 @@ private:
     QTimer *m_upcomingBlinkTimer = nullptr;
 
     void updateHeaderAppearance();
+    void updateTimingIndicator();
     QString defaultName() const;
 
 protected:

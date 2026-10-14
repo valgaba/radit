@@ -146,6 +146,8 @@ QString SpanishTranslator::translate(const char *context, const char *sourceText
         {QStringLiteral("Songs per turn"),QStringLiteral("Canciones por turno")},
         {QStringLiteral("Wait for the current Standby track to finish"),QStringLiteral("Esperar a que termine la pista actual de Standby")},
         {QStringLiteral("Wait only while Standby is playing. An active ScheduleSlot is never delayed."),QStringLiteral("Solo espera mientras suena Standby. Una pauta activa nunca se retrasa.")},
+        {QStringLiteral("Delayed until the current Standby track ends"),QStringLiteral("Retardado hasta que termine la pista actual de Standby")},
+        {QStringLiteral("Starts at the scheduled time"),QStringLiteral("Entra a la hora programada")},
         {QStringLiteral("Number of tracks to play from this folder before moving to the next item."),QStringLiteral("Número de pistas que se reproducirán de esta carpeta antes de pasar al siguiente elemento.")},
         {QStringLiteral("No color"),QStringLiteral("Sin color")},
         {QStringLiteral("No files"),QStringLiteral("No hay archivos")},

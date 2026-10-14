@@ -70,6 +70,12 @@ ScheduleSlot::ScheduleSlot(QWidget *parent) : Frame(parent)
     m_toggleContents->setAccessibleName(m_toggleContents->toolTip());
     headerLayout->addWidget(m_toggleContents);
 
+    m_timingIndicator=new Label(header);
+    m_timingIndicator->setObjectName("ScheduleSlotTimingIndicator");
+    m_timingIndicator->setFixedSize(12,12);
+    headerLayout->addWidget(m_timingIndicator);
+    updateTimingIndicator();
+
     m_time=new Label(header);
     m_time->setObjectName("ScheduleSlotTime");
     m_time->setText("10:00:00");
@@ -396,7 +402,28 @@ void ScheduleSlot::setPriority(bool priority)
 
 void ScheduleSlot::setStandbyTrackWait(bool enabled)
 {
+    if (m_waitForStandbyTrackEnd==enabled)
+        return;
     m_waitForStandbyTrackEnd=enabled;
+    updateTimingIndicator();
+}
+
+void ScheduleSlot::updateTimingIndicator()
+{
+    if (!m_timingIndicator)
+        return;
+
+    const QColor color=m_waitForStandbyTrackEnd
+        ? QColor(QStringLiteral("#43b581"))
+        : QColor(QStringLiteral("#e5484d"));
+    const QString description=m_waitForStandbyTrackEnd
+        ? tr("Delayed until the current Standby track ends")
+        : tr("Starts at the scheduled time");
+    m_timingIndicator->setStyleSheet(QStringLiteral(
+        "QLabel#ScheduleSlotTimingIndicator { background-color:%1; border:none; }")
+        .arg(color.name(QColor::HexRgb)));
+    m_timingIndicator->setToolTip(description);
+    m_timingIndicator->setAccessibleName(description);
 }
 
 void ScheduleSlot::setUpcoming(bool upcoming)

@@ -102,10 +102,12 @@ private:
     void checkSchedule();
     void cancelStandbyTrackWait();
     void finishStandbyTrackWait();
-    void startScheduleSlot(ScheduleSlot *slot);
+    void startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs = -1);
+    void startWaitingSlotCrossfade(int crossfadeDurationMs);
     void returnToStandby();
     void resumeStandbyAfterBoundaryCheck();
-    void beginCrossfade(Player *from, Player *to, int action);
+    void beginCrossfade(Player *from, Player *to, int action,
+                        int durationMs = -1);
     void finishCrossfade();
     void updatePlannerMeter();
     void updatePlaybackNameLabel();
