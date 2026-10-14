@@ -186,6 +186,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       labeltitle->setText(tr("Player [noname]"));
       labeltitle->setStyleSheet("font-size: 14px;");
       btnclose = new Button(this);
+      btnclose->setObjectName("RaditModuleCloseButton");
       btnclose->setStyleSheet(
           "QPushButton {"
           "   border: none;"
@@ -198,6 +199,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       btnclose->setFixedSize(15, 15);
       btnclose->setCursor(Qt::PointingHandCursor);
       btnclose->SetIcon("Close-hover.svg");
+      btnclose->setIconSize(QSize(15, 15));
       btnclose->setToolTip("Close player");
 
       layoutbarra->addWidget(labeltitle);
@@ -455,6 +457,7 @@ void Player::bindMediaManager()
      });
      connect(mediamanager, &MediaManager::playbackError, this, [this, manager](const QString &message) {
          if (manager != mediamanager) return;
+         finishEmission(tr("Error"),message);
          if (m_stopSequenceAtTrackEnd && m_sequenceContents) {
              stopSequentialPlayback();
              emit sequentialTrackFinished();
@@ -473,6 +476,7 @@ void Player::bindMediaManager()
        connect(mediamanager, &MediaManager::playbackFinished,
                this, [this, manager]() {
            if (manager != mediamanager) return;
+           finishEmission(tr("Completed"));
            finishMix(true);
 
            if (m_stopSequenceAtTrackEnd && m_sequenceContents) {
@@ -518,6 +522,10 @@ void Player::bindMediaManager()
                // LOOP
                mediamanager->seek(currentItem->secondStart());
                mediamanager->play();
+               const QString source=m_emissionSourceLabel.isEmpty() ? title() : m_emissionSourceLabel;
+               m_emissionEntryId=QStringLiteral("pending");
+               emit emissionPlaybackStarted(source,currentItem->playbackName(),
+                                            currentItem->playbackPath());
                return;
            }
 
@@ -658,6 +666,10 @@ bool Player::startPreparedItem(AudioItemMaxi *item)
 
        currentItem = item;
        markFolderTrackStarted(item);
+
+       const QString source=m_emissionSourceLabel.isEmpty() ? title() : m_emissionSourceLabel;
+       m_emissionEntryId=QStringLiteral("pending");
+       emit emissionPlaybackStarted(source,item->playbackName(),item->playbackPath());
 
 
        const double loadedDuration=mediamanager->getDuration();
@@ -1099,6 +1111,12 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
         });
     currentItem = next;
     markFolderTrackStarted(next);
+    // A mixed folder transition changes the active audio without going through
+    // startPreparedPlayback(), so record each incoming track explicitly.
+    finishEmission(tr("Completed"),tr("Faded into the next audio item."));
+    const QString source=m_emissionSourceLabel.isEmpty() ? title() : m_emissionSourceLabel;
+    m_emissionEntryId=QStringLiteral("pending");
+    emit emissionPlaybackStarted(source,next->playbackName(),next->playbackPath());
     m_folderIntroAnnounced=false;
     m_folderOutroAnnounced=false;
     m_mixSearchStartPosition = -1.0;
@@ -1244,6 +1262,8 @@ void Player::stopMain()
     if (!currentItem)
            return;
 
+        finishEmission(tr("Interrupted"),tr("Playback stopped before the item ended."));
+
         mediamanager->stop();
         mediamanager->seek(0.0);
         vumeter->reset();
@@ -1261,6 +1281,14 @@ void Player::stopMain()
         labeltiempo->setText("00:00:00.00");
         emit playbackProgressChanged(0.0,0.0,false);
 
+}
+
+void Player::finishEmission(const QString &result, const QString &details)
+{
+    if (m_emissionEntryId.isEmpty())
+        return;
+    m_emissionEntryId.clear();
+    emit emissionPlaybackFinished(result,details);
 }
 
 bool Player::seekPlaybackPosition(double seconds)

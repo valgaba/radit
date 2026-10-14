@@ -1902,9 +1902,11 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     titleLayout->addStretch();
 
     auto *close=new Button(titleBar);
+    close->setObjectName("RaditModuleCloseButton");
     close->setFixedSize(15,15);
     close->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
     close->SetIcon("Close-hover.svg");
+    close->setIconSize(QSize(15,15));
     close->setToolTip(tr("Close Planner"));
     titleLayout->addWidget(close);
     connect(close,&Button::clicked,this,&QWidget::hide);
@@ -2056,6 +2058,16 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         engine->hide();
         engine->setDevicePlay(m_devicePlay);
         engine->setVolume(0.0f);
+        engine->setEmissionSourceLabel(engine==m_standbyEngine
+            ? tr("Planner / Standby") : tr("Planner / ScheduleSlot"));
+        connect(engine,&Player::emissionPlaybackStarted,this,
+                [this,engine](const QString &source,const QString &name,const QString &path) {
+            emit emissionPlaybackStarted(engine,source,name,path);
+        });
+        connect(engine,&Player::emissionPlaybackFinished,this,
+                [this,engine](const QString &result,const QString &details) {
+            emit emissionPlaybackFinished(engine,result,details);
+        });
         connect(engine,&Player::audioLevelsChanged,this,[this,engine](float left,float right) {
             if (engine==m_standbyEngine) {
                 m_lastStandbyLeft=left; m_lastStandbyRight=right;
@@ -2631,6 +2643,7 @@ void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
     Player *incoming = m_activeScheduleEngine==m_scheduleEngineA
         ? m_scheduleEngineB : m_scheduleEngineA;
     incoming->stopSequentialPlayback();
+    incoming->setEmissionSourceLabel(tr("Planner / %1").arg(slot->name()));
     incoming->setDevicePlay(m_devicePlay);
     incoming->setVolume(0.0f);
     if (!incoming->startSequentialPlayback(slot->contents(),false))
@@ -2910,6 +2923,8 @@ void Planner::updateStandbyBarTitle()
     const QString title=tr("Standby [%1]").arg(baseName.isEmpty() ? QStringLiteral("noname") : baseName);
     if (m_standbyTitle->text()!=title)
         m_standbyTitle->setText(title);
+    if (m_standbyEngine)
+        m_standbyEngine->setEmissionSourceLabel(tr("Planner / %1").arg(title));
 }
 
 bool Planner::applyStandbyListChange(const QString &path, QString *error)

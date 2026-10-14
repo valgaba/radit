@@ -271,6 +271,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     layoutbarra->addWidget(labeltitle);
     layoutbarra->addStretch(1);
     auto *btnclose = new Button(framebarra);
+    btnclose->setObjectName("RaditModuleCloseButton");
     btnclose->setStyleSheet("QPushButton { border: none; background: transparent; padding: 0px; }");
     btnclose->setFixedSize(15, 15);
     btnclose->SetIcon("Close-hover.svg");

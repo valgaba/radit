@@ -47,6 +47,7 @@
 //#include "widgets/TabAuto.h"
 #include "widgets/FormAbout.h"
 #include "core/config.h"
+#include "core/EmissionLog.h"
 #include "widgets/fileexplore.h"
 #include "widgets/Capture.h"
 #include "widgets/Cast.h"
@@ -55,6 +56,7 @@
 #include "widgets/TabPlayer.h"
 #include "widgets/Player.h"
 #include "widgets/ElevenLabsSettingsDialog.h"
+#include "widgets/EmissionLogFrame.h"
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
@@ -63,6 +65,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
     mediamanager = new MediaManager(this);
     mediamanager->initialize(); //iniciamos audio
+    m_emissionLog=new EmissionLog(this);
 
 
 
@@ -244,6 +247,8 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     m_cast = new Cast;
     m_meteoClock = new MeteoClock;
     m_planner = new Planner;
+    m_emissionLogFrame=new EmissionLogFrame(m_emissionLog);
+    m_emissionLogFrame->hide();
 
     splittertop->addWidget(m_fileExplore);
     splittertop->addWidget(m_capture);
@@ -251,6 +256,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splittertop->addWidget(m_meteoClock);
 
     splittertop->addWidget(m_planner);
+    splittertop->addWidget(m_emissionLogFrame);
 
     splitterdown->addWidget(player2);
     splitterdown->addWidget(player3);
@@ -263,8 +269,9 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     splittertop->setStretchFactor(2, 2);
     splittertop->setStretchFactor(3, 2);
     splittertop->setStretchFactor(4, 3);
+    splittertop->setStretchFactor(5, 3);
     QList<int> sizesTop;
-    sizesTop << 400 << 400 << 400 << 400 << 600;
+    sizesTop << 400 << 400 << 400 << 400 << 600 << 0;
     splittertop->setSizes(sizesTop);
 
     QAction *resetInterface = vistasMenu->addAction(tr("Reset User Interface"));
@@ -290,6 +297,26 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
         connect(action, &QAction::triggered, this, [this,panel](bool visible) {
             clearWorkspacePresetSelection();
             panel->setVisible(visible);
+            if (panel->parentWidget()==splittertop) {
+                QList<int> sizes=splittertop->sizes();
+                const int panelIndex=splittertop->indexOf(panel);
+                if (panelIndex>=0 && panelIndex<sizes.size()) {
+                    if (visible && sizes[panelIndex]==0) {
+                        int donor=-1;
+                        for (int index=0;index<sizes.size();++index)
+                            if (index!=panelIndex && sizes[index]>(donor<0 ? 0 : sizes[donor]))
+                                donor=index;
+                        const int extra=qMin(280,donor>=0 ? sizes[donor]/2 : 0);
+                        if (donor>=0 && extra>0) {
+                            sizes[donor]-=extra;
+                            sizes[panelIndex]=extra;
+                        }
+                    } else if (!visible) {
+                        sizes[panelIndex]=0;
+                    }
+                    splittertop->setSizes(sizes);
+                }
+            }
             if (panel->parentWidget()==splitterdown) {
                 bool anyPlayerVisible=false;
                 for (int index=0; index<splitterdown->count(); ++index)
@@ -316,6 +343,28 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     addPanelAction(tr("Show Cast"), m_cast);
     addPanelAction(tr("Show MeteoClock"), m_meteoClock);
     addPanelAction(tr("Show Planner"), m_planner);
+    addPanelAction(tr("Show Emission Log"),m_emissionLogFrame);
+
+    const auto connectEmissionLog=[this](Player *player) {
+        connect(player,&Player::emissionPlaybackStarted,m_emissionLog,
+                [this,player](const QString &source,const QString &name,const QString &path) {
+            m_emissionLog->trackStarted(player,source,name,path);
+        });
+        connect(player,&Player::emissionPlaybackFinished,m_emissionLog,
+                [this,player](const QString &result,const QString &details) {
+            m_emissionLog->trackFinished(player,result,details);
+        });
+    };
+    for (Player *player : players)
+        connectEmissionLog(player);
+    connect(m_planner,&Planner::emissionPlaybackStarted,m_emissionLog,
+            [this](QObject *engine,const QString &source,const QString &name,const QString &path) {
+        m_emissionLog->trackStarted(engine,source,name,path);
+    });
+    connect(m_planner,&Planner::emissionPlaybackFinished,m_emissionLog,
+            [this](QObject *engine,const QString &result,const QString &details) {
+        m_emissionLog->trackFinished(engine,result,details);
+    });
 
 
 // cargar configuracion de los player*******************
@@ -361,8 +410,10 @@ void MainWindow::restoreInterface()
         splitterdown->widget(i)->show();
     splittertop->show();
     splitterdown->show();
+    if (m_emissionLogFrame)
+        m_emissionLogFrame->hide();
 
-    splittertop->setSizes({400, 400, 400, 400, 600});
+    splittertop->setSizes({400, 400, 400, 400, 600, 0});
     splitterdown->setSizes({400, 400, 400});
     const int height = qMax(3, splitterprincipal->height() - splitterprincipal->handleWidth());
     splitterprincipal->setSizes({height / 3, height - height / 3});
@@ -376,6 +427,8 @@ void MainWindow::clearWorkspacePresetSelection()
 
 void MainWindow::applyWorkspacePreset(bool plannerView)
 {
+    if (m_emissionLogFrame)
+        m_emissionLogFrame->hide();
     m_studioViewAction->setChecked(!plannerView);
     m_plannerViewAction->setChecked(plannerView);
 
@@ -393,10 +446,10 @@ void MainWindow::applyWorkspacePreset(bool plannerView)
     const int width=qMax(5,splittertop->width());
     const int height=qMax(2,splitterprincipal->height()-splitterprincipal->handleWidth());
     if (plannerView) {
-        splittertop->setSizes({width/4,0,0,width/4,width/2});
+        splittertop->setSizes({width/4,0,0,width/4,width/2,0});
         splitterprincipal->setSizes({height,0});
     } else {
-        splittertop->setSizes({width/3,width/3,0,width/3,0});
+        splittertop->setSizes({width/3,width/3,0,width/3,0,0});
         splitterdown->setSizes({1,1,1});
         splitterprincipal->setSizes({height/3,height-height/3});
     }
@@ -415,9 +468,11 @@ void MainWindow::saveWindowInterface() const
                       : m_studioViewAction && m_studioViewAction->isChecked()
                             ? QStringLiteral("studio") : QString());
 
-    const auto saveVisibility = [&settings](const QSplitter *splitter) {
+    const auto saveVisibility = [&settings,this](const QSplitter *splitter) {
         for (int index = 0; index < splitter->count(); ++index) {
             const QWidget *panel = splitter->widget(index);
+            if (panel==m_emissionLogFrame)
+                continue;
             if (!panel->objectName().isEmpty())
                 settings.setValue("visible/" + panel->objectName(), !panel->isHidden());
         }
@@ -440,9 +495,11 @@ void MainWindow::restoreWindowInterface()
     if (settings.contains("splitterDown"))
         splitterdown->restoreState(settings.value("splitterDown").toByteArray());
 
-    const auto restoreVisibility = [&settings](QSplitter *splitter) {
+    const auto restoreVisibility = [&settings,this](QSplitter *splitter) {
         for (int index = 0; index < splitter->count(); ++index) {
             QWidget *panel = splitter->widget(index);
+            if (panel==m_emissionLogFrame)
+                continue;
             const QString key = "visible/" + panel->objectName();
             if (!panel->objectName().isEmpty() && settings.contains(key))
                 panel->setVisible(settings.value(key).toBool());

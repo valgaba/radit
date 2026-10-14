@@ -132,6 +132,9 @@ private:
     bool m_userIsSeeking = false;
     double m_duration = 0.0;
     QString SecondToTime(double segundos);
+    QString m_emissionSourceLabel;
+    QString m_emissionEntryId;
+    void finishEmission(const QString &result, const QString &details = {});
 
     int m_deviceplay=0;
     int m_devicecue=0;
@@ -146,6 +149,7 @@ public:
 
     void setTitle(QString title);
     QString title() const;
+    void setEmissionSourceLabel(const QString &source) { m_emissionSourceLabel=source; }
 
     void playItem(AudioItemMaxi *item);
     bool startSequentialPlayback(ContentsBase *contents, bool repeat);
@@ -194,6 +198,8 @@ public:
     void audioLevelsChanged(float left, float right);
     void playbackProgressChanged(double position, double duration, bool seekable);
     void currentPlaybackNameChanged(const QString &name);
+    void emissionPlaybackStarted(const QString &source, const QString &name, const QString &path);
+    void emissionPlaybackFinished(const QString &result, const QString &details);
 
 
 };
