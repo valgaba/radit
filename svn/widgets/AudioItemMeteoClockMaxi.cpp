@@ -164,7 +164,7 @@ bool AudioItemMeteoClockMaxi::loadPreparedPlayback(MediaManager *manager)
 {
     if (m_useAiVoice) {
         const QString path=m_aiAudioPath;
-        if (path.isEmpty() || !manager->loadFile(path)) return fail(tr("The ElevenLabs voice clip could not be loaded."));
+        if (path.isEmpty() || !manager->loadFile(path)) return fail(tr("The AI voice clip could not be loaded."));
         m_aiAudioPath.clear();
         setSecond(manager->getDuration());setTiempoFile(second());return true;
     }

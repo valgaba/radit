@@ -45,8 +45,37 @@
 #include "widgets/ContentsPlayer.h"
 #include "widgets/AudioItem.h"
 #include "widgets/AudioItemFileMaxi.h"
+#include "widgets/AudioItemFilePlanner.h"
+#include "widgets/AudioItemFolderPlanner.h"
+#include "widgets/AudioItemMeteoClockPlanner.h"
+#include "widgets/AudioItemNetPlanner.h"
 #include "core/io.h"
 #include "core/MediaManager.h"
+
+namespace {
+AudioItemMaxi *makeMaxiItem(AudioItemMaxi *source, QWidget *parent)
+{
+    AudioItemMaxi *item=nullptr;
+    if (auto *file=qobject_cast<AudioItemFilePlanner*>(source))
+        item=file->AudioItemFileMaxi::copy(parent);
+    else if (auto *folder=qobject_cast<AudioItemFolderPlanner*>(source))
+        item=folder->AudioItemFolderMaxi::copy(parent);
+    else if (auto *meteo=qobject_cast<AudioItemMeteoClockPlanner*>(source))
+        item=meteo->AudioItemMeteoClockMaxi::copy(parent);
+    else if (auto *net=qobject_cast<AudioItemNetPlanner*>(source))
+        item=net->AudioItemNetMaxi::copy(parent);
+
+    if (item) {
+        item->setIsLoop(source->isLoop());
+        item->setIsPurge(source->isPurge());
+        item->setIsPlayNext(source->isPlayNext());
+        item->setEnabledForPlayback(source->isEnabledForPlayback());
+        item->setColor(source->color());
+        item->setToolTip(source->toolTip());
+    }
+    return item;
+}
+}
 
 
 ContentsPlayer::ContentsPlayer(QWidget *parent):ContentsBase(parent){
@@ -244,7 +273,9 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
                    if (!itemMaxi)
                        continue;
 
-                   AudioItemMaxi* newItem = itemMaxi->copy(this);
+                   AudioItemMaxi* newItem = makeMaxiItem(itemMaxi,this);
+                   if (!newItem)
+                       newItem = itemMaxi->copy(this);
 
                    // createItem(newItem) hace addWidget al final,
                    // así que aquí NO lo usamos directamente

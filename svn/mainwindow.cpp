@@ -116,9 +116,9 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
 
        QMenu *toolsMenu = menubar->addMenu(tr("&Tools"));
        QMenu *aiVoicesMenu = toolsMenu->addMenu(tr("AI voices (experimental)"));
-       QAction *elevenLabsSettings = aiVoicesMenu->addAction(tr("Configure ElevenLabs..."));
-       elevenLabsSettings->setObjectName("ConfigureElevenLabsAction");
-       connect(elevenLabsSettings, &QAction::triggered, this, [this]() {
+       QAction *aiVoiceSettings = aiVoicesMenu->addAction(tr("Configure AI voices..."));
+       aiVoiceSettings->setObjectName("ConfigureAIVoicesAction");
+       connect(aiVoiceSettings, &QAction::triggered, this, [this]() {
            ElevenLabsSettingsDialog dialog(this);
            dialog.exec();
        });

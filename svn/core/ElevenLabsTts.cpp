@@ -15,6 +15,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QCryptographicHash>
+#include <QXmlStreamWriter>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -73,21 +74,48 @@ void ElevenLabsTts::generate(const QString &text, QObject *context, Callback cal
     if (cleanText.isEmpty()) { finish({}, {}); return; }
 
     QSettings settings(QSettings::IniFormat, QSettings::UserScope, "Radit", "Radit");
-    settings.beginGroup("ElevenLabs");
-    const QString apiKey = decodeApiKey(settings.value("apiKey").toByteArray());
-    const QString voiceId = settings.value("voiceId").toString().trimmed();
-    const QString model = settings.value("model", "eleven_multilingual_v2").toString();
-    settings.endGroup();
-    if (apiKey.isEmpty() || voiceId.isEmpty()) {
-        finish({}, tr("Configure the ElevenLabs API key and Voice ID first."));
-        return;
+    const QString provider = settings.value("AIVoices/provider", "elevenlabs").toString();
+    QString apiKey;
+    QString voice;
+    QString model;
+    QString region;
+    QString locale;
+    if (provider == QLatin1String("azure")) {
+        settings.beginGroup("AzureSpeech");
+        apiKey = decodeApiKey(settings.value("apiKey").toByteArray());
+        region = settings.value("region", "westeurope").toString().trimmed();
+        voice = settings.value("voiceName", "es-ES-ElviraNeural").toString().trimmed();
+        locale = settings.value("voiceLocale", "es-ES").toString().trimmed();
+        settings.endGroup();
+        if (region.isEmpty() || voice.isEmpty() || apiKey.isEmpty()) {
+            finish({}, tr("Configure the Azure Speech key, region and voice first."));
+            return;
+        }
+        for (const QChar c : region) {
+            if (!(c.isLower() || c.isDigit() || c == QLatin1Char('-'))) {
+                finish({}, tr("The Azure Speech region is invalid."));
+                return;
+            }
+        }
+    } else {
+        settings.beginGroup("ElevenLabs");
+        apiKey = decodeApiKey(settings.value("apiKey").toByteArray());
+        voice = settings.value("voiceId").toString().trimmed();
+        model = settings.value("model", "eleven_multilingual_v2").toString();
+        settings.endGroup();
+        if (apiKey.isEmpty() || voice.isEmpty()) {
+            finish({}, tr("Configure the ElevenLabs API key and Voice ID first."));
+            return;
+        }
     }
 
     const QByteArray cacheKey = QCryptographicHash::hash(
-        (voiceId + QLatin1Char('\n') + model + QLatin1Char('\n') + cleanText).toUtf8(),
+        (provider + QLatin1Char('\n') + region + QLatin1Char('\n') + voice + QLatin1Char('\n')
+         + locale + QLatin1Char('\n') + model + QLatin1Char('\n') + cleanText).toUtf8(),
         QCryptographicHash::Sha256).toHex();
     const QString cacheDirectory = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
-                                   + QStringLiteral("/elevenlabs");
+        + (provider == QLatin1String("azure") ? QStringLiteral("/azure-speech")
+                                                : QStringLiteral("/elevenlabs"));
     QDir().mkpath(cacheDirectory);
     const QString cachedPath = cacheDirectory + QLatin1Char('/')
                                + QString::fromLatin1(cacheKey) + QStringLiteral(".mp3");
@@ -95,22 +123,47 @@ void ElevenLabsTts::generate(const QString &text, QObject *context, Callback cal
 
     QNetworkAccessManager *manager = networkManager();
     if (!manager) { finish({}, tr("The network service is unavailable.")); return; }
-    QUrl url(QStringLiteral("https://api.elevenlabs.io/v1/text-to-speech/")
-             + QString::fromLatin1(QUrl::toPercentEncoding(voiceId)));
-    QUrlQuery query;
-    query.addQueryItem(QStringLiteral("output_format"), QStringLiteral("mp3_44100_128"));
-    url.setQuery(query);
-    QNetworkRequest request(url);
+    QNetworkRequest request;
+    QByteArray postBody;
+    if (provider == QLatin1String("azure")) {
+        QUrl url(QStringLiteral("https://") + region
+                 + QStringLiteral(".tts.speech.microsoft.com/cognitiveservices/v1"));
+        request.setUrl(url);
+        request.setRawHeader("Ocp-Apim-Subscription-Key", apiKey.toUtf8());
+        request.setRawHeader("X-Microsoft-OutputFormat", "audio-24khz-96kbitrate-mono-mp3");
+        request.setRawHeader("User-Agent", "Radit");
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/ssml+xml");
+        QXmlStreamWriter xml(&postBody);
+        xml.writeStartDocument();
+        xml.writeStartElement(QStringLiteral("speak"));
+        xml.writeAttribute(QStringLiteral("version"), QStringLiteral("1.0"));
+        xml.writeAttribute(QStringLiteral("xmlns"), QStringLiteral("http://www.w3.org/2001/10/synthesis"));
+        xml.writeAttribute(QStringLiteral("xmlns:mstts"), QStringLiteral("https://www.w3.org/2001/mstts"));
+        xml.writeAttribute(QStringLiteral("xml:lang"), locale.isEmpty() ? QStringLiteral("es-ES") : locale);
+        xml.writeStartElement(QStringLiteral("voice"));
+        xml.writeAttribute(QStringLiteral("name"), voice);
+        xml.writeCharacters(cleanText);
+        xml.writeEndElement();
+        xml.writeEndElement();
+        xml.writeEndDocument();
+    } else {
+        QUrl url(QStringLiteral("https://api.elevenlabs.io/v1/text-to-speech/")
+                 + QString::fromLatin1(QUrl::toPercentEncoding(voice)));
+        QUrlQuery query;
+        query.addQueryItem(QStringLiteral("output_format"), QStringLiteral("mp3_44100_128"));
+        url.setQuery(query);
+        request.setUrl(url);
+        request.setRawHeader("xi-api-key", apiKey.toUtf8());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        QJsonObject payload;
+        payload.insert(QStringLiteral("text"), cleanText);
+        payload.insert(QStringLiteral("model_id"), model);
+        postBody = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+    }
     request.setTransferTimeout(30000);
-    request.setRawHeader("xi-api-key", apiKey.toUtf8());
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QJsonObject payload;
-    payload.insert(QStringLiteral("text"), cleanText);
-    payload.insert(QStringLiteral("model_id"), model);
-    QNetworkReply *reply = manager->post(request,
-        QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    QNetworkReply *reply = manager->post(request, postBody);
     connect(reply, &QNetworkReply::finished, this,
-            [reply, cachedPath, finish]() {
+            [reply, cachedPath, finish, provider]() {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QByteArray body = reply->readAll();
         const QString networkError = reply->errorString();
@@ -124,8 +177,11 @@ void ElevenLabsTts::generate(const QString &text, QObject *context, Callback cal
                 else if (detail.isString())
                     error = detail.toString();
             }
-            if (error.isEmpty()) error = status ? tr("ElevenLabs returned HTTP %1.").arg(status)
-                                                : networkError;
+            if (error.isEmpty()) error = status
+                ? (provider == QLatin1String("azure")
+                       ? tr("Azure Speech returned HTTP %1.").arg(status)
+                       : tr("ElevenLabs returned HTTP %1.").arg(status))
+                : networkError;
             reply->deleteLater();
             finish({}, error);
             return;

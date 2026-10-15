@@ -32,9 +32,10 @@
 
 FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
+    const bool showCueDevice=qobject_cast<Planner *>(parent)==nullptr;
     this->setObjectName("FrameOptionsPlayer"); //para qss
     this->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-    this->setFixedSize(350, 250);
+    this->setFixedSize(350, showCueDevice ? 250 : 220);
 
     layout = new QVBoxLayout(this);  // layout general
     layout->setContentsMargins(0, 0, 0, 0);
@@ -113,7 +114,12 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
      combocue->setObjectName("Combo"); //para qss
 
     layoutcenter->addRow(labelplay, comboplay);
-    layoutcenter->addRow(labelcue, combocue);
+    if (showCueDevice)
+        layoutcenter->addRow(labelcue, combocue);
+    else {
+        labelcue->hide();
+        combocue->hide();
+    }
 
     auto *volumeRow = new QWidget(framecenter);
     auto *volumeLayout = new QHBoxLayout(volumeRow);
@@ -213,7 +219,6 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
                emit player->configurationChanged();
            } else if (planner) {
                planner->setDevicePlay(selectedPlay);
-               planner->setDeviceCue(selectedCue);
                m_volumeCommitted = true;
                emit planner->configurationChanged();
            }
@@ -240,13 +245,15 @@ FrameOptionsPlayer::~FrameOptionsPlayer(){}
 void FrameOptionsPlayer::UpdateDevice(){
 
        comboplay->clear(); // borramos antes para no duplicar
-       combocue->clear();
+       if (combocue)
+           combocue->clear();
 
 
     for (const AudioDevice &device : MediaManager::outputDevices()) {
         // Añadimos el dispositivo a ambos combos.
         comboplay->addItem(device.name, device.id);
-        combocue->addItem(device.name, device.id);
+        if (combocue && !combocue->isHidden())
+            combocue->addItem(device.name, device.id);
     }
 
       // ----------------------------------------
@@ -265,7 +272,7 @@ void FrameOptionsPlayer::UpdateDevice(){
           // ----------------------------------------
 
           int currentPlay = player ? player->devicePlay() : planner->devicePlay();
-          int currentCue  = player ? player->deviceCue() : planner->deviceCue();
+          int currentCue  = player ? player->deviceCue() : 0;
 
 
           // ----------------------------------------
@@ -283,11 +290,11 @@ void FrameOptionsPlayer::UpdateDevice(){
           // Seleccionar dispositivo CUE
           // ----------------------------------------
 
-          int cueComboIndex =
-              combocue->findData(currentCue);
-
-          if (cueComboIndex >= 0)
-              combocue->setCurrentIndex(cueComboIndex);
+          if (combocue && !combocue->isHidden()) {
+              int cueComboIndex=combocue->findData(currentCue);
+              if (cueComboIndex>=0)
+                  combocue->setCurrentIndex(cueComboIndex);
+          }
 
 
 

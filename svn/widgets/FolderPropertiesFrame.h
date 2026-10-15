@@ -4,6 +4,7 @@
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/Player.h"
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDoubleValidator>
 #include <QDir>
 #include <QFileInfo>
@@ -30,7 +31,7 @@ public:
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowTitle(tr("Audio folder properties"));
         setWindowIcon(QIcon(":/icons/properties.svg"));
-        resize(540, 485);
+        resize(540, 520);
         auto *root = new QVBoxLayout(this);
         root->setContentsMargins(0, 0, 0, 0);
         root->setSpacing(0);
@@ -93,16 +94,49 @@ public:
         seconds->setValidator(validator);
         form->addRow(tr("Mix duration (seconds)"), seconds);
 
+        auto *sweeperEnabled = new QCheckBox(tr("Enable sweeper (random station ID)"), this);
+        sweeperEnabled->setObjectName("FolderSweeperEnabled");
+        sweeperEnabled->setChecked(item->sweeperEnabled());
+        form->addRow(sweeperEnabled);
+        auto *sweeperFolderRow = new QWidget(this);
+        auto *sweeperFolderLayout = new QHBoxLayout(sweeperFolderRow);
+        sweeperFolderLayout->setContentsMargins(0, 0, 0, 0);
+        sweeperFolderLayout->setSpacing(6);
+        auto *sweeperFolder = new QLineEdit(item->sweeperFolderPath(), sweeperFolderRow);
+        sweeperFolder->setObjectName("FolderSweeperFolder");
+        sweeperFolder->setPlaceholderText(tr("Folder containing sweeper audio clips"));
+        sweeperFolder->setToolTip(tr("A random clip is mixed over the track at the selected positions."));
+        auto *browseSweeper = new Button(sweeperFolderRow);
+        browseSweeper->setText(tr("Browse..."));
+        browseSweeper->setFixedSize(68, 24);
+        sweeperFolderLayout->addWidget(sweeperFolder, 1);
+        sweeperFolderLayout->addWidget(browseSweeper);
+        form->addRow(tr("Sweeper folder"), sweeperFolderRow);
+        auto *sweeperPlacement = new QComboBox(this);
+        sweeperPlacement->setObjectName("Combo");
+        sweeperPlacement->addItem(tr("Entry and exit"), 0);
+        sweeperPlacement->addItem(tr("Entry"), 1);
+        sweeperPlacement->addItem(tr("Exit"), 2);
+        const int placementIndex = item->sweeperAtEntry()
+            ? (item->sweeperAtExit() ? 0 : 1)
+            : (item->sweeperAtExit() ? 2 : 0);
+        sweeperPlacement->setCurrentIndex(placementIndex);
+        form->addRow(tr("Sweeper placement"), sweeperPlacement);
         auto *announcementsEnabled = new QCheckBox(tr("Enable voice announcements"), this);
         announcementsEnabled->setObjectName("FolderAnnouncementsEnabled");
         announcementsEnabled->setChecked(item->announcementsEnabled());
         form->addRow(announcementsEnabled);
+        connect(browseSweeper, &Button::clicked, this, [this, sweeperFolder]() {
+            const QString path = QFileDialog::getExistingDirectory(
+                this, tr("Select sweeper folder"), sweeperFolder->text());
+            if (!path.isEmpty()) sweeperFolder->setText(QDir::toNativeSeparators(path));
+        });
 
         auto *introDelay = new QLineEdit(QString::number(item->announcementDelaySeconds()), this);
         introDelay->setObjectName("FolderAnnouncementDelay");
         introDelay->setValidator(new QIntValidator(0, 30, introDelay));
-        introDelay->setToolTip(tr("Delay after the track starts before the opening announcement."));
-        form->addRow(tr("Opening announcement after (seconds)"), introDelay);
+        introDelay->setToolTip(tr("Delay after the track starts before the opening announcement or entry sweeper."));
+        form->addRow(tr("Opening announcement / sweeper after (seconds)"), introDelay);
 
         auto *voiceVolumeRow = new QWidget(this);
         auto *voiceVolumeLayout = new QHBoxLayout(voiceVolumeRow);
@@ -210,21 +244,31 @@ public:
         const auto validate = [=]() {
             seconds->setEnabled(enabled->isChecked());
             const bool speak = announcementsEnabled->isChecked();
-            introDelay->setEnabled(speak);
-            voiceVolume->setEnabled(speak);
-            musicVolume->setEnabled(speak);
-            recovery->setEnabled(speak);
+            const bool useSweeper = sweeperEnabled->isChecked();
+            const bool useVoiceMix = speak || useSweeper;
+            const bool entryCue = speak || (useSweeper && sweeperPlacement->currentData().toInt() != 2);
+            sweeperFolder->setEnabled(useSweeper);
+            browseSweeper->setEnabled(useSweeper);
+            sweeperPlacement->setEnabled(useSweeper);
+            introDelay->setEnabled(entryCue);
+            voiceVolume->setEnabled(useVoiceMix);
+            musicVolume->setEnabled(useVoiceMix);
+            recovery->setEnabled(useVoiceMix);
             introText->setEnabled(speak);
             outroText->setEnabled(speak);
             testVoice->setEnabled(speak);
             save->setEnabled(QFileInfo(folder->text()).isDir()
                 && songsPerTurn->hasAcceptableInput()
                 && (!enabled->isChecked() || seconds->hasAcceptableInput())
-                && (!speak || (introDelay->hasAcceptableInput()
-                               && recovery->hasAcceptableInput())));
+                && (!useSweeper || QFileInfo(sweeperFolder->text()).isDir())
+                && (!entryCue || introDelay->hasAcceptableInput())
+                && (!useVoiceMix || recovery->hasAcceptableInput()));
         };
         connect(enabled, &QCheckBox::toggled, this, validate);
         connect(announcementsEnabled, &QCheckBox::toggled, this, validate);
+        connect(sweeperEnabled, &QCheckBox::toggled, this, validate);
+        connect(sweeperPlacement, &QComboBox::currentIndexChanged, this, validate);
+        connect(sweeperFolder, &QLineEdit::textChanged, this, validate);
         connect(seconds, &QLineEdit::textChanged, this, validate);
         connect(songsPerTurn, &QLineEdit::textChanged, this, validate);
         connect(introDelay, &QLineEdit::textChanged, this, validate);
@@ -247,6 +291,9 @@ public:
             item->setMixSettings(enabled->isChecked(), seconds->text().toDouble());
             item->setSongsPerTurn(songsPerTurn->text().toInt());
             item->setAnnouncementsEnabled(announcementsEnabled->isChecked());
+            const int placement = sweeperPlacement->currentData().toInt();
+            item->setSweeper(sweeperEnabled->isChecked(), sweeperFolder->text(),
+                             placement != 2, placement != 1);
             item->setAnnouncementVolumePercent(voiceVolume->value());
             item->setAnnouncementMusicVolumePercent(musicVolume->value());
             item->setAnnouncementRecoverySeconds(recovery->text().toDouble());
@@ -257,7 +304,7 @@ public:
         connect(testVoice, &Button::clicked, this, [=]() {
             if (introText->text().trimmed() != item->introAnnouncement()) {
                 QMessageBox::information(this, tr("Test cached voice"),
-                    tr("Save this text and play the folder once to generate its voice. The test button only replays cached audio and never contacts ElevenLabs."));
+                    tr("Save this text and play the folder once to generate its voice. The test button only replays cached audio and never contacts the selected AI voice provider."));
                 return;
             }
             const QString voicePath = item->introAnnouncementPath();
@@ -265,7 +312,7 @@ public:
             if (voicePath.isEmpty() || !QFileInfo::exists(voicePath)
                 || musicPath.isEmpty() || !QFileInfo::exists(musicPath)) {
                 QMessageBox::information(this, tr("Test cached voice"),
-                    tr("A cached voice and its music track are required. Play this folder once to generate the voice. This test never contacts ElevenLabs or uses credits."));
+                    tr("A cached voice and its music track are required. Play this folder once to generate the voice. This test never contacts the selected AI voice provider or uses credits."));
                 return;
             }
             QWidget *owner = item->parentWidget();

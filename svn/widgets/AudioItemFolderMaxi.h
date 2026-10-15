@@ -36,12 +36,21 @@ public:
     void setAnnouncementMusicVolumePercent(int percent);
     double announcementRecoverySeconds() const { return m_announcementRecoverySeconds; }
     void setAnnouncementRecoverySeconds(double seconds);
-    bool hasAnnouncements() const { return m_announcementsEnabled
-        && (!m_introAnnouncement.isEmpty() || !m_outroAnnouncement.isEmpty()); }
+    bool hasAnnouncements() const { return (m_announcementsEnabled
+        && (!m_introAnnouncement.isEmpty() || !m_outroAnnouncement.isEmpty()))
+        || (m_sweeperEnabled && !m_sweeperFolderPath.isEmpty()); }
     QString introAnnouncementPath() const { return m_introAudioPath; }
     QString outroAnnouncementPath() const { return m_outroAudioPath; }
     QString resolvedIntroAnnouncement() const;
     QString resolvedOutroAnnouncement() const;
+    bool sweeperEnabled() const { return m_sweeperEnabled; }
+    QString sweeperFolderPath() const { return m_sweeperFolderPath; }
+    QString sweeperIntroAudioPath() const { return m_sweeperIntroAudioPath; }
+    QString sweeperOutroAudioPath() const { return m_sweeperOutroAudioPath; }
+    bool sweeperAtEntry() const { return m_sweeperAtEntry; }
+    bool sweeperAtExit() const { return m_sweeperAtExit; }
+    void setSweeper(bool enabled, const QString &folderPath,
+                    bool atEntry = true, bool atExit = true);
     AudioItemMaxi *copy(QWidget *newParent) const override;
     bool preparePlayback() override;
     bool isPreparingPlayback() const override { return m_waitingForScan || m_announcementPreparing; }
@@ -51,6 +60,8 @@ public:
     bool loadPreparedPlayback(MediaManager *manager) override;
 signals:
     void scanFinished();
+protected:
+    void copyFolderStateFrom(const AudioItemFolderMaxi &source);
 private:
     friend class Player;
     struct Sequence {
@@ -82,6 +93,11 @@ private:
     int m_announcementMusicVolumePercent = 8;
     double m_announcementRecoverySeconds = 1.0;
     QString m_introAudioPath, m_outroAudioPath;
+    bool m_sweeperEnabled = false;
+    bool m_sweeperAtEntry = true;
+    bool m_sweeperAtExit = true;
+    QString m_sweeperFolderPath;
+    QString m_sweeperIntroAudioPath, m_sweeperOutroAudioPath;
     bool m_announcementPreparing = false;
     bool m_trackPrepared = false;
     int m_announcementRequests = 0;

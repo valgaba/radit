@@ -16,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
@@ -26,6 +27,7 @@
 #include <QNetworkRequest>
 #include <QLocale>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QShortcut>
 #include <QTemporaryDir>
 #include <QTime>
@@ -33,6 +35,7 @@
 #include <QUrlQuery>
 #include <QVBoxLayout>
 #include <QWindow>
+#include <QXmlStreamWriter>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -85,11 +88,11 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     : QDialog(parent)
 {
     setObjectName("OnlineRadioDialog");
-    setWindowTitle(tr("ElevenLabs settings"));
+    setWindowTitle(tr("AI voice settings"));
     setWindowIcon(QIcon(":/icons/radit.ico"));
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setWindowModality(Qt::WindowModal);
-    resize(510, 335);
+    resize(510, 385);
     m_network = new QNetworkAccessManager(this);
 
     auto *root = new QVBoxLayout(this);
@@ -114,7 +117,7 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     close->setFixedSize(15, 15);
     close->SetIcon("Close-hover.svg");
     close->setIconSize(QSize(15, 15));
-    close->setToolTip(tr("Close ElevenLabs settings"));
+    close->setToolTip(tr("Close AI voice settings"));
     barLayout->addWidget(close);
     connect(close, &Button::clicked, this, &QDialog::reject);
     root->addWidget(m_titleBar);
@@ -123,13 +126,18 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     auto *contentLayout = new QVBoxLayout(content);
     contentLayout->setContentsMargins(12, 10, 12, 10);
     contentLayout->setSpacing(9);
-    auto *form = new QFormLayout;
-    form->setHorizontalSpacing(12);
-    form->setVerticalSpacing(8);
+    m_form = new QFormLayout;
+    m_form->setHorizontalSpacing(12);
+    m_form->setVerticalSpacing(8);
+    m_provider = new QComboBox(content);
+    m_provider->setObjectName("Combo");
+    m_provider->addItem(tr("ElevenLabs"), "elevenlabs");
+    m_provider->addItem(tr("Azure Speech"), "azure");
+    m_form->addRow(tr("Provider"), m_provider);
 
     m_apiKey = new QLineEdit(content);
     m_apiKey->setEchoMode(QLineEdit::Password);
-    m_apiKey->setPlaceholderText(tr("ElevenLabs API key"));
+    m_apiKey->setPlaceholderText(tr("Provider API key"));
     auto *keyRow = new QHBoxLayout;
     keyRow->setSpacing(6);
     keyRow->addWidget(m_apiKey, 1);
@@ -141,15 +149,16 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     connect(showKey, &Button::toggled, this, [this](bool visible) {
         m_apiKey->setEchoMode(visible ? QLineEdit::Normal : QLineEdit::Password);
     });
-    form->addRow(tr("API key"), keyRow);
+    m_apiKeyLabel = new QLabel(tr("API key"), content);
+    m_form->addRow(m_apiKeyLabel, keyRow);
 
     m_voiceId = new QLineEdit(content);
     m_voiceId->setPlaceholderText(tr("Voice ID from your ElevenLabs account"));
-    form->addRow(tr("Voice ID"), m_voiceId);
+    m_form->addRow(tr("Voice ID"), m_voiceId);
     m_voiceName = new QLabel(tr("Not checked"), content);
     m_voiceName->setObjectName("ElevenLabsVoiceName");
     m_voiceName->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    form->addRow(tr("Voice name"), m_voiceName);
+    m_form->addRow(tr("Voice name"), m_voiceName);
 
     m_model = new QComboBox(content);
     m_model->setObjectName("Combo");
@@ -157,13 +166,46 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     m_model->addItem("eleven_multilingual_v2", "eleven_multilingual_v2");
     m_model->addItem("eleven_flash_v2_5", "eleven_flash_v2_5");
     m_model->addItem("eleven_v3", "eleven_v3");
-    form->addRow(tr("Model"), m_model);
-    contentLayout->addLayout(form);
+    m_form->addRow(tr("Model"), m_model);
+
+    m_azureRegion = new QComboBox(content);
+    m_azureRegion->setObjectName("Combo");
+    m_azureRegion->setEditable(true);
+    m_azureRegion->addItems({"westeurope", "northeurope", "francecentral", "germanywestcentral",
+                             "uksouth", "eastus", "westus2", "centralus", "brazilsouth",
+                             "eastasia", "southeastasia", "australiaeast"});
+    m_azureRegion->setCurrentText("westeurope");
+    m_form->addRow(tr("Azure region"), m_azureRegion);
+    auto *azureVoiceRow = new QHBoxLayout;
+    azureVoiceRow->setSpacing(6);
+    m_azureVoice = new QComboBox(content);
+    m_azureVoice->setObjectName("Combo");
+    m_azureVoice->setEditable(true);
+    m_azureVoice->setInsertPolicy(QComboBox::NoInsert);
+    m_azureVoice->setPlaceholderText(tr("Voice name, e.g. es-ES-ElviraNeural"));
+    azureVoiceRow->addWidget(m_azureVoice, 1);
+    m_refreshAzureVoicesButton = new Button(content);
+    m_refreshAzureVoicesButton->setText(tr("Refresh"));
+    m_refreshAzureVoicesButton->setFixedSize(72, 24);
+    azureVoiceRow->addWidget(m_refreshAzureVoicesButton);
+    m_form->addRow(tr("Azure voice"), azureVoiceRow);
+    contentLayout->addLayout(m_form);
+
+    // Keep row visibility provider-specific while sharing the key and test controls.
+    m_form->setRowVisible(2, false);
+    m_form->setRowVisible(3, false);
+    m_form->setRowVisible(4, false);
+    m_form->setRowVisible(5, false);
+    m_form->setRowVisible(6, false);
 
     m_testStatus = new QLabel(tr("A short Spanish sample will be generated and played."), content);
     m_testStatus->setWordWrap(true);
     contentLayout->addWidget(m_testStatus);
 
+    m_accountPanel = new QWidget(content);
+    auto *accountLayout = new QVBoxLayout(m_accountPanel);
+    accountLayout->setContentsMargins(0, 0, 0, 0);
+    accountLayout->setSpacing(6);
     auto *accountRow = new QHBoxLayout;
     accountRow->setSpacing(8);
     auto *accountCaption = new QLabel(tr("Account"), content);
@@ -171,7 +213,7 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     m_accountName->setObjectName("ElevenLabsAccountName");
     accountRow->addWidget(accountCaption);
     accountRow->addWidget(m_accountName, 1);
-    contentLayout->addLayout(accountRow);
+    accountLayout->addLayout(accountRow);
 
     auto *creditsRow = new QHBoxLayout;
     creditsRow->setSpacing(8);
@@ -184,12 +226,13 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
     creditsRow->addWidget(creditsCaption);
     creditsRow->addWidget(m_creditStatus, 1);
     creditsRow->addWidget(m_refreshAccountButton);
-    contentLayout->addLayout(creditsRow);
+    accountLayout->addLayout(creditsRow);
 
     m_accountStatus = new QLabel(content);
     m_accountStatus->setObjectName("ElevenLabsAccountStatus");
     m_accountStatus->setWordWrap(true);
-    contentLayout->addWidget(m_accountStatus);
+    accountLayout->addWidget(m_accountStatus);
+    contentLayout->addWidget(m_accountPanel);
 
     auto *buttons = new QHBoxLayout;
     buttons->setSpacing(8);
@@ -211,12 +254,25 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
 
     QSettings stored(QSettings::IniFormat, QSettings::UserScope, "Radit", "Radit");
     stored.beginGroup("ElevenLabs");
-    m_apiKey->setText(unprotectApiKey(stored.value("apiKey").toByteArray()));
-    m_voiceId->setText(stored.value("voiceId").toString());
-    const int modelIndex = m_model->findData(
-        stored.value("model", "eleven_multilingual_v2").toString());
-    m_model->setCurrentIndex(modelIndex >= 0 ? modelIndex : 0);
+    ProviderDraft eleven;
+    eleven.apiKey = unprotectApiKey(stored.value("apiKey").toByteArray());
+    eleven.voiceId = stored.value("voiceId").toString();
+    eleven.model = stored.value("model", "eleven_multilingual_v2").toString();
     stored.endGroup();
+    m_providerDrafts.insert("elevenlabs", eleven);
+    stored.beginGroup("AzureSpeech");
+    ProviderDraft azure;
+    azure.apiKey = unprotectApiKey(stored.value("apiKey").toByteArray());
+    azure.region = stored.value("region", "westeurope").toString();
+    azure.voiceName = stored.value("voiceName", "es-ES-ElviraNeural").toString();
+    azure.voiceLocale = stored.value("voiceLocale", "es-ES").toString();
+    stored.endGroup();
+    m_providerDrafts.insert("azure", azure);
+    int providerIndex = m_provider->findData(stored.value("AIVoices/provider", "elevenlabs").toString());
+    if (providerIndex < 0) providerIndex = 0;
+    m_provider->setCurrentIndex(providerIndex);
+    m_displayedProvider = selectedProvider();
+    applyProviderUi();
 
     connect(cancel, &Button::clicked, this, &QDialog::reject);
     connect(m_testButton, &Button::clicked, this, &ElevenLabsSettingsDialog::testVoice);
@@ -226,13 +282,109 @@ ElevenLabsSettingsDialog::ElevenLabsSettingsDialog(QWidget *parent)
             this, &ElevenLabsSettingsDialog::refreshVoiceName);
     connect(m_apiKey, &QLineEdit::editingFinished,
             this, &ElevenLabsSettingsDialog::refreshVoiceName);
+    connect(m_provider, &QComboBox::currentIndexChanged, this, [this](int) {
+        captureProviderDraft();
+        m_displayedProvider = selectedProvider();
+        applyProviderUi();
+    });
+    connect(m_azureRegion, &QComboBox::currentTextChanged, this, [this]() {
+        ProviderDraft &draft = m_providerDrafts["azure"];
+        draft.region = m_azureRegion->currentText().trimmed();
+        const QString voiceName = azureVoiceName();
+        const QString voiceLocale = azureVoiceLocale();
+        const QSignalBlocker blocker(m_azureVoice);
+        m_azureVoice->clear();
+        m_azureVoice->setEditText(voiceName);
+        draft.voiceName = voiceName;
+        draft.voiceLocale = voiceLocale;
+    });
+    connect(m_azureVoice, &QComboBox::currentTextChanged, this, [this](const QString &) {
+        m_providerDrafts["azure"].voiceName = azureVoiceName();
+        m_providerDrafts["azure"].voiceLocale = azureVoiceLocale();
+    });
+    connect(m_refreshAzureVoicesButton, &Button::clicked,
+            this, &ElevenLabsSettingsDialog::refreshAzureVoices);
     connect(save, &Button::clicked, this, [this]() {
         if (saveSettings()) accept();
     });
     auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     connect(escape, &QShortcut::activated, this, &QDialog::reject);
-    refreshAccountInfo();
-    refreshVoiceName();
+    if (selectedProvider() == "elevenlabs") {
+        refreshAccountInfo();
+        refreshVoiceName();
+    } else {
+        m_azureVoice->setEditText(azure.voiceName);
+    }
+}
+
+QString ElevenLabsSettingsDialog::selectedProvider() const
+{
+    return m_provider ? m_provider->currentData().toString() : QStringLiteral("elevenlabs");
+}
+
+QString ElevenLabsSettingsDialog::azureVoiceName() const
+{
+    const QString id = m_azureVoice->currentData().toString().trimmed();
+    return id.isEmpty() ? m_azureVoice->currentText().trimmed() : id;
+}
+
+QString ElevenLabsSettingsDialog::azureVoiceLocale() const
+{
+    const QString locale = m_azureVoice->currentData(Qt::UserRole + 1).toString().trimmed();
+    return locale.isEmpty() ? QStringLiteral("es-ES") : locale;
+}
+
+void ElevenLabsSettingsDialog::captureProviderDraft()
+{
+    const QString provider = m_displayedProvider.isEmpty() ? selectedProvider() : m_displayedProvider;
+    ProviderDraft &draft = m_providerDrafts[provider];
+    draft.apiKey = m_apiKey->text().trimmed();
+    if (provider == QLatin1String("elevenlabs")) {
+        draft.voiceId = m_voiceId->text().trimmed();
+        draft.model = m_model->currentData().toString();
+    } else {
+        draft.region = m_azureRegion->currentText().trimmed();
+        draft.voiceName = azureVoiceName();
+        draft.voiceLocale = azureVoiceLocale();
+    }
+}
+
+void ElevenLabsSettingsDialog::applyProviderUi()
+{
+    const bool elevenLabs = selectedProvider() == QLatin1String("elevenlabs");
+    const ProviderDraft draft = m_providerDrafts.value(selectedProvider());
+    m_apiKey->setText(draft.apiKey);
+    m_apiKeyLabel->setText(elevenLabs ? tr("API key") : tr("Subscription key"));
+    m_apiKey->setPlaceholderText(elevenLabs ? tr("ElevenLabs API key")
+                                            : tr("Azure Speech subscription key"));
+    m_form->setRowVisible(2, elevenLabs);
+    m_form->setRowVisible(3, elevenLabs);
+    m_form->setRowVisible(4, elevenLabs);
+    m_form->setRowVisible(5, !elevenLabs);
+    m_form->setRowVisible(6, !elevenLabs);
+    m_voiceId->setText(draft.voiceId);
+    m_voiceName->setText(draft.voiceId.isEmpty() ? tr("Enter a Voice ID to look up its name.") : tr("Not checked"));
+    const int modelIndex = m_model->findData(draft.model.isEmpty()
+                                                  ? QStringLiteral("eleven_multilingual_v2")
+                                                  : draft.model);
+    m_model->setCurrentIndex(modelIndex >= 0 ? modelIndex : 0);
+    m_azureRegion->setCurrentText(draft.region.isEmpty() ? QStringLiteral("westeurope") : draft.region);
+    const QSignalBlocker azureVoiceSignals(m_azureVoice);
+    m_azureVoice->clear();
+    m_azureVoice->setEditText(draft.voiceName.isEmpty()
+                                  ? QStringLiteral("es-ES-ElviraNeural") : draft.voiceName);
+    m_accountPanel->setVisible(elevenLabs);
+    m_testStatus->setText(elevenLabs
+        ? tr("A short Spanish sample will be generated and played.")
+        : tr("Azure Speech will generate a short Spanish sample and play it."));
+    if (elevenLabs) {
+        refreshAccountInfo();
+        refreshVoiceName();
+    } else {
+        m_accountName->clear();
+        m_creditStatus->clear();
+        m_accountStatus->clear();
+    }
 }
 
 ElevenLabsSettingsDialog::~ElevenLabsSettingsDialog()
@@ -254,6 +406,61 @@ void ElevenLabsSettingsDialog::clearPreview()
 void ElevenLabsSettingsDialog::testVoice()
 {
     const QString apiKey = m_apiKey->text().trimmed();
+    if (selectedProvider() == QLatin1String("azure")) {
+        const QString region = m_azureRegion->currentText().trimmed();
+        const QString voice = azureVoiceName();
+        if (apiKey.isEmpty() || region.isEmpty() || voice.isEmpty()) {
+            m_testStatus->setText(tr("Enter the Azure subscription key, region and voice first."));
+            return;
+        }
+        clearPreview();
+        m_testButton->setEnabled(false);
+        m_testStatus->setText(tr("Connecting to Azure Speech…"));
+        const QString sample = tr("Esta es una prueba de voz de Radit. Son las %1. La temperatura es de veinte grados.")
+                                   .arg(QLocale(QLocale::Spanish, QLocale::Spain)
+                                            .toString(QTime::currentTime(), "H:mm"));
+        QByteArray ssml;
+        QXmlStreamWriter xml(&ssml);
+        xml.writeStartDocument();
+        xml.writeStartElement(QStringLiteral("speak"));
+        xml.writeAttribute(QStringLiteral("version"), QStringLiteral("1.0"));
+        xml.writeAttribute(QStringLiteral("xmlns"), QStringLiteral("http://www.w3.org/2001/10/synthesis"));
+        xml.writeAttribute(QStringLiteral("xmlns:mstts"), QStringLiteral("https://www.w3.org/2001/mstts"));
+        xml.writeAttribute(QStringLiteral("xml:lang"), QStringLiteral("es-ES"));
+        xml.writeStartElement(QStringLiteral("voice"));
+        xml.writeAttribute(QStringLiteral("name"), voice);
+        xml.writeCharacters(sample);
+        xml.writeEndElement();
+        xml.writeEndElement();
+        xml.writeEndDocument();
+
+        const QUrl url(QStringLiteral("https://") + region
+                       + QStringLiteral(".tts.speech.microsoft.com/cognitiveservices/v1"));
+        QNetworkRequest request(url);
+        request.setTransferTimeout(30000);
+        request.setRawHeader("Ocp-Apim-Subscription-Key", apiKey.toUtf8());
+        request.setRawHeader("X-Microsoft-OutputFormat", "audio-24khz-96kbitrate-mono-mp3");
+        request.setRawHeader("User-Agent", "Radit");
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/ssml+xml");
+        QNetworkReply *reply = m_network->post(request, ssml);
+        connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+            m_testButton->setEnabled(true);
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const QByteArray response = reply->readAll();
+            const QString networkError = reply->errorString();
+            reply->deleteLater();
+            if (status < 200 || status >= 300 || response.isEmpty()) {
+                QString details = QString::fromUtf8(response).trimmed();
+                if (details.size() > 240) details.truncate(240);
+                m_testStatus->setText(status
+                    ? tr("Azure Speech returned HTTP %1. Check the key, region and voice. %2").arg(status).arg(details)
+                    : tr("Could not connect to Azure Speech: %1").arg(networkError));
+                return;
+            }
+            playPreview(response);
+        });
+        return;
+    }
     const QString voiceId = m_voiceId->text().trimmed();
     if (apiKey.isEmpty() || voiceId.isEmpty()) {
         m_testStatus->setText(tr("Enter the API key and Voice ID first."));
@@ -313,41 +520,46 @@ void ElevenLabsSettingsDialog::testVoice()
             return;
         }
 
-        m_previewDirectory = new QTemporaryDir;
-        if (!m_previewDirectory->isValid()) {
-            clearPreview();
-            m_testStatus->setText(tr("Radit could not create a temporary audio file."));
-            return;
-        }
-        QFile file(m_previewDirectory->filePath(QStringLiteral("voice-test.mp3")));
-        if (!file.open(QIODevice::WriteOnly) || file.write(audio) != audio.size()) {
-            clearPreview();
-            m_testStatus->setText(tr("Radit could not save the generated audio."));
-            return;
-        }
-        file.close();
-
-        m_previewMedia = new MediaManager(this);
-        if (!m_previewMedia->setDevice(-1) || !m_previewMedia->loadFile(file.fileName())) {
-            clearPreview();
-            m_testStatus->setText(tr("The voice was generated, but Radit could not play the preview."));
-            return;
-        }
-        connect(m_previewMedia, &MediaManager::playbackFinished, this, [this]() {
-            clearPreview();
-            m_testStatus->setText(tr("Voice test finished."));
-        });
-        connect(m_previewMedia, &MediaManager::playbackError, this, [this](const QString &) {
-            clearPreview();
-            m_testStatus->setText(tr("The voice was generated, but Radit could not play the preview."));
-        });
-        m_testStatus->setText(tr("Playing voice test…"));
-        m_previewMedia->play();
+        playPreview(audio);
     });
+}
+
+void ElevenLabsSettingsDialog::playPreview(const QByteArray &audio)
+{
+    m_previewDirectory = new QTemporaryDir;
+    if (!m_previewDirectory->isValid()) {
+        clearPreview();
+        m_testStatus->setText(tr("Radit could not create a temporary audio file."));
+        return;
+    }
+    QFile file(m_previewDirectory->filePath(QStringLiteral("voice-test.mp3")));
+    if (!file.open(QIODevice::WriteOnly) || file.write(audio) != audio.size()) {
+        clearPreview();
+        m_testStatus->setText(tr("Radit could not save the generated audio."));
+        return;
+    }
+    file.close();
+    m_previewMedia = new MediaManager(this);
+    if (!m_previewMedia->setDevice(-1) || !m_previewMedia->loadFile(file.fileName())) {
+        clearPreview();
+        m_testStatus->setText(tr("The voice was generated, but Radit could not play the preview."));
+        return;
+    }
+    connect(m_previewMedia, &MediaManager::playbackFinished, this, [this]() {
+        clearPreview();
+        m_testStatus->setText(tr("Voice test finished."));
+    });
+    connect(m_previewMedia, &MediaManager::playbackError, this, [this](const QString &) {
+        clearPreview();
+        m_testStatus->setText(tr("The voice was generated, but Radit could not play the preview."));
+    });
+    m_testStatus->setText(tr("Playing voice test…"));
+    m_previewMedia->play();
 }
 
 void ElevenLabsSettingsDialog::refreshAccountInfo()
 {
+    if (selectedProvider() != QLatin1String("elevenlabs")) return;
     const QString apiKey = m_apiKey->text().trimmed();
     if (apiKey.isEmpty()) {
         m_accountName->setText(tr("—"));
@@ -445,6 +657,7 @@ void ElevenLabsSettingsDialog::refreshAccountInfo()
 
 void ElevenLabsSettingsDialog::refreshVoiceName()
 {
+    if (selectedProvider() != QLatin1String("elevenlabs")) return;
     const QString apiKey = m_apiKey->text().trimmed();
     const QString voiceId = m_voiceId->text().trimmed();
     const quint64 lookupSerial = ++m_voiceLookupSerial;
@@ -514,29 +727,101 @@ void ElevenLabsSettingsDialog::refreshVoiceName()
     });
 }
 
+void ElevenLabsSettingsDialog::refreshAzureVoices()
+{
+    const QString apiKey = m_apiKey->text().trimmed();
+    const QString region = m_azureRegion->currentText().trimmed();
+    if (apiKey.isEmpty() || region.isEmpty()) {
+        m_testStatus->setText(tr("Enter the Azure subscription key and region to load voices."));
+        return;
+    }
+    m_refreshAzureVoicesButton->setEnabled(false);
+    m_testStatus->setText(tr("Loading Azure voices…"));
+    QNetworkRequest request(QUrl(QStringLiteral("https://") + region
+        + QStringLiteral(".tts.speech.microsoft.com/cognitiveservices/voices/list")));
+    request.setTransferTimeout(20000);
+    request.setRawHeader("Ocp-Apim-Subscription-Key", apiKey.toUtf8());
+    QNetworkReply *reply = m_network->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, region]() {
+        m_refreshAzureVoicesButton->setEnabled(true);
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray body = reply->readAll();
+        const QString networkError = reply->errorString();
+        reply->deleteLater();
+        const QJsonDocument document = QJsonDocument::fromJson(body);
+        if (status < 200 || status >= 300 || !document.isArray()) {
+            QString details = QString::fromUtf8(body).trimmed();
+            if (details.size() > 240) details.truncate(240);
+            m_testStatus->setText(status
+                ? tr("Azure voice list failed (HTTP %1). Check the key and region. %2").arg(status).arg(details)
+                : tr("Could not connect to Azure Speech: %1").arg(networkError));
+            return;
+        }
+        const QString previousVoice = m_azureVoice->currentText().trimmed();
+        const QString localePrefix = QStringLiteral("es-");
+        m_azureVoice->clear();
+        int preferredIndex = -1;
+        for (const QJsonValue &value : document.array()) {
+            if (!value.isObject()) continue;
+            const QJsonObject voice = value.toObject();
+            const QString shortName = voice.value(QStringLiteral("ShortName")).toString();
+            const QString locale = voice.value(QStringLiteral("Locale")).toString();
+            if (shortName.isEmpty()) continue;
+            const QString display = voice.value(QStringLiteral("DisplayName")).toString();
+            m_azureVoice->addItem(QStringLiteral("%1 — %2 (%3)").arg(display, shortName, locale), shortName);
+            const int index = m_azureVoice->count() - 1;
+            m_azureVoice->setItemData(index, locale, Qt::UserRole + 1);
+            if (shortName == previousVoice) preferredIndex = index;
+            if (preferredIndex < 0 && locale.startsWith(localePrefix)) preferredIndex = index;
+        }
+        if (preferredIndex >= 0) m_azureVoice->setCurrentIndex(preferredIndex);
+        else m_azureVoice->setEditText(previousVoice);
+        ProviderDraft &draft = m_providerDrafts["azure"];
+        draft.region = region;
+        draft.voiceName = azureVoiceName();
+        draft.voiceLocale = azureVoiceLocale();
+        m_testStatus->setText(tr("Loaded %1 Azure voices for %2.").arg(m_azureVoice->count()).arg(region));
+    });
+}
+
 bool ElevenLabsSettingsDialog::saveSettings()
 {
-    const QByteArray protectedKey = protectApiKey(m_apiKey->text().trimmed());
+    captureProviderDraft();
+    const ProviderDraft eleven = m_providerDrafts.value("elevenlabs");
+    const ProviderDraft azure = m_providerDrafts.value("azure");
+    const QByteArray protectedElevenKey = protectApiKey(eleven.apiKey);
+    const QByteArray protectedAzureKey = protectApiKey(azure.apiKey);
 #ifdef Q_OS_WIN
-    if (!m_apiKey->text().trimmed().isEmpty() && protectedKey.isEmpty()) {
-        QMessageBox::warning(this, tr("ElevenLabs settings"),
+    if ((!eleven.apiKey.isEmpty() && protectedElevenKey.isEmpty())
+        || (!azure.apiKey.isEmpty() && protectedAzureKey.isEmpty())) {
+        QMessageBox::warning(this, tr("AI voice settings"),
                              tr("Windows could not securely save the API key."));
         return false;
     }
 #endif
     QSettings stored(QSettings::IniFormat, QSettings::UserScope, "Radit", "Radit");
     stored.beginGroup("ElevenLabs");
-    if (m_apiKey->text().trimmed().isEmpty())
+    if (eleven.apiKey.isEmpty())
         stored.remove("apiKey");
     else
-        stored.setValue("apiKey", protectedKey);
-    stored.setValue("voiceId", m_voiceId->text().trimmed());
-    stored.setValue("model", m_model->currentData().toString());
+        stored.setValue("apiKey", protectedElevenKey);
+    stored.setValue("voiceId", eleven.voiceId);
+    stored.setValue("model", eleven.model.isEmpty() ? QStringLiteral("eleven_multilingual_v2") : eleven.model);
+    stored.endGroup();
+    stored.beginGroup("AzureSpeech");
+    if (azure.apiKey.isEmpty()) stored.remove("apiKey");
+    else stored.setValue("apiKey", protectedAzureKey);
+    stored.setValue("region", azure.region.isEmpty() ? QStringLiteral("westeurope") : azure.region);
+    stored.setValue("voiceName", azure.voiceName);
+    stored.setValue("voiceLocale", azure.voiceLocale.isEmpty() ? QStringLiteral("es-ES") : azure.voiceLocale);
+    stored.endGroup();
+    stored.beginGroup("AIVoices");
+    stored.setValue("provider", selectedProvider());
     stored.endGroup();
     stored.sync();
     if (stored.status() != QSettings::NoError) {
-        QMessageBox::warning(this, tr("ElevenLabs settings"),
-                             tr("Radit could not save the ElevenLabs settings."));
+        QMessageBox::warning(this, tr("AI voice settings"),
+                             tr("Radit could not save the AI voice settings."));
         return false;
     }
     return true;

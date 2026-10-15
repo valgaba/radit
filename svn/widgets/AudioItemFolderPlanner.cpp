@@ -22,15 +22,15 @@ AudioItemFolderPlanner::AudioItemFolderPlanner(const AudioItemFolderMaxi &source
     setAnnouncementVolumePercent(source.announcementVolumePercent());
     setAnnouncementMusicVolumePercent(source.announcementMusicVolumePercent());
     setAnnouncementRecoverySeconds(source.announcementRecoverySeconds());
+    setSweeper(source.sweeperEnabled(), source.sweeperFolderPath(),
+               source.sweeperAtEntry(), source.sweeperAtExit());
     setIsPurge(source.isPurge());
     setIsPlayNext(source.isPlayNext());
     setIsLoop(source.isLoop());
     setIsSelect(source.isSelect());
     setEnabledForPlayback(source.isEnabledForPlayback());
     setColor(source.color());
-    setToolTip(source.toolTip());
-    if (!source.folderPath().isEmpty())
-        setFolderPath(source.folderPath());
+    copyFolderStateFrom(source);
 }
 
 AudioItemMaxi *AudioItemFolderPlanner::copy(QWidget *newParent) const
