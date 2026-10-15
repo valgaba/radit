@@ -88,6 +88,10 @@ QJsonArray saveItems(QLayout *layout)
             object["announcementVolumePercent"] = folder->announcementVolumePercent();
             object["announcementMusicVolumePercent"] = folder->announcementMusicVolumePercent();
             object["announcementRecoverySeconds"] = folder->announcementRecoverySeconds();
+            object["sweeperEnabled"] = folder->sweeperEnabled();
+            object["sweeperFolder"] = folder->sweeperFolderPath();
+            object["sweeperAtEntry"] = folder->sweeperAtEntry();
+            object["sweeperAtExit"] = folder->sweeperAtExit();
         }
         if (auto *meteo = qobject_cast<AudioItemMeteoClockMaxi*>(item)) {
             object["announceTime"] = meteo->announcesTime();
@@ -132,6 +136,10 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             folderItem->setAnnouncementVolumePercent(object["announcementVolumePercent"].toInt(140));
             folderItem->setAnnouncementMusicVolumePercent(object["announcementMusicVolumePercent"].toInt(8));
             folderItem->setAnnouncementRecoverySeconds(object["announcementRecoverySeconds"].toDouble(1.0));
+            folderItem->setSweeper(object["sweeperEnabled"].toBool(false),
+                                   object["sweeperFolder"].toString(),
+                                   object["sweeperAtEntry"].toBool(true),
+                                   object["sweeperAtExit"].toBool(true));
         }
         if (meteo) {
             auto *meteoItem=static_cast<AudioItemMeteoClockMaxi*>(item);
@@ -253,6 +261,10 @@ bool validItems(const QJsonArray &items, LoadingDialog *loading = nullptr)
         if (item.contains("announcementDelaySeconds") && (!item["announcementDelaySeconds"].isDouble()
             || item["announcementDelaySeconds"].toInt(-1) < 0
             || item["announcementDelaySeconds"].toInt(-1) > 30)) return false;
+        if (item.contains("sweeperEnabled") && !item["sweeperEnabled"].isBool()) return false;
+        if (item.contains("sweeperFolder") && !item["sweeperFolder"].isString()) return false;
+        if (item.contains("sweeperAtEntry") && !item["sweeperAtEntry"].isBool()) return false;
+        if (item.contains("sweeperAtExit") && !item["sweeperAtExit"].isBool()) return false;
         if (item.contains("secondStart") && (!item["secondStart"].isDouble()
             || item["secondStart"].toDouble() < 0
             || !std::isfinite(item["secondStart"].toDouble()))) return false;

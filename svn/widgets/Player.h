@@ -8,6 +8,7 @@
 #include <QStyle>
 #include <QPointer>
 #include <QElapsedTimer>
+#include <QStringList>
 
 #include "widgets/button.h"
 #include "widgets/label.h"
@@ -82,7 +83,8 @@ private:
     bool m_purgeOutgoing = false;
     bool m_folderIntroAnnounced = false;
     bool m_folderOutroAnnounced = false;
-    QString m_queuedAnnouncementPath;
+    bool m_folderSweeperAnnounced = false;
+    QStringList m_queuedAnnouncementPaths;
     bool m_mixAttempted = false;
     bool m_pendingMixNeedsPlaybackPreparation = false;
     double m_mixSearchStartPosition = -1.0;
@@ -99,6 +101,7 @@ private:
     void bindMediaManager();
     bool startPreparedItem(AudioItemMaxi *item);
     void checkFolderAnnouncement(const AudioFrame &frame);
+    void queueFolderAnnouncement(const QString &path);
     float folderAnnouncementMusicGain() const;
     void startFolderAnnouncement(const QString &audioPath, int voiceVolumePercent = -1,
                                  int musicVolumePercent = -1, double recoverySeconds = -1.0);

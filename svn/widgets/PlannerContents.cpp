@@ -304,8 +304,16 @@ void PlannerContents::dropEvent(QDropEvent *event)
         auto *audioSource=qobject_cast<AudioItemMaxi*>(source);
         if (!audioSource)
             continue;
-        if (AudioItemMaxi *compact=makePlannerItem(audioSource,this))
-            createItem(compact);
+        AudioItemMaxi *compact=makePlannerItem(audioSource,this);
+        if (!compact || !createItem(compact))
+            continue;
+
+        QWidget *owner=audioSource->parentWidget();
+        while (owner && !qobject_cast<ContentsPlayer*>(owner))
+            owner=owner->parentWidget();
+        auto *sourceContents=qobject_cast<ContentsPlayer*>(owner);
+        if (sourceContents && sourceContents!=this)
+            sourceContents->deleteItem(audioSource);
     }
     event->acceptProposedAction();
 }

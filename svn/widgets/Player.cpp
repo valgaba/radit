@@ -647,7 +647,8 @@ bool Player::startPreparedItem(AudioItemMaxi *item)
        }
        m_folderIntroAnnounced=false;
        m_folderOutroAnnounced=false;
-       m_queuedAnnouncementPath.clear();
+       m_folderSweeperAnnounced=false;
+       m_queuedAnnouncementPaths.clear();
        if (!item->loadPreparedPlayback(mediamanager)) {
            const auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(item);
            qWarning().noquote() << "No se pudo cargar el audio:" << item->playbackName()
@@ -699,19 +700,29 @@ void Player::checkFolderAnnouncement(const AudioFrame &frame)
     if (!m_folderIntroAnnounced && frame.position>=folder->announcementDelaySeconds()) {
         m_folderIntroAnnounced=true;
         const QString path=folder->introAnnouncementPath();
-        if (!path.isEmpty()) {
-            if (m_announcementManager) m_queuedAnnouncementPath=path;
-            else startFolderAnnouncement(path);
-        }
+        if (!path.isEmpty()) queueFolderAnnouncement(path);
+    }
+    if (!m_folderSweeperAnnounced && frame.position>=folder->announcementDelaySeconds()) {
+        m_folderSweeperAnnounced=true;
+        const QString path=folder->sweeperIntroAudioPath();
+        if (!path.isEmpty()) queueFolderAnnouncement(path);
     }
     if (!m_folderOutroAnnounced && m_duration>0.0 && m_duration-frame.position<=10.0) {
         m_folderOutroAnnounced=true;
         const QString path=folder->outroAnnouncementPath();
-        if (!path.isEmpty()) {
-            if (m_announcementManager) m_queuedAnnouncementPath=path;
-            else startFolderAnnouncement(path);
-        }
+        if (!path.isEmpty()) queueFolderAnnouncement(path);
+        const QString sweeperPath=folder->sweeperOutroAudioPath();
+        if (!sweeperPath.isEmpty()) queueFolderAnnouncement(sweeperPath);
     }
+}
+
+void Player::queueFolderAnnouncement(const QString &path)
+{
+    if (path.isEmpty()) return;
+    if (m_announcementManager)
+        m_queuedAnnouncementPaths.append(path);
+    else
+        startFolderAnnouncement(path);
 }
 
 float Player::folderAnnouncementMusicGain() const
@@ -753,8 +764,8 @@ void Player::startFolderAnnouncement(const QString &audioPath, int voiceVolumePe
         m_announcementManager=nullptr;
         voice->stop();
         voice->deleteLater();
-        const QString next=m_queuedAnnouncementPath;
-        m_queuedAnnouncementPath.clear();
+        const QString next=m_queuedAnnouncementPaths.isEmpty()
+            ? QString() : m_queuedAnnouncementPaths.takeFirst();
         if (!next.isEmpty()) startFolderAnnouncement(next);
         else fadeMusicBackAfterAnnouncement();
     });
@@ -769,7 +780,7 @@ void Player::stopFolderAnnouncement()
 {
     if (m_announcementFadeTimer)
         m_announcementFadeTimer->stop();
-    m_queuedAnnouncementPath.clear();
+    m_queuedAnnouncementPaths.clear();
     if (m_announcementManager) {
         MediaManager *voice=m_announcementManager;
         m_announcementManager=nullptr;
@@ -1119,6 +1130,7 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
     emit emissionPlaybackStarted(source,next->playbackName(),next->playbackPath());
     m_folderIntroAnnounced=false;
     m_folderOutroAnnounced=false;
+    m_folderSweeperAnnounced=false;
     m_mixSearchStartPosition = -1.0;
     m_mixSearchStartLevel = -120.0;
     m_mixQuietSincePosition = -1.0;

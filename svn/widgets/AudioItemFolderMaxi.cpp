@@ -13,7 +13,144 @@
 #include <QDateTime>
 #include <QFutureWatcher>
 #include <QRandomGenerator>
+#include <QSet>
 #include <QtConcurrent/QtConcurrentRun>
+#ifdef Q_OS_WIN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
+namespace {
+struct SweeperSequence {
+    QStringList files;
+    QStringList remaining;
+    QString lastFile;
+};
+
+QString nextRandomSweeper(const QString &folderPath)
+{
+    const QFileInfo folderInfo(folderPath);
+    QString key=folderInfo.canonicalFilePath();
+    if (key.isEmpty())
+        key=folderInfo.absoluteFilePath();
+    key=QDir::cleanPath(QDir::fromNativeSeparators(key));
+#ifdef Q_OS_WIN
+    key=key.toCaseFolded();
+#endif
+
+    QStringList files;
+    const QFileInfoList entries=QDir(folderPath).entryInfoList(
+        MediaManager::supportedAudioNameFilters(),QDir::Files | QDir::Readable,QDir::Name);
+    files.reserve(entries.size());
+    for (const QFileInfo &entry : entries)
+        files.append(entry.absoluteFilePath());
+    if (files.isEmpty())
+        return {};
+
+    // Like folder-track selection, sweeper rotation is shared by copies of the
+    // same configured directory and is accessed from the GUI thread.
+    static QHash<QString,SweeperSequence> sequences;
+    SweeperSequence &sequence=sequences[key];
+    if (sequence.files!=files) {
+        sequence.files=files;
+        sequence.remaining=files;
+        sequence.lastFile.clear();
+    }
+    if (sequence.remaining.isEmpty()) {
+        sequence.remaining=sequence.files;
+        for (int i=sequence.remaining.size()-1;i>0;--i) {
+            const int j=QRandomGenerator::global()->bounded(i+1);
+            sequence.remaining.swapItemsAt(i,j);
+        }
+        if (sequence.remaining.size()>1 && sequence.remaining.constFirst()==sequence.lastFile) {
+            const int other=1+QRandomGenerator::global()->bounded(sequence.remaining.size()-1);
+            sequence.remaining.swapItemsAt(0,other);
+        }
+    }
+
+    const QString selected=sequence.remaining.takeFirst();
+    sequence.lastFile=selected;
+    return selected;
+}
+
+QVector<AudioItemFolderMaxi::Track> enumerateAudioTracks(
+    const QString &folder, const QStringList &filters,
+    const std::shared_ptr<std::atomic_bool> &cancel)
+{
+    QVector<AudioItemFolderMaxi::Track> tracks;
+#ifdef Q_OS_WIN
+    QSet<QString> extensions;
+    for (const QString &filter : filters) {
+        const qsizetype dot = filter.lastIndexOf(QLatin1Char('.'));
+        if (dot >= 0)
+            extensions.insert(filter.mid(dot).toCaseFolded());
+    }
+
+    // Enumerate each directory in batches. LARGE_FETCH can reduce round trips
+    // to SMB servers for folders containing thousands of entries.
+    QVector<QString> directories{folder};
+    for (qsizetype directoryIndex = 0;
+         directoryIndex < directories.size() && !cancel->load(); ++directoryIndex) {
+        const QString searchPath = QDir::toNativeSeparators(
+            QDir(directories.at(directoryIndex)).filePath(QStringLiteral("*")));
+        const std::wstring nativeSearchPath = searchPath.toStdWString();
+        WIN32_FIND_DATAW entry{};
+        HANDLE search = FindFirstFileExW(nativeSearchPath.c_str(), FindExInfoBasic,
+                                         &entry, FindExSearchNameMatch, nullptr,
+                                         FIND_FIRST_EX_LARGE_FETCH);
+        DWORD searchError = search == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
+        if (search == INVALID_HANDLE_VALUE
+            && (searchError == ERROR_INVALID_PARAMETER || searchError == ERROR_NOT_SUPPORTED)) {
+            search = FindFirstFileExW(nativeSearchPath.c_str(), FindExInfoBasic,
+                                      &entry, FindExSearchNameMatch, nullptr, 0);
+            searchError = search == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
+        }
+        if (search == INVALID_HANDLE_VALUE
+            && (searchError == ERROR_INVALID_PARAMETER || searchError == ERROR_NOT_SUPPORTED))
+            search = FindFirstFileExW(nativeSearchPath.c_str(), FindExInfoStandard,
+                                      &entry, FindExSearchNameMatch, nullptr, 0);
+        if (search == INVALID_HANDLE_VALUE)
+            continue;
+
+        do {
+            if (cancel->load())
+                break;
+            const QString name = QString::fromWCharArray(entry.cFileName);
+            if (name == QLatin1String(".") || name == QLatin1String(".."))
+                continue;
+            if (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+                continue;
+
+            const QString path = QDir::cleanPath(
+                QDir(directories.at(directoryIndex)).filePath(name));
+            if (entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                directories.append(path);
+            } else {
+                const QString suffix = QLatin1Char('.')
+                    + QFileInfo(name).suffix().toCaseFolded();
+                if (extensions.contains(suffix))
+                    tracks.append({path, 0.0});
+            }
+        } while (FindNextFileW(search, &entry));
+        FindClose(search);
+    }
+#else
+    QDirIterator files(folder, filters, QDir::Files | QDir::Readable | QDir::NoSymLinks,
+                       QDirIterator::Subdirectories);
+    while (!cancel->load() && files.hasNext()) {
+        files.next();
+        const QString path = QDir::cleanPath(files.filePath());
+        if (!path.isEmpty()) tracks.append({path, 0.0});
+    }
+#endif
+    return tracks;
+}
+}
 
 AudioItemFolderMaxi::AudioItemFolderMaxi(QWidget *parent) : AudioItemMaxi(parent)
 {
@@ -114,34 +251,44 @@ QString AudioItemFolderMaxi::resolvedOutroAnnouncement() const
     return text.trimmed();
 }
 
+void AudioItemFolderMaxi::setSweeper(bool enabled, const QString &folderPath,
+                                     bool atEntry, bool atExit)
+{
+    m_sweeperFolderPath = folderPath.trimmed().isEmpty()
+        ? QString() : QDir::cleanPath(QFileInfo(folderPath).absoluteFilePath());
+    m_sweeperEnabled = enabled;
+    m_sweeperAtEntry = atEntry;
+    m_sweeperAtExit = atExit;
+    m_sweeperIntroAudioPath.clear();
+    m_sweeperOutroAudioPath.clear();
+}
+
 bool AudioItemFolderMaxi::prepareAnnouncementAudio()
 {
-    if (!m_announcementsEnabled) {
-        m_introAudioPath.clear();
-        m_outroAudioPath.clear();
-        return true;
-    }
     if (m_announcementPreparing) return false;
     m_introAudioPath.clear();
     m_outroAudioPath.clear();
-    const QString intro=resolvedIntroAnnouncement();
-    const QString outro=resolvedOutroAnnouncement();
-    m_announcementRequests=int(!intro.isEmpty())+int(!outro.isEmpty());
+    const QString intro = m_announcementsEnabled ? resolvedIntroAnnouncement() : QString();
+    const QString outro = m_announcementsEnabled ? resolvedOutroAnnouncement() : QString();
+    m_sweeperIntroAudioPath.clear();
+    m_sweeperOutroAudioPath.clear();
+    if (m_sweeperEnabled && !m_sweeperFolderPath.isEmpty()) {
+        if (m_sweeperAtEntry)
+            m_sweeperIntroAudioPath=nextRandomSweeper(m_sweeperFolderPath);
+        if (m_sweeperAtExit)
+            m_sweeperOutroAudioPath=nextRandomSweeper(m_sweeperFolderPath);
+    }
+    m_announcementRequests = int(!intro.isEmpty()) + int(!outro.isEmpty());
     if (m_announcementRequests==0) return true;
     m_announcementPreparing=true;
-    const auto finished=[this](bool isIntro,const QString &path,const QString &error) {
+    const auto finished=[this](int type,const QString &path,const QString &error) {
         if (!m_announcementsEnabled) {
             m_introAudioPath.clear();
             m_outroAudioPath.clear();
-            if (--m_announcementRequests <= 0) {
-                m_announcementPreparing = false;
-                emit playbackPreparationReady(true);
-            }
-            return;
         }
         if (!path.isEmpty()) {
-            if (isIntro) m_introAudioPath=path;
-            else m_outroAudioPath=path;
+            if (type == 0 && m_announcementsEnabled) m_introAudioPath = path;
+            else if (type == 1 && m_announcementsEnabled) m_outroAudioPath = path;
         } else if (!error.isEmpty()) {
             setToolTip(folderPath()+QStringLiteral("\n")+error);
         }
@@ -151,9 +298,9 @@ bool AudioItemFolderMaxi::prepareAnnouncementAudio()
         }
     };
     if (!intro.isEmpty()) ElevenLabsTts::instance()->generate(intro,this,
-        [finished](const QString &path,const QString &error) { finished(true,path,error); });
+        [finished](const QString &path,const QString &error) { finished(0,path,error); });
     if (!outro.isEmpty()) ElevenLabsTts::instance()->generate(outro,this,
-        [finished](const QString &path,const QString &error) { finished(false,path,error); });
+        [finished](const QString &path,const QString &error) { finished(1,path,error); });
     return false;
 }
 
@@ -272,17 +419,7 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
         }
     });
     watcher->setFuture(QtConcurrent::run([folder, filters, cancel]() {
-        QVector<Track> tracks;
-        QDirIterator files(folder, filters, QDir::Files | QDir::Readable | QDir::NoSymLinks,
-                           QDirIterator::Subdirectories);
-        while (!cancel->load() && files.hasNext()) {
-            files.next();
-            // Enumerate only. Opening every file with BASS to read its duration
-            // makes network folders with thousands of entries take minutes.
-            const QString path = QDir::cleanPath(files.filePath());
-            if (!path.isEmpty()) tracks.append({path, 0.0});
-        }
-        return tracks;
+        return enumerateAudioTracks(folder, filters, cancel);
     }));
 }
 
@@ -337,6 +474,31 @@ QString AudioItemFolderMaxi::playbackName() const
         nameFile() + " — " + QFileInfo(m_currentTrack).completeBaseName();
 }
 
+void AudioItemFolderMaxi::copyFolderStateFrom(const AudioItemFolderMaxi &source)
+{
+    // A loaded folder already owns the complete index. Share it directly when
+    // duplicating an item so network directories are not enumerated again.
+    if (source.m_scanning) {
+        setFolderPath(source.folderPath());
+        return;
+    }
+
+    if (m_cancel) m_cancel->store(true);
+    m_cancel.reset();
+    m_sequence = source.m_sequence;
+    m_tracks = source.m_tracks;
+    m_currentTrack.clear();
+    m_trackPrepared = false;
+    m_scanning = false;
+    m_waitingForScan = false;
+    setFilePath(source.folderPath());
+    setNameFile(source.nameFile());
+    setSecond(0);
+    setSecondStart(0);
+    setToolTip(source.toolTip());
+    setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
+}
+
 AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
 {
     auto *item = new AudioItemFolderMaxi(newParent);
@@ -346,15 +508,12 @@ AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
                                m_announcementDelaySeconds);
     item->setAnnouncementsEnabled(m_announcementsEnabled);
     item->setAnnouncementVolumePercent(m_announcementVolumePercent);
+    item->setAnnouncementMusicVolumePercent(m_announcementMusicVolumePercent);
     item->setAnnouncementRecoverySeconds(m_announcementRecoverySeconds);
+    item->setSweeper(m_sweeperEnabled, m_sweeperFolderPath,
+                     m_sweeperAtEntry, m_sweeperAtExit);
     item->setIsPurge(isPurge()); item->setIsPlayNext(isPlayNext());
     item->setIsLoop(isLoop()); item->setIsSelect(isSelect()); item->setColor(color());
-    if (m_scanning) item->setFolderPath(folderPath());
-    else {
-        item->setFilePath(folderPath()); item->setNameFile(nameFile());
-        item->m_tracks = m_tracks; item->m_sequence = m_sequence;
-        item->setToolTip(toolTip());
-        item->setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
-    }
+    item->copyFolderStateFrom(*this);
     return item;
 }

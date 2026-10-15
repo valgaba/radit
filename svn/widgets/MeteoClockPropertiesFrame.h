@@ -63,7 +63,7 @@ public:
         layout->setSpacing(8);
         root->addWidget(content);
 
-        m_aiVoice = new QCheckBox(tr("Use ElevenLabs voice"), content);
+        m_aiVoice = new QCheckBox(tr("Use AI voice"), content);
         m_aiVoice->setObjectName("MeteoUseElevenLabs");
         m_aiVoice->setChecked(item->usesElevenLabs());
         layout->addWidget(m_aiVoice);
