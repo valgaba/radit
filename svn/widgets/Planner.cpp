@@ -652,6 +652,34 @@ public:
         return false;
     }
 
+    ScheduleSlot *slotAtTime(int second, const ScheduleSlot *except = nullptr) const
+    {
+        for (const TimedSlot &entry : m_slots) {
+            if (entry.widget!=except && entry.widget->entrySecond()==second)
+                return entry.widget;
+        }
+        return nullptr;
+    }
+
+    void removeSlotForPaste(ScheduleSlot *slot)
+    {
+        if (!slot)
+            return;
+        QWidget *owner=this;
+        while (owner && !qobject_cast<Planner*>(owner))
+            owner=owner->parentWidget();
+        if (auto *planner=qobject_cast<Planner*>(owner))
+            planner->prepareForScheduleSlotRemoval(slot);
+        m_dayContents.removeAll(slot->contents());
+        for (qsizetype index=m_slots.size()-1; index>=0; --index) {
+            if (m_slots.at(index).widget==slot)
+                m_slots.removeAt(index);
+        }
+        slot->hide();
+        slot->deleteLater();
+        updateSlotPositions();
+    }
+
     bool hasSlotStartingWithin(int nowMilliseconds, int windowMilliseconds) const
     {
         for (const TimedSlot &entry : m_slots) {
@@ -996,10 +1024,25 @@ private:
         }
 
         const int second=g_scheduleSlotClipboard->entrySecond();
-        if (hasSlotAtTime(second)) {
-            QMessageBox::information(this,tr("Paste schedule slot"),
-                                     tr("This day already has a schedule slot at that time."));
+        ScheduleSlot *movingSlot=g_scheduleSlotClipboardIsCut
+            ? g_scheduleSlotClipboard.data() : nullptr;
+        auto *sourcePage=movingSlot
+            ? dynamic_cast<PlannerDayPage*>(movingSlot->parentWidget()) : nullptr;
+        if (movingSlot && !sourcePage) {
+            g_scheduleSlotClipboard.clear();
+            g_scheduleSlotClipboardIsCut=false;
             return;
+        }
+        ScheduleSlot *existingSlot=slotAtTime(second,
+            sourcePage==this ? movingSlot : nullptr);
+        if (existingSlot) {
+            const auto answer=QMessageBox::question(
+                this,tr("Paste schedule slot"),
+                tr("A schedule slot already exists at that time. Do you want to replace it?"),
+                QMessageBox::Yes|QMessageBox::No,QMessageBox::No);
+            if (answer!=QMessageBox::Yes)
+                return;
+            removeSlotForPaste(existingSlot);
         }
 
         if (!g_scheduleSlotClipboardIsCut) {
@@ -1012,14 +1055,6 @@ private:
             if (m_focusSlot)
                 m_focusSlot(copy);
             markDocumentModified();
-            return;
-        }
-
-        ScheduleSlot *movingSlot=g_scheduleSlotClipboard;
-        auto *sourcePage=dynamic_cast<PlannerDayPage*>(movingSlot->parentWidget());
-        if (!sourcePage) {
-            g_scheduleSlotClipboard.clear();
-            g_scheduleSlotClipboardIsCut=false;
             return;
         }
 
@@ -1078,6 +1113,35 @@ private:
                                     tr("Thursday"),tr("Friday"),tr("Saturday"),
                                     tr("Sunday")};
 
+        bool replaceExisting=false;
+        bool hasCollision=false;
+        for (int targetDay : targetDays) {
+            if (targetDay<0 || targetDay>=pages->count())
+                continue;
+            auto *target=dynamic_cast<PlannerDayPage*>(pages->widget(targetDay));
+            if (!target)
+                continue;
+            const ScheduleSlot *except=(cutOperation && target==sourcePage) ? source : nullptr;
+            if (target->hasSlotAtTime(second,except)) {
+                hasCollision=true;
+                break;
+            }
+        }
+        if (hasCollision) {
+            QMessageBox prompt(QMessageBox::Question,tr("Paste schedule slot"),
+                tr("A schedule slot already exists at that time on one or more selected days."),
+                QMessageBox::NoButton,this);
+            QPushButton *replaceButton=prompt.addButton(tr("Replace"),QMessageBox::AcceptRole);
+            QPushButton *skipButton=prompt.addButton(tr("Skip existing"),QMessageBox::DestructiveRole);
+            prompt.addButton(QMessageBox::Cancel);
+            prompt.setDefaultButton(skipButton);
+            prompt.exec();
+            if (prompt.clickedButton()==replaceButton)
+                replaceExisting=true;
+            else if (prompt.clickedButton()!=skipButton)
+                return;
+        }
+
         for (int targetDay : targetDays) {
             if (targetDay<0 || targetDay>=pages->count())
                 continue;
@@ -1099,9 +1163,13 @@ private:
                 continue;
             }
 
-            if (target->hasSlotAtTime(second)) {
-                skippedDays.append(dayNames.value(targetDay));
-                continue;
+            if (ScheduleSlot *existing=target->slotAtTime(second)) {
+                if (replaceExisting)
+                    target->removeSlotForPaste(existing);
+                else {
+                    skippedDays.append(dayNames.value(targetDay));
+                    continue;
+                }
             }
 
             const bool autoFocus=target->m_contentAutoFocusEnabled;
