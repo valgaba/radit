@@ -33,6 +33,7 @@ public:
     void setDeleteVisible(bool visible);
     void setPropertiesVisible(bool visible);
     void setPasteVisible(bool visible);
+    void setSumDurationsVisible(bool visible);
 
     void setLoadVisible(bool visible);
     void setSaveVisible(bool visible);
@@ -60,6 +61,7 @@ private:
 
     QAction *selectallAction;
     QAction *unselectallAction;
+    QAction *sumDurationsAction;
 
 
     QAction *cutAction;

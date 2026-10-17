@@ -38,11 +38,18 @@
 #include <QVector>
 #include <QHash>
 #include <QSet>
+#include <QDialog>
+#include <QLabel>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrentRun>
 #include <cmath>
 
 
 #include "widgets/ContentsPlayer.h"
+#include "widgets/button.h"
+#include "widgets/frame.h"
+#include "widgets/label.h"
 #include "widgets/AudioItem.h"
 #include "widgets/AudioItemFileMaxi.h"
 #include "widgets/AudioItemFilePlanner.h"
@@ -368,6 +375,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             contentsMenu->setCutVisible(false);
             contentsMenu->setDeleteVisible(false);
             contentsMenu->setPropertiesVisible(false);
+            contentsMenu->setSumDurationsVisible(false);
 
             contentsMenu->setnextVisible(false);
             contentsMenu->setpurgeVisible(false);
@@ -401,12 +409,15 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
         contentsMenu->setselectVisible(true);
 
         bool hasSelection = false;
+        int selectedCount = 0;
         bool canPurge = false;
         for (auto *item : findChildren<AudioItemMaxi*>()) {
             if (!item->isSelect()) continue;
             hasSelection = true;
+            ++selectedCount;
             canPurge |= !item->isLiveStream();
         }
+        contentsMenu->setSumDurationsVisible(selectedCount>0);
         if (!hasSelection) {
             QWidget *target = widget;
             while (target && !qobject_cast<AudioItemMaxi*>(target))
@@ -582,6 +593,106 @@ void ContentsPlayer::unSelectAllItems(){
         }
 
 
+}
+
+void ContentsPlayer::sumSelectedDurations()
+{
+    double totalSeconds=0.0;
+    int selectedCount=0;
+    int unknownCount=0;
+    for (AudioItemMaxi *item : findChildren<AudioItemMaxi*>()) {
+        if (!item || !item->isSelect())
+            continue;
+        ++selectedCount;
+        const auto *fileItem=qobject_cast<AudioItemFileMaxi*>(item);
+        if (!fileItem) {
+            ++unknownCount;
+            continue;
+        }
+        const double duration=fileItem->second();
+        if (!std::isfinite(duration) || duration<=0.0) {
+            ++unknownCount;
+            continue;
+        }
+        totalSeconds+=duration;
+    }
+    if (selectedCount==0)
+        return;
+
+    const qint64 seconds=qRound64(totalSeconds);
+    const QString formatted=QStringLiteral("%1:%2:%3")
+        .arg(seconds/3600,2,10,QLatin1Char('0'))
+        .arg((seconds%3600)/60,2,10,QLatin1Char('0'))
+        .arg(seconds%60,2,10,QLatin1Char('0'));
+
+    QDialog dialog(this);
+    dialog.setObjectName(QStringLiteral("SelectedDurationDialog"));
+    dialog.setWindowFlags(Qt::Dialog|Qt::FramelessWindowHint);
+    dialog.setWindowModality(Qt::WindowModal);
+    dialog.setModal(true);
+    dialog.setWindowTitle(tr("Selected duration"));
+    dialog.setFixedWidth(360);
+    dialog.setStyleSheet(QStringLiteral(
+        "QDialog#SelectedDurationDialog { background:#181e2c; border:1px solid #77859a; }"
+        "QDialog#SelectedDurationDialog QLabel { color:#8a8d96; }"
+        "QDialog#SelectedDurationDialog Frame#framebarra { background:#4e4d7a; border:none; }"
+        "QDialog#SelectedDurationDialog QPushButton { color:#8a8d96; background:#282f40;"
+        " border:1px solid #626b7e; padding:2px 10px; }"
+        "QDialog#SelectedDurationDialog QPushButton:hover { border-color:#80A4AE; background:#30384b; }"));
+
+    auto *root=new QVBoxLayout(&dialog);
+    root->setContentsMargins(0,0,0,0);
+    root->setSpacing(0);
+    auto *titleBar=new Frame(&dialog);
+    titleBar->setObjectName(QStringLiteral("framebarra"));
+    titleBar->setFixedHeight(27);
+    auto *titleLayout=new QHBoxLayout(titleBar);
+    titleLayout->setContentsMargins(8,0,4,0);
+    auto *title=new Label(titleBar);
+    title->setText(dialog.windowTitle());
+    titleLayout->addWidget(title);
+    titleLayout->addStretch(1);
+    auto *close=new Button(titleBar);
+    close->setStyleSheet(QStringLiteral("QPushButton { border:none; background:transparent; padding:0px; }"));
+    close->setFixedSize(18,18);
+    close->SetIcon(QStringLiteral("Close-hover.svg"));
+    close->setIconSize(QSize(15,15));
+    titleLayout->addWidget(close);
+    QObject::connect(close,&QPushButton::clicked,&dialog,&QDialog::accept);
+    root->addWidget(titleBar);
+
+    auto *body=new QWidget(&dialog);
+    auto *bodyLayout=new QVBoxLayout(body);
+    bodyLayout->setContentsMargins(18,16,18,14);
+    bodyLayout->setSpacing(8);
+    auto *duration=new Label(body);
+    duration->setText(formatted);
+    duration->setAlignment(Qt::AlignCenter);
+    QFont durationFont=duration->font();
+    durationFont.setPointSize(durationFont.pointSize()+8);
+    durationFont.setBold(true);
+    duration->setFont(durationFont);
+    duration->setMinimumHeight(46);
+    duration->setStyleSheet(QStringLiteral("color:#80A4AE;"));
+    bodyLayout->addWidget(duration);
+    auto *details=new Label(body);
+    details->setText(tr("Selected items: %1\nItems without a known duration: %2")
+                         .arg(selectedCount).arg(unknownCount));
+    details->setAlignment(Qt::AlignCenter);
+    details->setWordWrap(true);
+    bodyLayout->addWidget(details);
+    root->addWidget(body);
+
+    auto *buttonRow=new QHBoxLayout;
+    buttonRow->setContentsMargins(12,0,12,10);
+    buttonRow->addStretch(1);
+    auto *ok=new Button(&dialog);
+    ok->setText(tr("OK"));
+    ok->setFixedSize(72,25);
+    buttonRow->addWidget(ok);
+    root->addLayout(buttonRow);
+    QObject::connect(ok,&QPushButton::clicked,&dialog,&QDialog::accept);
+    dialog.exec();
 }
 
 void ContentsPlayer::deleteSelected(){

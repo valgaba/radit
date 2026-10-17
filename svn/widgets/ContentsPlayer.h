@@ -49,6 +49,7 @@ public:
 
     void selectAllItems();
     void unSelectAllItems();
+    void sumSelectedDurations();
 
     void deleteSelected();
     void copySelected();

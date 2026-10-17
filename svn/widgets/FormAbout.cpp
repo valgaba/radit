@@ -18,13 +18,22 @@
 #include "widgets/FormAbout.h"
 #include <QCoreApplication>
 #include <QDate>
+#include <QDateTime>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLocale>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPainter>
 #include <QScreen>
 #include <QSvgRenderer>
+#include <QRegularExpression>
 #include <QVBoxLayout>
 
 FormAbout::FormAbout(QWidget *parent) : Frame(parent)
@@ -106,9 +115,84 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     right->addWidget(label("FFmpeg · LAME", "AboutCredits"));
     right->addSpacing(6);
     right->addWidget(label("GNU GPL v3 or later", "AboutCredits"));
+    right->addSpacing(8);
+    const QDate buildDate = QLocale(QLocale::English).toDate(
+        QString::fromLatin1(__DATE__).simplified(), QStringLiteral("MMM d yyyy"));
+    m_buildDateLabel = label(tr("Installed binaries: %1").arg(
+        buildDate.isValid() ? buildDate.toString("dd/MM/yyyy") : tr("Unknown")), "AboutBuildDate");
+    right->addWidget(m_buildDateLabel);
+    m_downloadDateLabel = label(tr("Latest downloadable binaries: %1").arg(tr("Checking…")), "AboutDownloadDate");
+    right->addWidget(m_downloadDateLabel);
     right->addStretch();
     right->addWidget(label(QString("© %1 Victor Algaba").arg(QDate::currentDate().year()), "AboutCopyright"));
     columns->addLayout(right, 1);
+
+    m_network = new QNetworkAccessManager(this);
+    checkLatestDownload();
+}
+
+void FormAbout::checkLatestDownload()
+{
+    // The website currently replaces the binary asset on this stable release tag.
+    // Read the asset's updated_at value so older installed builds can show when a
+    // newer ZIP became available, without treating the tag's original release date
+    // as the date of every subsequent binary upload.
+    const QUrl url(QStringLiteral("https://api.github.com/repos/valgaba/radit/releases/tags/dev-2026-10-05"));
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Radit"));
+    request.setRawHeader("Accept", "application/vnd.github+json");
+    request.setTransferTimeout(10000);
+    auto *reply = m_network->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (!m_downloadDateLabel)
+            return;
+        if (reply->error() != QNetworkReply::NoError) {
+            m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(tr("Unavailable")));
+            return;
+        }
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+            m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(tr("Unavailable")));
+            return;
+        }
+
+        const QJsonArray assets = document.object().value(QStringLiteral("assets")).toArray();
+        QJsonObject selectedAsset;
+        for (const QJsonValue &value : assets) {
+            const QJsonObject asset = value.toObject();
+            const QString name = asset.value(QStringLiteral("name")).toString();
+            if (name.compare(QStringLiteral("radit_1_0_0.zip"), Qt::CaseInsensitive) == 0
+                || name.compare(QStringLiteral("binaries.zip"), Qt::CaseInsensitive) == 0) {
+                selectedAsset = asset;
+                if (name.compare(QStringLiteral("radit_1_0_0.zip"), Qt::CaseInsensitive) == 0)
+                    break;
+            }
+        }
+
+        const QString uploadedAtText = selectedAsset.value(QStringLiteral("updated_at")).toString();
+        QDateTime uploadedAt = QDateTime::fromString(uploadedAtText, Qt::ISODateWithMs);
+        if (!uploadedAt.isValid())
+            uploadedAt = QDateTime::fromString(uploadedAtText, Qt::ISODate);
+        if (selectedAsset.isEmpty() || !uploadedAt.isValid()) {
+            m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(tr("Unavailable")));
+            return;
+        }
+
+        QString downloadVersion = QStringLiteral("1.0.0");
+        const QString assetName = selectedAsset.value(QStringLiteral("name")).toString();
+        const QRegularExpression versionPattern(QStringLiteral("^radit_(\\d+)_(\\d+)_(\\d+)\\.zip$"),
+                                                QRegularExpression::CaseInsensitiveOption);
+        const QRegularExpressionMatch match = versionPattern.match(assetName);
+        if (match.hasMatch())
+            downloadVersion = QStringLiteral("%1.%2.%3").arg(match.captured(1), match.captured(2), match.captured(3));
+
+        const QString date = uploadedAt.toLocalTime().date().toString(QStringLiteral("dd/MM/yyyy"));
+        m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(
+            QStringLiteral("%1 · %2").arg(downloadVersion, date)));
+    });
 }
 
 void FormAbout::showEvent(QShowEvent *event)
