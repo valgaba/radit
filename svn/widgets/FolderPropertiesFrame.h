@@ -25,11 +25,12 @@ class FolderPropertiesFrame : public Frame
 public:
     explicit FolderPropertiesFrame(AudioItemFolderMaxi *item) : Frame(item)
     {
+        const bool orderedList = item->isOrderedList();
         setObjectName("FolderPropertiesFrame");
         setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
         setWindowModality(Qt::WindowModal);
         setAttribute(Qt::WA_DeleteOnClose);
-        setWindowTitle(tr("Audio folder properties"));
+        setWindowTitle(orderedList ? tr("Audio list properties") : tr("Audio folder properties"));
         setWindowIcon(QIcon(":/icons/properties.svg"));
         resize(540, 520);
         auto *root = new QVBoxLayout(this);
@@ -76,12 +77,15 @@ public:
         browse->setFixedHeight(24);
         folderRow->addWidget(folder, 1);
         folderRow->addWidget(browse);
-        form->addRow(tr("Folder"), folderRow);
+        form->addRow(orderedList ? tr("Radit list") : tr("Folder"), folderRow);
         auto *songsPerTurn = new QLineEdit(QString::number(item->songsPerTurn()), this);
         songsPerTurn->setObjectName("FolderSongsPerTurn");
         songsPerTurn->setValidator(new QIntValidator(1, 999, songsPerTurn));
         songsPerTurn->setToolTip(tr("Number of tracks to play from this folder before moving to the next item."));
-        form->addRow(tr("Songs per turn"), songsPerTurn);
+        if (orderedList)
+            songsPerTurn->setVisible(false);
+        else
+            form->addRow(tr("Songs per turn"), songsPerTurn);
         auto *enabled = new QCheckBox(tr("Mix before the audio ends"), this);
         enabled->setObjectName("MixEnabled");
         enabled->setChecked(item->mixEnabled());
@@ -237,8 +241,11 @@ public:
         cancel->setFixedSize(70, 24); save->setFixedSize(70, 24);
         buttons->addWidget(testVoice); buttons->addWidget(cancel); buttons->addWidget(save);
         layout->addLayout(buttons);
-        connect(browse, &Button::clicked, this, [this, folder]() {
-            const QString path = QFileDialog::getExistingDirectory(this, tr("Select audio folder"), folder->text());
+        connect(browse, &Button::clicked, this, [this, folder, orderedList]() {
+            const QString path = orderedList
+                ? QFileDialog::getOpenFileName(this, tr("Select Radit list"), folder->text(),
+                                               tr("Radit List (*.list);;All files (*)"))
+                : QFileDialog::getExistingDirectory(this, tr("Select audio folder"), folder->text());
             if (!path.isEmpty()) folder->setText(QDir::toNativeSeparators(path));
         });
         const auto validate = [=]() {
@@ -257,8 +264,12 @@ public:
             introText->setEnabled(speak);
             outroText->setEnabled(speak);
             testVoice->setEnabled(speak);
-            save->setEnabled(QFileInfo(folder->text()).isDir()
-                && songsPerTurn->hasAcceptableInput()
+            const QFileInfo sourceInfo(folder->text());
+            const bool sourceValid = orderedList ? (sourceInfo.isFile()
+                    && sourceInfo.suffix().compare("list", Qt::CaseInsensitive) == 0)
+                : sourceInfo.isDir();
+            save->setEnabled(sourceValid
+                && (orderedList || songsPerTurn->hasAcceptableInput())
                 && (!enabled->isChecked() || seconds->hasAcceptableInput())
                 && (!useSweeper || QFileInfo(sweeperFolder->text()).isDir())
                 && (!entryCue || introDelay->hasAcceptableInput())
@@ -286,10 +297,19 @@ public:
                     while (owner && !qobject_cast<Player*>(owner)) owner = owner->parentWidget();
                     if (auto *player = qobject_cast<Player*>(owner)) player->stopMain();
                 }
-                item->setFolderPath(path);
+                if (orderedList) {
+                    QString error;
+                    if (!item->setOrderedListPath(path, &error)) {
+                        QMessageBox::warning(this, tr("Audio list"), error);
+                        return;
+                    }
+                } else {
+                    item->setFolderPath(path);
+                }
             }
             item->setMixSettings(enabled->isChecked(), seconds->text().toDouble());
-            item->setSongsPerTurn(songsPerTurn->text().toInt());
+            if (!orderedList)
+                item->setSongsPerTurn(songsPerTurn->text().toInt());
             item->setAnnouncementsEnabled(announcementsEnabled->isChecked());
             const int placement = sweeperPlacement->currentData().toInt();
             item->setSweeper(sweeperEnabled->isChecked(), sweeperFolder->text(),

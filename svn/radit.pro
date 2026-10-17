@@ -38,6 +38,8 @@ SOURCES += \
     widgets/AudioItemFilePlanner.cpp \
     widgets/AudioItemFolderPlanner.cpp \
     widgets/AudioItemFolderMaxi.cpp \
+    widgets/AudioItemListMaxi.cpp \
+    widgets/AudioItemListPlanner.cpp \
     widgets/AudioItemMaxi.cpp \
     widgets/AudioItemNetMaxi.cpp \
     widgets/AudioItemNetPlanner.cpp \
@@ -97,6 +99,8 @@ HEADERS += \
     widgets/AudioItemFilePlanner.h \
     widgets/AudioItemFolderPlanner.h \
     widgets/AudioItemFolderMaxi.h \
+    widgets/AudioItemListMaxi.h \
+    widgets/AudioItemListPlanner.h \
     widgets/FolderPropertiesFrame.h \
     widgets/FilePropertiesFrame.h \
     widgets/AudioItemMaxi.h \

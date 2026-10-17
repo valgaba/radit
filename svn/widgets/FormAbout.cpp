@@ -34,6 +34,7 @@
 #include <QScreen>
 #include <QSvgRenderer>
 #include <QRegularExpression>
+#include <QTime>
 #include <QVBoxLayout>
 
 FormAbout::FormAbout(QWidget *parent) : Frame(parent)
@@ -100,9 +101,18 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     center->addWidget(logo, 0, Qt::AlignHCenter);
     center->addWidget(label("radit", "AboutName"));
     center->addStretch();
+    const QDate buildDate = QLocale(QLocale::English).toDate(
+        QString::fromLatin1(__DATE__).simplified(), QStringLiteral("MMM d yyyy"));
+    const QTime buildTime = QLocale(QLocale::C).toTime(
+        QString::fromLatin1(__TIME__).simplified(), QStringLiteral("HH:mm:ss"));
     const QString version = QCoreApplication::applicationVersion().isEmpty()
         ? QStringLiteral("1.0.0") : QCoreApplication::applicationVersion();
-    center->addWidget(label(tr("Version %1").arg(version), "AboutVersion"));
+    const QString revision = buildDate.isValid() && buildTime.isValid()
+        ? QStringLiteral("rev. %1-%2").arg(buildDate.toString(QStringLiteral("yyyyMMdd")),
+                                          buildTime.toString(QStringLiteral("HHmmss")))
+        : QStringLiteral("rev. unknown");
+    center->addWidget(label(tr("Version %1").arg(QStringLiteral("%1 %2").arg(version, revision)),
+                            "AboutVersion"));
     columns->addLayout(center, 1);
 
     auto *right = new QVBoxLayout;
@@ -116,8 +126,6 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     right->addSpacing(6);
     right->addWidget(label("GNU GPL v3 or later", "AboutCredits"));
     right->addSpacing(8);
-    const QDate buildDate = QLocale(QLocale::English).toDate(
-        QString::fromLatin1(__DATE__).simplified(), QStringLiteral("MMM d yyyy"));
     m_buildDateLabel = label(tr("Installed binaries: %1").arg(
         buildDate.isValid() ? buildDate.toString("dd/MM/yyyy") : tr("Unknown")), "AboutBuildDate");
     right->addWidget(m_buildDateLabel);
@@ -187,7 +195,7 @@ void FormAbout::checkLatestDownload()
         if (match.hasMatch())
             downloadVersion = QStringLiteral("%1.%2.%3").arg(match.captured(1), match.captured(2), match.captured(3));
 
-        const QString date = uploadedAt.toLocalTime().date().toString(QStringLiteral("dd/MM/yyyy"));
+        const QString date = uploadedAt.toLocalTime().toString(QStringLiteral("dd/MM/yyyy HH:mm:ss"));
         m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(
             QStringLiteral("%1 · %2").arg(downloadVersion, date)));
     });

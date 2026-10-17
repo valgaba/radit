@@ -10,6 +10,11 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <utility>
 #include <QDateTime>
 #include <QFutureWatcher>
 #include <QRandomGenerator>
@@ -78,11 +83,38 @@ QString nextRandomSweeper(const QString &folderPath)
     return selected;
 }
 
-QVector<AudioItemFolderMaxi::Track> enumerateAudioTracks(
+struct FolderScan {
+    QVector<AudioItemFolderMaxi::Track> tracks;
+    QHash<QString, QDateTime> directoryStamps;
+    bool rootReadable = false;
+};
+
+#ifdef Q_OS_WIN
+QDateTime fileTimeDateTime(const FILETIME &fileTime)
+{
+    ULARGE_INTEGER ticks{};
+    ticks.LowPart = fileTime.dwLowDateTime;
+    ticks.HighPart = fileTime.dwHighDateTime;
+    constexpr quint64 windowsToUnixEpochMs = 11644473600000ULL;
+    const quint64 fileTimeMs = ticks.QuadPart / 10000ULL;
+    if (fileTimeMs < windowsToUnixEpochMs)
+        return {};
+    return QDateTime::fromMSecsSinceEpoch(qint64(fileTimeMs - windowsToUnixEpochMs), Qt::UTC);
+}
+#endif
+
+FolderScan enumerateAudioTracks(
     const QString &folder, const QStringList &filters,
     const std::shared_ptr<std::atomic_bool> &cancel)
 {
-    QVector<AudioItemFolderMaxi::Track> tracks;
+    FolderScan result;
+    const QFileInfo rootInfo(folder);
+    if (!rootInfo.isDir() || !rootInfo.isReadable())
+        return result;
+    result.rootReadable = true;
+    const QDateTime rootStamp = rootInfo.lastModified();
+    if (rootStamp.isValid())
+        result.directoryStamps.insert(QDir::cleanPath(folder), rootStamp);
 #ifdef Q_OS_WIN
     QSet<QString> extensions;
     for (const QString &filter : filters) {
@@ -129,12 +161,15 @@ QVector<AudioItemFolderMaxi::Track> enumerateAudioTracks(
             const QString path = QDir::cleanPath(
                 QDir(directories.at(directoryIndex)).filePath(name));
             if (entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                const QDateTime stamp = fileTimeDateTime(entry.ftLastWriteTime);
+                if (stamp.isValid())
+                    result.directoryStamps.insert(path, stamp);
                 directories.append(path);
             } else {
                 const QString suffix = QLatin1Char('.')
                     + QFileInfo(name).suffix().toCaseFolded();
                 if (extensions.contains(suffix))
-                    tracks.append({path, 0.0});
+                    result.tracks.append({path, 0.0});
             }
         } while (FindNextFileW(search, &entry));
         FindClose(search);
@@ -145,10 +180,18 @@ QVector<AudioItemFolderMaxi::Track> enumerateAudioTracks(
     while (!cancel->load() && files.hasNext()) {
         files.next();
         const QString path = QDir::cleanPath(files.filePath());
-        if (!path.isEmpty()) tracks.append({path, 0.0});
+        if (path.isEmpty()) continue;
+        const QFileInfo info = files.fileInfo();
+        if (info.isDir()) {
+            const QDateTime stamp = info.lastModified();
+            if (stamp.isValid())
+                result.directoryStamps.insert(path, stamp);
+        } else {
+            result.tracks.append({path, 0.0});
+        }
     }
 #endif
-    return tracks;
+    return result;
 }
 }
 
@@ -158,6 +201,9 @@ AudioItemFolderMaxi::AudioItemFolderMaxi(QWidget *parent) : AudioItemMaxi(parent
     setSecond(0);
     setNameFile(tr("Audio folder"));
     setFolderPresentation(tr("FOLDER"), false);
+    m_refreshTimer.setInterval(45000);
+    connect(&m_refreshTimer, &QTimer::timeout, this, [this]() { checkFolderForChanges(); });
+    m_refreshTimer.start();
     connect(propertiesButton(), &Button::clicked, this, [this]() {
         if (!m_propertiesFrame) {
             m_propertiesFrame = new FolderPropertiesFrame(this);
@@ -357,6 +403,9 @@ void AudioItemFolderMaxi::updateSequence(const QVector<Track> &tracks)
 
 void AudioItemFolderMaxi::setFolderPath(const QString &path)
 {
+    m_orderedList = false;
+    m_orderedListPath.clear();
+    m_nextOrderedTrack = 0;
     if (m_cancel) m_cancel->store(true);
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancel = m_cancel;
@@ -369,14 +418,11 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
     m_tracks.clear(); m_currentTrack.clear();
     setSecond(0); setSecondStart(0);
 
-    // Reuse a recent in-memory index when another item points at the same folder.
-    // Missing files are discarded lazily by preparePlayback().
-    constexpr qint64 cacheLifetimeMs = 2 * 60 * 1000;
-    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-    const qint64 cacheAgeMs = nowMs - (m_sequence ? m_sequence->scannedAtMs : 0);
-    if (m_sequence && m_sequence->scanComplete
-        && cacheAgeMs >= 0 && cacheAgeMs < cacheLifetimeMs) {
+    // Keep a completed in-memory index available. A lightweight background
+    // timestamp check below schedules a refresh if the directory tree changes.
+    if (m_sequence && m_sequence->scanComplete) {
         m_tracks = m_sequence->tracks.values().toVector();
+        m_displayedSequenceRevision = m_sequence->revision;
         m_scanning = false;
         setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
         setToolTip(tr("%1\n%2 audio files — random playback without repeats")
@@ -397,15 +443,20 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
     setFolderPresentation(QString(), false);
     setLoadingPresentation(true);
     const QStringList filters = MediaManager::supportedAudioNameFilters();
-    auto *watcher = new QFutureWatcher<QVector<Track>>(this);
-    connect(watcher, &QFutureWatcher<QVector<Track>>::finished, this, [this, watcher, cancel, folder]() {
-        const auto tracks = watcher->result();
+    auto *watcher = new QFutureWatcher<FolderScan>(this);
+    connect(watcher, &QFutureWatcher<FolderScan>::finished, this, [this, watcher, cancel, folder]() {
+        const FolderScan scan = watcher->result();
         watcher->deleteLater();
         if (cancel != m_cancel || cancel->load()) return;
-        m_tracks = tracks; m_scanning = false;
-        updateSequence(tracks);
-        m_sequence->scannedAtMs = QDateTime::currentMSecsSinceEpoch();
-        m_sequence->scanComplete = true;
+        m_scanning = false;
+        if (scan.rootReadable) {
+            updateSequence(scan.tracks);
+            m_sequence->directoryStamps = scan.directoryStamps;
+            m_sequence->scannedAtMs = QDateTime::currentMSecsSinceEpoch();
+            m_sequence->scanComplete = true;
+        }
+        m_tracks = m_sequence->tracks.values().toVector();
+        m_displayedSequenceRevision = m_sequence->revision;
         setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
         setToolTip(tr("%1\n%2 audio files — random playback without repeats").arg(folder).arg(m_tracks.size()));
         emit scanFinished();
@@ -423,11 +474,199 @@ void AudioItemFolderMaxi::setFolderPath(const QString &path)
     }));
 }
 
+bool AudioItemFolderMaxi::setOrderedListPath(const QString &path, QString *error)
+{
+    if (error) error->clear();
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (error) *error = tr("Cannot read list: %1").arg(file.errorString());
+        return false;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()
+        || !document.object().value("items").isArray()) {
+        if (error) *error = tr("This Radit list does not contain a playable item sequence.");
+        return false;
+    }
+
+    QVector<Track> tracks;
+    const QJsonArray items = document.object().value("items").toArray();
+    for (const QJsonValue &value : items) {
+        if (!value.isObject()) continue;
+        const QJsonObject object = value.toObject();
+        if (object.value("type").toString() != QLatin1String("file")) {
+            if (error) *error = tr("Ordered Radit lists can contain audio files only.");
+            return false;
+        }
+        QString audioPath = object.value("url").toString();
+        if (audioPath.isEmpty()) continue;
+        if (QDir::isRelativePath(audioPath))
+            audioPath = QFileInfo(path).dir().absoluteFilePath(audioPath);
+        audioPath = QDir::cleanPath(QFileInfo(audioPath).absoluteFilePath());
+        if (!QFileInfo(audioPath).isFile()) continue;
+        const double seconds = object.value("second").toDouble();
+        tracks.append({audioPath, std::isfinite(seconds) && seconds > 0.0 ? seconds : 0.0});
+    }
+    if (tracks.isEmpty()) {
+        if (error) *error = tr("The Radit list contains no available audio files.");
+        return false;
+    }
+
+    if (m_cancel) m_cancel->store(true);
+    m_cancel.reset();
+    m_sequence.reset();
+    m_scanning = false;
+    m_waitingForScan = false;
+    m_trackPrepared = false;
+    m_currentTrack.clear();
+    m_orderedList = true;
+    m_orderedListPath = QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+    m_nextOrderedTrack = 0;
+    m_tracks = std::move(tracks);
+    double totalSeconds = 0.0;
+    for (const Track &track : m_tracks) totalSeconds += track.seconds;
+    setFilePath(m_orderedListPath);
+    setNameFile(QFileInfo(path).completeBaseName());
+    setSecond(totalSeconds);
+    setTiempoFile(totalSeconds);
+    setSecondStart(0);
+    setFolderPresentation(tr("%1 files").arg(m_tracks.size()), true);
+    setToolTip(tr("%1\n%2 audio files — ordered Radit list")
+                   .arg(m_orderedListPath).arg(m_tracks.size()));
+    emit scanFinished();
+    return true;
+}
+
+void AudioItemFolderMaxi::resetOrderedListPlayback()
+{
+    if (!m_orderedList) return;
+    m_nextOrderedTrack = 0;
+    m_trackPrepared = false;
+    m_currentTrack.clear();
+}
+
+void AudioItemFolderMaxi::checkFolderForChanges()
+{
+    if (!m_sequence || !m_sequence->scanComplete || m_scanning
+        || m_trackPrepared || m_announcementPreparing)
+        return;
+
+    if (m_displayedSequenceRevision != m_sequence->revision) {
+        m_tracks = m_sequence->tracks.values().toVector();
+        m_displayedSequenceRevision = m_sequence->revision;
+        setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
+        setToolTip(tr("%1\n%2 audio files — random playback without repeats")
+                       .arg(folderPath()).arg(m_tracks.size()));
+    }
+
+    const auto sequence = m_sequence;
+    if (sequence->directoryStamps.isEmpty() || sequence->refreshInProgress
+        || sequence->changeCheckInProgress)
+        return;
+
+    constexpr qint64 checkIntervalMs = 45000;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    if (nowMs - sequence->lastChangeCheckMs < checkIntervalMs)
+        return;
+    sequence->lastChangeCheckMs = nowMs;
+    sequence->changeCheckInProgress = true;
+
+    const auto stamps = sequence->directoryStamps;
+    const std::weak_ptr<Sequence> weakSequence = sequence;
+    auto *watcher = new QFutureWatcher<bool>(this);
+    connect(watcher, &QObject::destroyed, [weakSequence]() {
+        if (const auto current = weakSequence.lock())
+            current->changeCheckInProgress = false;
+    });
+    connect(watcher, &QFutureWatcher<bool>::finished, this, [this, watcher, sequence]() {
+        const bool changed = watcher->result();
+        sequence->changeCheckInProgress = false;
+        watcher->deleteLater();
+        if (changed && m_sequence == sequence && !sequence->refreshInProgress)
+            refreshFolderIndex();
+    });
+    watcher->setFuture(QtConcurrent::run([stamps]() {
+        for (auto it = stamps.cbegin(); it != stamps.cend(); ++it) {
+            const QFileInfo directory(it.key());
+            if (!directory.isDir())
+                return true;
+            const QDateTime currentStamp = directory.lastModified();
+            if (!currentStamp.isValid() || currentStamp != it.value())
+                return true;
+        }
+        return false;
+    }));
+}
+
+void AudioItemFolderMaxi::refreshFolderIndex()
+{
+    const auto sequence = m_sequence;
+    if (!sequence || sequence->refreshInProgress)
+        return;
+
+    sequence->refreshInProgress = true;
+    const QString folder = folderPath();
+    const QStringList filters = MediaManager::supportedAudioNameFilters();
+    const auto cancel = std::make_shared<std::atomic_bool>(false);
+    const std::weak_ptr<Sequence> weakSequence = sequence;
+    auto *watcher = new QFutureWatcher<FolderScan>(this);
+    connect(watcher, &QObject::destroyed, [weakSequence, cancel]() {
+        cancel->store(true);
+        if (const auto current = weakSequence.lock())
+            current->refreshInProgress = false;
+    });
+    connect(watcher, &QFutureWatcher<FolderScan>::finished, this,
+            [this, watcher, sequence, folder]() {
+        const FolderScan scan = watcher->result();
+        sequence->refreshInProgress = false;
+        watcher->deleteLater();
+        // If a network share is temporarily unavailable, keep the playable
+        // index and try again on a later timestamp check.
+        if (m_sequence != sequence || !scan.rootReadable)
+            return;
+
+        updateSequence(scan.tracks);
+        sequence->directoryStamps = scan.directoryStamps;
+        sequence->scannedAtMs = QDateTime::currentMSecsSinceEpoch();
+        m_tracks = sequence->tracks.values().toVector();
+        m_displayedSequenceRevision = sequence->revision;
+        setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
+        setToolTip(tr("%1\n%2 audio files — random playback without repeats")
+                       .arg(folder).arg(m_tracks.size()));
+        emit scanFinished();
+    });
+    watcher->setFuture(QtConcurrent::run([folder, filters, cancel]() {
+        return enumerateAudioTracks(folder, filters, cancel);
+    }));
+}
+
 bool AudioItemFolderMaxi::preparePlayback()
 {
     if (m_trackPrepared) return !m_announcementPreparing;
     if (m_scanning) {
         m_waitingForScan = true;
+        return false;
+    }
+    if (m_orderedList) {
+        if (m_nextOrderedTrack >= m_tracks.size()) {
+            if (!isLoop()) return false;
+            m_nextOrderedTrack = 0;
+        }
+        for (int checked = 0; checked < m_tracks.size(); ++checked) {
+            if (m_nextOrderedTrack >= m_tracks.size()) {
+                if (!isLoop()) break;
+                m_nextOrderedTrack = 0;
+            }
+            const Track track = m_tracks.at(m_nextOrderedTrack++);
+            if (!QFileInfo(track.path).isFile()) continue;
+            m_currentTrack = track.path;
+            setSecond(track.seconds);
+            setTiempoFile(track.seconds);
+            setSecondStart(0);
+            m_trackPrepared = true;
+            return prepareAnnouncementAudio();
+        }
         return false;
     }
     if (!m_sequence || m_sequence->tracks.isEmpty()) return false;
@@ -463,8 +702,10 @@ bool AudioItemFolderMaxi::loadPreparedPlayback(MediaManager *manager)
     const bool loaded=manager->loadFile(m_currentTrack);
     m_trackPrepared=false;
     if (!loaded) return false;
-    setSecond(manager->getDuration());
-    setTiempoFile(second());
+    if (!m_orderedList) {
+        setSecond(manager->getDuration());
+        setTiempoFile(second());
+    }
     return true;
 }
 
@@ -476,6 +717,29 @@ QString AudioItemFolderMaxi::playbackName() const
 
 void AudioItemFolderMaxi::copyFolderStateFrom(const AudioItemFolderMaxi &source)
 {
+    if (source.m_orderedList) {
+        if (m_cancel) m_cancel->store(true);
+        m_cancel.reset();
+        m_sequence.reset();
+        m_scanning = false;
+        m_waitingForScan = false;
+        m_trackPrepared = false;
+        m_orderedList = true;
+        m_orderedListPath = source.m_orderedListPath;
+        m_nextOrderedTrack = 0;
+        m_tracks = source.m_tracks;
+        m_currentTrack.clear();
+        setFilePath(m_orderedListPath);
+        setNameFile(source.nameFile());
+        setSecond(0);
+        setSecondStart(0);
+        setToolTip(source.toolTip());
+        setFolderPresentation(tr("%1 files").arg(m_tracks.size()), !m_tracks.isEmpty());
+        return;
+    }
+    m_orderedList = false;
+    m_orderedListPath.clear();
+    m_nextOrderedTrack = 0;
     // A loaded folder already owns the complete index. Share it directly when
     // duplicating an item so network directories are not enumerated again.
     if (source.m_scanning) {
@@ -486,7 +750,8 @@ void AudioItemFolderMaxi::copyFolderStateFrom(const AudioItemFolderMaxi &source)
     if (m_cancel) m_cancel->store(true);
     m_cancel.reset();
     m_sequence = source.m_sequence;
-    m_tracks = source.m_tracks;
+    m_tracks = m_sequence ? m_sequence->tracks.values().toVector() : source.m_tracks;
+    m_displayedSequenceRevision = m_sequence ? m_sequence->revision : 0;
     m_currentTrack.clear();
     m_trackPrepared = false;
     m_scanning = false;

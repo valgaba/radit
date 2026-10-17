@@ -1,10 +1,12 @@
 #ifndef AUDIOITEMFOLDERMAXI_H
 #define AUDIOITEMFOLDERMAXI_H
 #include "widgets/AudioItemMaxi.h"
+#include <QDateTime>
 #include <QVector>
 #include <QPointer>
 #include <QHash>
 #include <QSet>
+#include <QTimer>
 #include <atomic>
 #include <memory>
 
@@ -16,13 +18,17 @@ public:
     explicit AudioItemFolderMaxi(QWidget *parent = nullptr);
     ~AudioItemFolderMaxi() override;
     void setFolderPath(const QString &path);
+    bool setOrderedListPath(const QString &path, QString *error = nullptr);
+    bool isOrderedList() const { return m_orderedList; }
+    QString orderedListPath() const { return m_orderedList ? m_orderedListPath : QString(); }
+    void resetOrderedListPlayback();
     QString folderPath() const { return filePath(); }
     int fileCount() const { return m_tracks.size(); }
     bool isScanning() const { return m_scanning; }
     bool mixEnabled() const { return m_mixEnabled; }
     double mixSeconds() const { return m_mixSeconds; }
     void setMixSettings(bool enabled, double seconds);
-    int songsPerTurn() const { return m_songsPerTurn; }
+    int songsPerTurn() const { return m_orderedList ? m_tracks.size() : m_songsPerTurn; }
     void setSongsPerTurn(int count) { m_songsPerTurn = qBound(1, count, 999); }
     QString introAnnouncement() const { return m_introAnnouncement; }
     QString outroAnnouncement() const { return m_outroAnnouncement; }
@@ -69,18 +75,27 @@ private:
         QStringList remaining;
         QSet<QString> played;
         QString lastTrack;
+        QHash<QString, QDateTime> directoryStamps;
         quint64 revision = 0;
         qint64 scannedAtMs = 0;
+        qint64 lastChangeCheckMs = 0;
         bool scanComplete = false;
+        bool changeCheckInProgress = false;
+        bool refreshInProgress = false;
     };
     static std::shared_ptr<Sequence> sequenceForFolder(const QString &path);
     static QString trackKey(const QString &path);
     void updateSequence(const QVector<Track> &tracks);
+    void checkFolderForChanges();
+    void refreshFolderIndex();
     bool prepareAnnouncementAudio();
     QVector<Track> m_tracks;
     std::shared_ptr<Sequence> m_sequence;
     QString m_currentTrack;
     bool m_scanning = false;
+    bool m_orderedList = false;
+    QString m_orderedListPath;
+    int m_nextOrderedTrack = 0;
     bool m_waitingForScan = false;
     bool m_mixEnabled = false;
     double m_mixSeconds = 3.0;
@@ -101,7 +116,9 @@ private:
     bool m_announcementPreparing = false;
     bool m_trackPrepared = false;
     int m_announcementRequests = 0;
+    quint64 m_displayedSequenceRevision = 0;
     QPointer<Frame> m_propertiesFrame;
     std::shared_ptr<std::atomic_bool> m_cancel;
+    QTimer m_refreshTimer;
 };
 #endif

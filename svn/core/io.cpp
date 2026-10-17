@@ -34,6 +34,7 @@
 #include "widgets/AudioItemNetMaxi.h"
 #include "widgets/AudioItemNetPlanner.h"
 #include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemListMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFilemaxi.h"
@@ -67,7 +68,7 @@ QJsonArray saveItems(QLayout *layout)
         auto *item = qobject_cast<AudioItemMaxi*>(layout->itemAt(i)->widget());
         if (!item) continue;
         QJsonObject object{
-            {"type", qobject_cast<AudioItemMeteoClockMaxi*>(item) ? "meteo" : qobject_cast<AudioItemFolderMaxi*>(item) ? "folder" :
+            {"type", qobject_cast<AudioItemMeteoClockMaxi*>(item) ? "meteo" : qobject_cast<AudioItemListMaxi*>(item) ? "playlist" : qobject_cast<AudioItemFolderMaxi*>(item) ? "folder" :
                          item->isLiveStream() ? "net" : "file"},
             {"url", item->filePath()}, {"name", item->nameFile()},
             {"second", item->second()}, {"secondStart", item->secondStart()},
@@ -117,16 +118,28 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
         if (path.isEmpty() && !aiMeteo) continue;
         const bool network = MediaManager::isNetworkUrl(path);
         const bool folder = object["type"].toString() == "folder";
+        const bool playlist = object["type"].toString() == "playlist";
+        const bool folderLike = folder || playlist;
         const bool meteo = object["type"].toString() == "meteo";
         const bool plannerNet = network && qobject_cast<PlannerContents*>(contents);
         AudioItemMaxi *item = meteo ? static_cast<AudioItemMaxi*>(new AudioItemMeteoClockMaxi(contents)) :
+            playlist ? static_cast<AudioItemMaxi*>(new AudioItemListMaxi(contents)) :
             folder ? static_cast<AudioItemMaxi*>(new AudioItemFolderMaxi(contents)) :
             plannerNet ? static_cast<AudioItemMaxi*>(new AudioItemNetPlanner(contents)) :
             network ? static_cast<AudioItemMaxi*>(new AudioItemNetMaxi(contents)) :
                       static_cast<AudioItemMaxi*>(new AudioItemFileMaxi(contents));
-        if (folder) {
+        if (folderLike) {
             auto *folderItem = static_cast<AudioItemFolderMaxi*>(item);
-            folderItem->setFolderPath(path);
+            if (playlist) {
+                QString error;
+                if (!folderItem->setOrderedListPath(path, &error)) {
+                    delete item;
+                    loading.setProgress(++completed, total);
+                    continue;
+                }
+            } else {
+                folderItem->setFolderPath(path);
+            }
             folderItem->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
             folderItem->setSongsPerTurn(object["songsPerTurn"].toInt(1));
             folderItem->setAnnouncementTexts(object["introAnnouncement"].toString(),
@@ -155,8 +168,8 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             item->setPlaybackLimitSeconds(object.value("playbackLimitSeconds").toDouble());
         const double seconds = object["second"].toDouble();
         item->setSecond(seconds);
-        if (!network && !folder && !meteo) item->setTiempoFile(seconds);
-        if (!folder && !meteo) item->setSecondStart(object["secondStart"].toDouble());
+        if (!network && !folderLike && !meteo) item->setTiempoFile(seconds);
+        if (!folderLike && !meteo) item->setSecondStart(object["secondStart"].toDouble());
         item->setIsSelect(object["select"].toBool());
         if (belongsToScheduleSlot(contents))
             item->setEnabledForPlayback(object["enabled"].toBool(true));
@@ -228,7 +241,7 @@ bool validItems(const QJsonArray &items, LoadingDialog *loading = nullptr)
         if (!value.isObject()) return false;
         const auto item = value.toObject();
         if (item.contains("type") && (!item["type"].isString() ||
-            !QStringList{"file", "net", "folder", "meteo"}.contains(item["type"].toString()))) return false;
+            !QStringList{"file", "net", "folder", "playlist", "meteo"}.contains(item["type"].toString()))) return false;
         const bool aiMeteo=item["type"].toString()=="meteo" && item["useElevenLabs"].toBool();
         if (!item["url"].isString() || (item["url"].toString().isEmpty() && !aiMeteo)
             || !item["name"].isString() || !item["second"].isDouble()
