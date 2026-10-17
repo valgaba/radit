@@ -133,11 +133,11 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
 
 void FormAbout::checkLatestDownload()
 {
-    // The website currently replaces the binary asset on this stable release tag.
+    // The website's fixed download URL points to this stable release and asset.
     // Read the asset's updated_at value so older installed builds can show when a
     // newer ZIP became available, without treating the tag's original release date
     // as the date of every subsequent binary upload.
-    const QUrl url(QStringLiteral("https://api.github.com/repos/valgaba/radit/releases/tags/dev-2026-10-05"));
+    const QUrl url(QStringLiteral("https://api.github.com/repos/valgaba/radit/releases/tags/radit-1.0.0"));
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Radit"));
     request.setRawHeader("Accept", "application/vnd.github+json");
@@ -164,11 +164,9 @@ void FormAbout::checkLatestDownload()
         for (const QJsonValue &value : assets) {
             const QJsonObject asset = value.toObject();
             const QString name = asset.value(QStringLiteral("name")).toString();
-            if (name.compare(QStringLiteral("radit_1_0_0.zip"), Qt::CaseInsensitive) == 0
-                || name.compare(QStringLiteral("binaries.zip"), Qt::CaseInsensitive) == 0) {
+            if (name.compare(QStringLiteral("radit_1_0_0.zip"), Qt::CaseInsensitive) == 0) {
                 selectedAsset = asset;
-                if (name.compare(QStringLiteral("radit_1_0_0.zip"), Qt::CaseInsensitive) == 0)
-                    break;
+                break;
             }
         }
 
