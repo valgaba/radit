@@ -48,6 +48,7 @@ void ContentsMenu::setCutVisible(bool visible) { if (cutAction) cutAction->setVi
 void ContentsMenu::setDeleteVisible(bool visible) { if (deleteAction) deleteAction->setVisible(visible); }
 void ContentsMenu::setPropertiesVisible(bool visible) { if (propertiesAction) propertiesAction->setVisible(visible); }
 void ContentsMenu::setPasteVisible(bool visible) { if (pasteAction) pasteAction->setVisible(visible); }
+void ContentsMenu::setSumDurationsVisible(bool visible) { if (sumDurationsAction) sumDurationsAction->setVisible(visible); }
 
 void ContentsMenu::setLoadVisible(bool visible) { if (loadAction) loadAction->setVisible(visible); }
 void ContentsMenu::setSaveVisible(bool visible) { if (saveAction) saveAction->setVisible(visible); }
@@ -78,6 +79,7 @@ void ContentsMenu::setupActions() {
 
     selectallAction = new QAction("SelectAll", this);
     unselectallAction = new QAction("UnselectAll", this);
+    sumDurationsAction = new QAction(tr("Sum selected item durations"), this);
 
     cutAction = new QAction("Cut", this);
     copyAction = new QAction("Copy", this);
@@ -113,6 +115,7 @@ void ContentsMenu::setupActions() {
      addSeparator();
      Menu::addAction(selectallAction);
      Menu::addAction(unselectallAction);
+     sumDurationsAction->setVisible(false);
 
     addSeparator();
     Menu::addAction(nextItemAction);
@@ -133,6 +136,7 @@ void ContentsMenu::setupActions() {
 
     addSeparator();
     Menu::addAction(refreshDurationsAction);
+    Menu::addAction(sumDurationsAction);
 
     addSeparator();
     Menu::addAction(propertiesAction);
@@ -152,6 +156,7 @@ void ContentsMenu::connectActions() {
 
     connect(selectallAction, &QAction::triggered, player, &ContentsPlayer::selectAllItems);
     connect(unselectallAction, &QAction::triggered, player, &ContentsPlayer::unSelectAllItems);
+    connect(sumDurationsAction, &QAction::triggered, player, &ContentsPlayer::sumSelectedDurations);
 
     connect(deleteAction, &QAction::triggered, player, &ContentsPlayer::deleteSelected);
     connect(copyAction, &QAction::triggered, player, &ContentsPlayer::copySelected);

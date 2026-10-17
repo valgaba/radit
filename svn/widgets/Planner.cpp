@@ -3040,9 +3040,11 @@ bool Planner::applyStandbyListChange(const QString &path, QString *error)
         }
     }
     for (AudioItemMaxi *item : stagedItems) {
-        AudioItemMaxi *copy=item->copy(m_fallbackContents);
-        if (copy)
-            m_fallbackContents->createItem(copy);
+        // Keep the staged item itself: copying a folder item starts another
+        // directory scan, which can double the delay for large or network folders.
+        if (staged.layout)
+            staged.layout->removeWidget(item);
+        m_fallbackContents->createItem(item);
     }
     m_fallbackContents->setListFileName(QFileInfo(path).absoluteFilePath());
     updateStandbyBarTitle();
