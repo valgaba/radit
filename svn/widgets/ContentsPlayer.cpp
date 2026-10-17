@@ -54,6 +54,8 @@
 #include "widgets/AudioItemFileMaxi.h"
 #include "widgets/AudioItemFilePlanner.h"
 #include "widgets/AudioItemFolderPlanner.h"
+#include "widgets/AudioItemListMaxi.h"
+#include "widgets/AudioItemListPlanner.h"
 #include "widgets/AudioItemMeteoClockPlanner.h"
 #include "widgets/AudioItemNetPlanner.h"
 #include "core/io.h"
@@ -63,7 +65,9 @@ namespace {
 AudioItemMaxi *makeMaxiItem(AudioItemMaxi *source, QWidget *parent)
 {
     AudioItemMaxi *item=nullptr;
-    if (auto *file=qobject_cast<AudioItemFilePlanner*>(source))
+    if (auto *list=qobject_cast<AudioItemListPlanner*>(source))
+        item=list->AudioItemListMaxi::copy(parent);
+    else if (auto *file=qobject_cast<AudioItemFilePlanner*>(source))
         item=file->AudioItemFileMaxi::copy(parent);
     else if (auto *folder=qobject_cast<AudioItemFolderPlanner*>(source))
         item=folder->AudioItemFolderMaxi::copy(parent);

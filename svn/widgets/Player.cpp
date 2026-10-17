@@ -676,7 +676,8 @@ bool Player::startPreparedItem(AudioItemMaxi *item)
        const double loadedDuration=mediamanager->getDuration();
        if (loadedDuration>0.0) {
            m_duration=loadedDuration;
-           if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(item)) {
+           if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(item);
+               folderItem && !folderItem->isOrderedList()) {
                folderItem->setSecond(loadedDuration);
                folderItem->setTiempoFile(loadedDuration);
            }
@@ -821,6 +822,10 @@ bool Player::startSequentialPlayback(ContentsBase *contents, bool repeat)
     if (currentItem)
         stopMain();
     m_sequenceContents=contents;
+    for (int index=0; index<contents->layout->count(); ++index) {
+        auto *folder=qobject_cast<AudioItemFolderMaxi*>(contents->layout->itemAt(index)->widget());
+        if (folder) folder->resetOrderedListPlayback();
+    }
     m_sequenceRepeat=repeat;
     m_stopSequenceAtTrackEnd=false;
     m_sequenceIndex=-1;
@@ -956,6 +961,12 @@ void Player::advanceSequence()
         emit sequentialPlaybackFinished();
         return;
     }
+    if (next>=count && m_sequenceRepeat) {
+        for (int index=0; index<count; ++index) {
+            auto *folder=qobject_cast<AudioItemFolderMaxi*>(contents->layout->itemAt(index)->widget());
+            if (folder) folder->resetOrderedListPlayback();
+        }
+    }
     stopMain();
     if (playSequenceFrom(next))
         return;
@@ -1032,12 +1043,16 @@ bool Player::tryFolderMix(const AudioFrame &frame)
     auto *nextFolder = qobject_cast<AudioItemFolderMaxi*>(next);
     const auto oldSequence = nextFolder && nextFolder->m_sequence
         ? std::make_unique<AudioItemFolderMaxi::Sequence>(*nextFolder->m_sequence) : nullptr;
+    const int oldOrderedTrackIndex = nextFolder ? nextFolder->m_nextOrderedTrack : 0;
     const QString oldTrack = nextFolder ? nextFolder->m_currentTrack : QString();
     const double oldSeconds = next->second(), oldStart = next->secondStart();
     const auto restoreSelection = [&]() {
-        if (!nextFolder || !oldSequence) return;
-        if (nextFolder->m_sequence->revision == oldSequence->revision + 1)
+        if (!nextFolder) return;
+        if (oldSequence && nextFolder->m_sequence
+            && nextFolder->m_sequence->revision == oldSequence->revision + 1)
             *nextFolder->m_sequence = *oldSequence;
+        else if (nextFolder->m_orderedList)
+            nextFolder->m_nextOrderedTrack = oldOrderedTrackIndex;
         nextFolder->m_currentTrack = oldTrack;
         nextFolder->setSecond(oldSeconds); nextFolder->setTiempoFile(oldSeconds); nextFolder->setSecondStart(oldStart);
     };

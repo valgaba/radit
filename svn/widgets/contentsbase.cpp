@@ -43,6 +43,7 @@
 
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemListMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include "widgets/AudioItemFilemaxi.h"
 #include "core/io.h"
@@ -189,18 +190,14 @@ void ContentsBase::importNextDroppedFile()
         m_dropLoading->setDetail(tr("Reading: %1 (%2/%3)")
             .arg(info.fileName()).arg(m_dropIndex + 1).arg(m_dropPaths.size()));
     if (info.suffix().compare("list", Qt::CaseInsensitive) == 0) {
-        QWidget *owner = this;
-        while (owner && !qobject_cast<TabPlayer*>(owner)) owner = owner->parentWidget();
-        auto *tabs = qobject_cast<TabPlayer*>(owner);
-        if (m_dropLoading) m_dropLoading->hide();
-        QPointer<ContentsBase> target(this);
-        Io io;
         QString error;
-        const bool loaded = tabs ? tabs->loadListFile(path, &error)
-                                 : io.LoadListPlayer(this, path, &error);
-        if (!target) return;
-        if (!loaded) QMessageBox::warning(this, tr("Load list"), error);
-        if (m_dropLoading) m_dropLoading->show();
+        auto *item = new AudioItemListMaxi(this);
+        if (item->setOrderedListPath(path, &error))
+            createItem(item);
+        else {
+            delete item;
+            QMessageBox::warning(this, tr("Radit list"), error);
+        }
         finishDroppedFile();
         return;
     }
