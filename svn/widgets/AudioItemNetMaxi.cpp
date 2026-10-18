@@ -27,7 +27,7 @@ bool AudioItemNetMaxi::setUrl(const QString &text)
 
 bool AudioItemNetMaxi::editStation()
 {
-    NetPropertiesDialog dialog(nameFile(),url(),-1,this);
+    NetPropertiesDialog dialog(nameFile(),url(),-1,this,mixEnabled(),mixSeconds());
     if (dialog.exec()!=QDialog::Accepted)
         return false;
     if (isPlaying()) {
@@ -37,7 +37,15 @@ bool AudioItemNetMaxi::editStation()
     }
     setUrl(dialog.streamUrl());
     setNameFile(dialog.stationName());
+    setMixSettings(dialog.mixEnabled(),dialog.mixSeconds());
     return true;
+}
+
+void AudioItemNetMaxi::setMixSettings(bool enabled, double seconds)
+{
+    m_mixEnabled=enabled;
+    m_mixSeconds=qBound(0.1,seconds,30.0);
+    emit itemStateChanged();
 }
 
 AudioItemMaxi *AudioItemNetMaxi::copy(QWidget *newParent) const
@@ -49,5 +57,6 @@ AudioItemMaxi *AudioItemNetMaxi::copy(QWidget *newParent) const
     item->setIsPlayNext(isPlayNext());
     item->setIsPurge(isPurge());
     item->setColor(color());
+    item->setMixSettings(mixEnabled(),mixSeconds());
     return item;
 }

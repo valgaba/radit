@@ -284,13 +284,15 @@ void ScheduleSlot::setStandbyListPath(const QString &path)
     const QString listName=QFileInfo(m_standbyListPath).completeBaseName();
     setName(listName.isEmpty() ? tr("noname") : listName);
     m_nameLabel->setToolTip(m_standbyListPath);
-    m_toggleContents->setText(QStringLiteral("↻"));
+    m_toggleContents->setText(QString());
+    m_toggleContents->SetIcon("pending_actions.svg");
+    m_toggleContents->setIconSize(QSize(18,18));
     m_toggleContents->setEnabled(false);
     m_toggleContents->setToolTip(tr("Standby list change event"));
     m_scrollArea->hide();
     m_header->setFixedHeight(30);
-    m_duration->setFixedWidth(46);
-    m_duration->setText(tr("LIST"));
+    m_duration->setFixedWidth(96);
+    m_duration->setText(tr("STANDBY"));
     setTimelineHeight(32);
 }
 
@@ -299,7 +301,7 @@ void ScheduleSlot::setTotalDuration(double seconds, bool known)
     m_totalDurationSeconds=seconds;
     m_totalDurationKnown=known && std::isfinite(seconds) && seconds>=0.0;
     if (m_standbyListEvent) {
-        m_duration->setText(tr("LIST"));
+        m_duration->setText(tr("STANDBY"));
         return;
     }
     if (!m_totalDurationKnown) {

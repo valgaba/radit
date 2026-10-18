@@ -11,10 +11,13 @@
 
 #include <QDialogButtonBox>
 #include <QAbstractSpinBox>
+#include <QCheckBox>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLineEdit>
+#include <QDoubleValidator>
+#include <QLocale>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QShortcut>
@@ -24,7 +27,8 @@
 #include <QWindow>
 
 NetPropertiesDialog::NetPropertiesDialog(const QString &name, const QString &url,
-                                         int connectionDurationSeconds, QWidget *parent)
+                                         int connectionDurationSeconds, QWidget *parent,
+                                         bool mixEnabled, double mixSeconds)
     : QDialog(parent)
 {
     setObjectName("OnlineRadioDialog");
@@ -32,7 +36,24 @@ NetPropertiesDialog::NetPropertiesDialog(const QString &name, const QString &url
     setWindowIcon(QIcon(":/icons/radit.ico"));
     setWindowFlags(Qt::Dialog|Qt::FramelessWindowHint);
     setWindowModality(Qt::WindowModal);
-    resize(520,connectionDurationSeconds>=0 ? 205 : 165);
+    resize(520,connectionDurationSeconds>=0 ? 285 : 245);
+    setStyleSheet(
+        "QDialog#OnlineRadioDialog { background:#181e2c; border:1px solid #77859a; }"
+        "QDialog#OnlineRadioDialog QLabel, QCheckBox { color:#8a8d96; }"
+        "QDialog#OnlineRadioDialog QCheckBox { spacing:6px; }"
+        "QDialog#OnlineRadioDialog QCheckBox::indicator { width:13px; height:13px;"
+        " border:1px solid #5b6070; background:#202635; border-radius:2px; }"
+        "QDialog#OnlineRadioDialog QCheckBox::indicator:checked {"
+        " background:#80A4AE; border:1px solid #80A4AE; }"
+        "QDialog#OnlineRadioDialog QLineEdit, QTimeEdit { color:#80A4AE; background:#282f40;"
+        " border:1px solid #535b6a; border-radius:3px; padding:2px 6px;"
+        " selection-background-color:#4e4d7a; selection-color:white; }"
+        "QDialog#OnlineRadioDialog QLineEdit:focus, QTimeEdit:focus { border-color:#80A4AE; }"
+        "QDialog#OnlineRadioDialog QTimeEdit::up-button, QTimeEdit::down-button { width:0; }"
+        "QDialog#OnlineRadioDialog QPushButton { color:#8a8d96; background:#282f40;"
+        " border:1px solid #5b6070; border-radius:2px; padding:2px 8px; }"
+        "QDialog#OnlineRadioDialog QPushButton:hover { border-color:#80A4AE; background:#30384b; }"
+        "QDialog#OnlineRadioDialog Frame#framebarra { background:#4e4d7a; border:none; }");
 
     auto *root=new QVBoxLayout(this);
     root->setContentsMargins(0,0,0,0);
@@ -85,6 +106,19 @@ NetPropertiesDialog::NetPropertiesDialog(const QString &name, const QString &url
         m_connectionDuration->setToolTip(tr("Stop playback after this connection time"));
         form->addRow(tr("Connection time"),m_connectionDuration);
     }
+    m_mixEnabled = new QCheckBox(tr("Mix before the audio ends"),content);
+    m_mixEnabled->setObjectName("MixEnabled");
+    m_mixEnabled->setChecked(mixEnabled);
+    form->addRow(m_mixEnabled);
+    m_mixSeconds = new QLineEdit(QString::number(mixSeconds,'f',1),content);
+    m_mixSeconds->setObjectName("MixSeconds");
+    auto *mixValidator = new QDoubleValidator(0.1,30.0,1,m_mixSeconds);
+    mixValidator->setLocale(QLocale::c());
+    mixValidator->setNotation(QDoubleValidator::StandardNotation);
+    m_mixSeconds->setValidator(mixValidator);
+    form->addRow(tr("Mix duration (seconds)"),m_mixSeconds);
+    connect(m_mixEnabled,&QCheckBox::toggled,m_mixSeconds,&QLineEdit::setEnabled);
+    m_mixSeconds->setEnabled(mixEnabled);
     contentLayout->addLayout(form);
 
     auto *buttons=new QHBoxLayout;
@@ -103,7 +137,8 @@ NetPropertiesDialog::NetPropertiesDialog(const QString &name, const QString &url
 
     const auto validate=[this,save]() {
         save->setEnabled(!m_name->text().trimmed().isEmpty()
-                         && MediaManager::isNetworkUrl(m_url->text()));
+                         && MediaManager::isNetworkUrl(m_url->text())
+                         && (!m_mixEnabled->isChecked() || m_mixSeconds->hasAcceptableInput()));
     };
     connect(m_name,&QLineEdit::textChanged,this,validate);
     connect(m_url,&QLineEdit::textChanged,this,validate);
@@ -132,6 +167,18 @@ bool NetPropertiesDialog::hasConnectionDuration() const
 int NetPropertiesDialog::connectionDurationSeconds() const
 {
     return m_connectionDuration ? QTime(0,0).secsTo(m_connectionDuration->time()) : -1;
+}
+
+bool NetPropertiesDialog::mixEnabled() const
+{
+    return m_mixEnabled && m_mixEnabled->isChecked();
+}
+
+double NetPropertiesDialog::mixSeconds() const
+{
+    bool ok=false;
+    const double seconds=m_mixSeconds ? m_mixSeconds->text().toDouble(&ok) : 3.0;
+    return ok ? seconds : 3.0;
 }
 
 bool NetPropertiesDialog::eventFilter(QObject *watched, QEvent *event)

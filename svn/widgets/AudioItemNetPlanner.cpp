@@ -26,6 +26,7 @@ AudioItemNetPlanner::AudioItemNetPlanner(const AudioItemNetMaxi &source, QWidget
     setIsPlayNext(source.isPlayNext());
     setIsPurge(source.isPurge());
     setColor(source.color());
+    setMixSettings(source.mixEnabled(),source.mixSeconds());
     setToolTip(source.toolTip());
     if (source.playbackLimitSeconds() > 0.0)
         setConnectionDurationSeconds(qRound(source.playbackLimitSeconds()));
@@ -48,7 +49,8 @@ void AudioItemNetPlanner::setConnectionDurationSeconds(int seconds)
 
 bool AudioItemNetPlanner::editStation()
 {
-    NetPropertiesDialog dialog(nameFile(),url(),m_connectionDurationSeconds,this);
+    NetPropertiesDialog dialog(nameFile(),url(),m_connectionDurationSeconds,this,
+                               mixEnabled(),mixSeconds());
     if (dialog.exec()!=QDialog::Accepted)
         return false;
 
@@ -62,5 +64,6 @@ bool AudioItemNetPlanner::editStation()
     setUrl(dialog.streamUrl());
     setNameFile(dialog.stationName());
     setConnectionDurationSeconds(dialog.connectionDurationSeconds());
+    setMixSettings(dialog.mixEnabled(),dialog.mixSeconds());
     return true;
 }

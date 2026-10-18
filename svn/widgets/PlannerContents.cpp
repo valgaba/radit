@@ -105,6 +105,16 @@ AudioItemMaxi *PlannerContents::createItem(AudioItemMaxi *item)
         created->setPlannerEnableControlVisible(owner!=nullptr);
         if (!owner)
             created->setEnabledForPlayback(true);
+        if (qobject_cast<AudioItemListMaxi*>(created))
+            created->setPlannerTypeIcon(QStringLiteral(":/icons/list2.svg"));
+        else if (qobject_cast<AudioItemFolderMaxi*>(created))
+            created->setPlannerTypeIcon(QStringLiteral(":/icons/folder.svg"));
+        else if (qobject_cast<AudioItemFileMaxi*>(created))
+            created->setPlannerTypeIcon(QStringLiteral(":/icons/audiofile.svg"));
+        else if (qobject_cast<AudioItemNetMaxi*>(created))
+            created->setPlannerTypeIcon(QStringLiteral(":/icons/net.svg"));
+        else if (qobject_cast<AudioItemMeteoClockMaxi*>(created))
+            created->setPlannerTypeIcon(QStringLiteral(":/icons/meteo.svg"));
         connect(created,&AudioItemMaxi::propertiesOpened,this,[this]() {
             emit contentModified();
         });
@@ -173,7 +183,14 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     QAction *loadListAction=nullptr;
     QAction *saveListAction=nullptr;
     QAction *saveListAsAction=nullptr;
+    QAction *loadStandbyAction=nullptr;
+    QAction *saveStandbyAction=nullptr;
+    QAction *saveStandbyAsAction=nullptr;
     if (m_listFileActionsEnabled) {
+        menu.addSeparator();
+        loadStandbyAction=menu.addAction(tr("Load Standby"));
+        saveStandbyAction=menu.addAction(tr("Save Standby"));
+        saveStandbyAsAction=menu.addAction(tr("Save Standby As"));
         menu.addSeparator();
         loadListAction=menu.addAction(tr("Load list"));
         saveListAction=menu.addAction(tr("Save list"));
@@ -230,6 +247,18 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
         if (item)
             item->triggerProperties();
     }
+    else if (chosen && (chosen==loadStandbyAction || chosen==saveStandbyAction
+                        || chosen==saveStandbyAsAction)) {
+        QWidget *owner=parentWidget();
+        while (owner && !qobject_cast<Planner*>(owner))
+            owner=owner->parentWidget();
+        if (auto *planner=qobject_cast<Planner*>(owner)) {
+            if (chosen==loadStandbyAction)
+                planner->loadStandbyFile();
+            else
+                planner->saveStandbyFile(chosen==saveStandbyAsAction);
+        }
+    }
     else if (loadListAction && chosen==loadListAction) {
         const int oldItemCount=findChildren<AudioItemMaxi*>().size();
         const QString oldListFile=listFileName();
@@ -244,7 +273,15 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     else if (saveListAsAction && chosen==saveListAsAction) {
         const QString oldListFile=listFileName();
         saveAsItems();
-        refreshPlannerStandbyTitle(this,oldListFile!=listFileName());
+        const bool changedListFile=oldListFile!=listFileName();
+        refreshPlannerStandbyTitle(this,changedListFile);
+        if (changedListFile) {
+            QWidget *owner=parentWidget();
+            while (owner && !qobject_cast<Planner*>(owner))
+                owner=owner->parentWidget();
+            if (auto *planner=qobject_cast<Planner*>(owner))
+                planner->markStandbyFileModified();
+        }
     }
     event->accept();
 }

@@ -107,7 +107,7 @@ private:
                                  int musicVolumePercent = -1, double recoverySeconds = -1.0);
     void stopFolderAnnouncement();
     void fadeMusicBackAfterAnnouncement();
-    bool tryFolderMix(const AudioFrame &frame);
+    bool tryItemMix(const AudioFrame &frame);
     void beginMix(AudioItemMaxi *next, MediaManager *incoming, double remaining);
     void finishPendingMix();
     void cancelPendingMix();
@@ -180,7 +180,7 @@ public:
     }
     ContentsBase *sequentialContents() const;
     int sequentialIndex() const { return m_sequenceIndex; }
-    bool isCurrentFolderTrackLastInSequence() const;
+    bool isCurrentItemLastInSequence() const;
 
 
     protected:

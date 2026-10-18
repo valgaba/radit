@@ -61,7 +61,7 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     auto *left = new QVBoxLayout;
     left->setSpacing(12);
     left->addStretch();
-    left->addWidget(label(tr("Audio playback and recording\nfor radio and theatre"), "AboutDescription"));
+    left->addWidget(label(tr("Software for radio station management and automation."), "AboutDescription"));
     left->addSpacing(10);
     left->addWidget(label(tr("Developed by"), "AboutMuted"));
     left->addWidget(label("Victor Algaba", "AboutAuthor"));
@@ -126,10 +126,10 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     right->addSpacing(6);
     right->addWidget(label("GNU GPL v3 or later", "AboutCredits"));
     right->addSpacing(8);
-    m_buildDateLabel = label(tr("Installed binaries: %1").arg(
+    m_buildDateLabel = label(tr("Installed version: %1").arg(
         buildDate.isValid() ? buildDate.toString("dd/MM/yyyy") : tr("Unknown")), "AboutBuildDate");
     right->addWidget(m_buildDateLabel);
-    m_downloadDateLabel = label(tr("Latest downloadable binaries: %1").arg(tr("Checking…")), "AboutDownloadDate");
+    m_downloadDateLabel = label(tr("Latest available version: %1").arg(tr("Checking…")), "AboutDownloadDate");
     right->addWidget(m_downloadDateLabel);
     right->addStretch();
     right->addWidget(label(QString("© %1 Victor Algaba").arg(QDate::currentDate().year()), "AboutCopyright"));
@@ -156,14 +156,14 @@ void FormAbout::checkLatestDownload()
         if (!m_downloadDateLabel)
             return;
         if (reply->error() != QNetworkReply::NoError) {
-            m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(tr("Unavailable")));
+            m_downloadDateLabel->setText(tr("Latest available version: %1").arg(tr("Unavailable")));
             return;
         }
 
         QJsonParseError parseError;
         const QJsonDocument document = QJsonDocument::fromJson(reply->readAll(), &parseError);
         if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-            m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(tr("Unavailable")));
+            m_downloadDateLabel->setText(tr("Latest available version: %1").arg(tr("Unavailable")));
             return;
         }
 
@@ -183,7 +183,7 @@ void FormAbout::checkLatestDownload()
         if (!uploadedAt.isValid())
             uploadedAt = QDateTime::fromString(uploadedAtText, Qt::ISODate);
         if (selectedAsset.isEmpty() || !uploadedAt.isValid()) {
-            m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(tr("Unavailable")));
+            m_downloadDateLabel->setText(tr("Latest available version: %1").arg(tr("Unavailable")));
             return;
         }
 
@@ -196,7 +196,7 @@ void FormAbout::checkLatestDownload()
             downloadVersion = QStringLiteral("%1.%2.%3").arg(match.captured(1), match.captured(2), match.captured(3));
 
         const QString date = uploadedAt.toLocalTime().toString(QStringLiteral("dd/MM/yyyy HH:mm:ss"));
-        m_downloadDateLabel->setText(tr("Latest downloadable binaries: %1").arg(
+        m_downloadDateLabel->setText(tr("Latest available version: %1").arg(
             QStringLiteral("%1 · %2").arg(downloadVersion, date)));
     });
 }

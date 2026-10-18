@@ -69,5 +69,9 @@
         <file>icons/Undo.svg</file>
         <file>icons/Redo.svg</file>
         <file>icons/settings.svg</file>
+        <file>icons/list2.svg</file>
+        <file>icons/meteo.svg</file>
+        <file>icons/pending_actions.svg</file>
+        <file>icons/tab.svg</file>
     </qresource>
 </RCC>

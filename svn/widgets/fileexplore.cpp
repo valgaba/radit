@@ -100,6 +100,7 @@ QStringList explorerNameFilters()
 {
     QStringList filters = MediaManager::supportedAudioNameFilters();
     filters.append("*.list");
+    filters.append("*.standby");
     filters.append("*.player");
     filters.append("*.zip");
     filters.removeDuplicates();
@@ -253,7 +254,7 @@ void installRaditEditMenu(QLineEdit *edit)
 FileExplore::FileExplore(QWidget *parent) : Frame(parent)
 {
     setObjectName("FileExplore");
-    setMinimumWidth(220);
+    setMinimumWidth(160);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);

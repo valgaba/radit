@@ -25,9 +25,9 @@ public:
     QString folderPath() const { return filePath(); }
     int fileCount() const { return m_tracks.size(); }
     bool isScanning() const { return m_scanning; }
-    bool mixEnabled() const { return m_mixEnabled; }
-    double mixSeconds() const { return m_mixSeconds; }
-    void setMixSettings(bool enabled, double seconds);
+    bool mixEnabled() const override { return m_mixEnabled; }
+    double mixSeconds() const override { return m_mixSeconds; }
+    void setMixSettings(bool enabled, double seconds) override;
     int songsPerTurn() const { return m_orderedList ? m_tracks.size() : m_songsPerTurn; }
     void setSongsPerTurn(int count) { m_songsPerTurn = qBound(1, count, 999); }
     QString introAnnouncement() const { return m_introAnnouncement; }

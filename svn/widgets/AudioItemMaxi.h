@@ -15,6 +15,7 @@
 
 class CueWaveformFrame;
 class LoadingSpinner;
+class QLabel;
 class QTimer;
 class QGraphicsOpacityEffect;
 
@@ -59,6 +60,7 @@ private:
 
     Button * btnplay;
     Label *labelnombre;
+    QLabel *m_plannerTypeIcon = nullptr;
     Label *labeltiempo;
     LoadingSpinner *m_loadingSpinner = nullptr;
 
@@ -112,6 +114,9 @@ public:
 
      virtual AudioItemMaxi* copy(QWidget* newParent) const = 0;
      virtual bool isLiveStream() const { return false; }
+     virtual bool mixEnabled() const { return false; }
+     virtual double mixSeconds() const { return 3.0; }
+     virtual void setMixSettings(bool, double) {}
      virtual double playbackLimitSeconds() const { return 0.0; }
      virtual void setPlaybackLimitSeconds(double) {}
      virtual bool advancesOnLoop() const { return false; }
@@ -124,6 +129,7 @@ public:
     bool isEnabledForPlayback() const { return m_isEnabled; }
     void setEnabledForPlayback(bool enabled);
     void setPlannerEnableControlVisible(bool visible);
+    void setPlannerTypeIcon(const QString &iconPath);
     void triggerProperties() { if (btnproperties) btnproperties->click(); }
 
 

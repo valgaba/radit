@@ -35,6 +35,7 @@
 #include <QPointer>
 #include <QTimer>
 #include <QtConcurrent/QtConcurrentRun>
+#include <utility>
 #include "widgets/LoadingDialog.h"
 
 //#include <QtConcurrent/QtConcurrentMap>
@@ -46,6 +47,7 @@
 #include "widgets/AudioItemListMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include "widgets/AudioItemFilemaxi.h"
+#include "widgets/TabPlayer.h"
 #include "core/io.h"
 //#include "bass.h"
 
@@ -140,6 +142,28 @@ void ContentsBase::dropEvent(QDropEvent *event){
         event->ignore();
         return;
     }
+
+    // In a regular player, dropping a .list has the same meaning as Load list:
+    // create a player tab populated with the list's individual items. Planner
+    // contents deliberately keep the one-item, ordered-list behavior below.
+    if (tabs) {
+        QStringList filesToImport;
+        for (const QString &path : std::as_const(paths)) {
+            if (QFileInfo(path).suffix().compare("list", Qt::CaseInsensitive) != 0) {
+                filesToImport.append(path);
+                continue;
+            }
+            QString error;
+            if (!tabs->loadListFile(path, &error))
+                QMessageBox::warning(this, tr("Load list"), error);
+        }
+        paths=filesToImport;
+        if (paths.isEmpty()) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+
     // Return from the native drop before starting work, so its drag image disappears.
     m_importingFiles = true;
     event->acceptProposedAction();

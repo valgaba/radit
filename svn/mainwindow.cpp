@@ -446,7 +446,10 @@ void MainWindow::applyWorkspacePreset(bool plannerView)
     const int width=qMax(5,splittertop->width());
     const int height=qMax(2,splitterprincipal->height()-splitterprincipal->handleWidth());
     if (plannerView) {
-        splittertop->setSizes({width/4,0,0,width/4,width/2,0});
+        const int fileExploreWidth=m_fileExplore->minimumWidth();
+        const int meteoClockWidth=m_meteoClock->minimumWidth();
+        const int plannerWidth=qMax(1,width-fileExploreWidth-meteoClockWidth);
+        splittertop->setSizes({fileExploreWidth,0,0,meteoClockWidth,plannerWidth,0});
         splitterprincipal->setSizes({height,0});
     } else {
         splittertop->setSizes({width/3,width/3,0,width/3,0,0});

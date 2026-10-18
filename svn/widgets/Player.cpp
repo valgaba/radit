@@ -37,14 +37,14 @@ MixGains equalPowerGains(float progress)
     return {std::sin(angle),std::cos(angle)};
 }
 
-AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
+AudioItemMaxi *mixTransitionTarget(AudioItemMaxi *source,
                                       ContentsBase *sequenceContents,
                                       int sequenceIndex,
                                       bool sequenceRepeat,
-                                      bool continueFolderTurn)
+                                      bool repeatSource)
 {
-    if (folder->isLoop() || continueFolderTurn)
-        return folder->isEnabledForPlayback() ? folder : nullptr;
+    if (source->isLoop() || repeatSource)
+        return source->isEnabledForPlayback() ? source : nullptr;
     if (sequenceContents && sequenceContents->layout) {
         const int count=sequenceContents->layout->count();
         if (sequenceIndex>=0 && sequenceIndex<count) {
@@ -63,11 +63,11 @@ AudioItemMaxi *folderTransitionTarget(AudioItemFolderMaxi *folder,
             return nullptr;
         }
     }
-    QWidget *owner = folder->parentWidget();
+    QWidget *owner = source->parentWidget();
     while (owner && !qobject_cast<ContentsBase*>(owner)) owner = owner->parentWidget();
     auto *contents = qobject_cast<ContentsBase*>(owner);
     if (!contents || !contents->layout) return nullptr;
-    const int index = contents->layout->indexOf(folder);
+    const int index = contents->layout->indexOf(source);
     if (index < 0) return nullptr;
     for (int offset = 1; offset < contents->layout->count(); ++offset) {
         const int row = (index + offset) % contents->layout->count();
@@ -447,7 +447,7 @@ void Player::bindMediaManager()
          emit playbackProgressChanged(frame.position,m_duration,
                                       !mediamanager->isNetworkSource() && m_duration>0.0);
          checkFolderAnnouncement(frame);
-         tryFolderMix(frame);
+         tryItemMix(frame);
 
        });
 
@@ -674,7 +674,9 @@ bool Player::startPreparedItem(AudioItemMaxi *item)
 
 
        const double loadedDuration=mediamanager->getDuration();
-       if (loadedDuration>0.0) {
+       if (item->playbackLimitSeconds()>0.0) {
+           m_duration=item->playbackLimitSeconds();
+       } else if (loadedDuration>0.0) {
            m_duration=loadedDuration;
            if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(item);
                folderItem && !folderItem->isOrderedList()) {
@@ -682,7 +684,8 @@ bool Player::startPreparedItem(AudioItemMaxi *item)
                folderItem->setTiempoFile(loadedDuration);
            }
        } else {
-           m_duration=item->second();
+           m_duration=item->playbackLimitSeconds()>0.0
+               ? item->playbackLimitSeconds() : item->second();
        }
        emit playbackProgressChanged(mediamanager->getPosition(),m_duration,
                                     !mediamanager->isNetworkSource() && m_duration>0.0);
@@ -842,14 +845,16 @@ ContentsBase *Player::sequentialContents() const
     return m_sequenceContents.data();
 }
 
-bool Player::isCurrentFolderTrackLastInSequence() const
+bool Player::isCurrentItemLastInSequence() const
 {
-    auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem);
-    if (!folder || folder->isLoop() || m_sequenceRepeat
-        || m_folderTurnItem!=folder
-        || m_folderTurnTracksStarted<folder->songsPerTurn()
+    if (!currentItem || currentItem->isLoop() || m_sequenceRepeat
         || !m_sequenceContents || !m_sequenceContents->layout)
         return false;
+    if (auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem)) {
+        if (m_folderTurnItem!=folder
+            || m_folderTurnTracksStarted<folder->songsPerTurn())
+            return false;
+    }
 
     const int count=m_sequenceContents->layout->count();
     for (int index=m_sequenceIndex+1; index<count; ++index) {
@@ -979,24 +984,25 @@ void Player::advanceSequence()
     emit sequentialPlaybackFinished();
 }
 
-bool Player::tryFolderMix(const AudioFrame &frame)
+bool Player::tryItemMix(const AudioFrame &frame)
 {
-    auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
+    AudioItemMaxi *source=currentItem;
     // Once Planner has requested a clean track boundary, do not launch another
     // overlapping track. Otherwise continuous folder mixing can keep moving the
     // active manager forward before its natural end is reported.
-    if (m_stopSequenceAtTrackEnd || !folder || !folder->mixEnabled()
+    if (m_stopSequenceAtTrackEnd || !source || !source->mixEnabled()
         || m_outgoingManager || m_pendingMixManager || m_mixAttempted
         || !mediamanager->isPlaying()) return false;
     const double remaining = m_duration - frame.position;
     if (remaining <= 0.02) return false;
+    const double mixSeconds=source->mixSeconds();
 
     // Look slightly ahead of the configured mix duration so a natural quiet/fade
     // near the end can choose the transition point. The configured duration stays
     // the maximum overlap; if no useful point is found, the old fixed-time start
     // remains the fallback.
-    const double searchWindow = std::min({30.0, folder->mixSeconds() + 5.0,
-                                          std::max(folder->mixSeconds(), m_duration * 0.25)});
+    const double searchWindow = std::min({30.0, mixSeconds + 5.0,
+                                          std::max(mixSeconds, m_duration * 0.25)});
     if (remaining > searchWindow || m_userIsSeeking) {
         m_mixSearchStartPosition = -1.0;
         m_mixQuietSincePosition = -1.0;
@@ -1031,13 +1037,14 @@ bool Player::tryFolderMix(const AudioFrame &frame)
     const bool naturalFade = frame.position - m_mixSearchStartPosition >= 0.50
         && m_mixSearchStartLevel - m_mixSmoothedLevel >= 9.0
         && m_mixSmoothedLevel <= -18.0;
-    const bool fixedFallback = remaining <= folder->mixSeconds();
+    const bool fixedFallback = remaining <= mixSeconds;
     if (!sustainedQuiet && !naturalFade && !fixedFallback)
         return false;
-    const bool moreFolderTracks=m_folderTurnItem==folder
-        && m_folderTurnTracksStarted<folder->songsPerTurn();
-    AudioItemMaxi *next = folderTransitionTarget(
-        folder,m_sequenceContents.data(),m_sequenceIndex,m_sequenceRepeat,moreFolderTracks);
+    auto *sourceFolder=qobject_cast<AudioItemFolderMaxi*>(source);
+    const bool moreFolderTracks=sourceFolder && m_folderTurnItem==sourceFolder
+        && m_folderTurnTracksStarted<sourceFolder->songsPerTurn();
+    AudioItemMaxi *next = mixTransitionTarget(
+        source,m_sequenceContents.data(),m_sequenceIndex,m_sequenceRepeat,moreFolderTracks);
     if (!next) return false;
     m_mixAttempted = true;
     auto *nextFolder = qobject_cast<AudioItemFolderMaxi*>(next);
@@ -1137,7 +1144,7 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
         });
     currentItem = next;
     markFolderTrackStarted(next);
-    // A mixed folder transition changes the active audio without going through
+    // A mixed transition changes the active audio without going through
     // startPreparedPlayback(), so record each incoming track explicitly.
     finishEmission(tr("Completed"),tr("Faded into the next audio item."));
     const QString source=m_emissionSourceLabel.isEmpty() ? title() : m_emissionSourceLabel;
@@ -1153,11 +1160,14 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
     startPlaybackLimit(next->playbackLimitSeconds());
     next->setPlaying(true); next->playColor(true); next->setIsPlayNext(false);
     m_duration = incoming->getDuration();
+    if (m_duration<=0.0)
+        m_duration=next->playbackLimitSeconds()>0.0
+            ? next->playbackLimitSeconds() : next->second();
     slider->setEnabled(!incoming->isNetworkSource());
     labelnombre->setText(next->playbackName());
     emit currentPlaybackNameChanged(labelnombre->text());
     btnpause->SetIcon("Pausemini.svg");
-    m_mixDurationMs = std::max(1, qRound(1000.0 * std::min({folder->mixSeconds(), remaining, available / 2.0})));
+    m_mixDurationMs = std::max(1, qRound(1000.0 * std::min({currentItem->mixSeconds(), remaining, available / 2.0})));
     m_mixElapsedMs = 0; m_mixProgress = 0.0f; m_mixAttempted = false;
     m_mixClock.restart();
     incoming->play();
@@ -1166,11 +1176,13 @@ void Player::beginMix(AudioItemMaxi *next, MediaManager *incoming, double remain
 
 void Player::finishPendingMix()
 {
-    auto *folder = qobject_cast<AudioItemFolderMaxi*>(currentItem);
-    if (!folder || !m_pendingMixItem || !m_pendingMixItem->isEnabledForPlayback() || !folder->mixEnabled()
-        || folderTransitionTarget(folder,m_sequenceContents.data(),m_sequenceIndex,
-                                  m_sequenceRepeat,m_folderTurnItem==folder
-                                      && m_folderTurnTracksStarted<folder->songsPerTurn())
+    AudioItemMaxi *source=currentItem;
+    auto *sourceFolder=qobject_cast<AudioItemFolderMaxi*>(source);
+    const bool moreFolderTracks=sourceFolder && m_folderTurnItem==sourceFolder
+        && m_folderTurnTracksStarted<sourceFolder->songsPerTurn();
+    if (!source || !m_pendingMixItem || !m_pendingMixItem->isEnabledForPlayback() || !source->mixEnabled()
+        || mixTransitionTarget(source,m_sequenceContents.data(),m_sequenceIndex,
+                               m_sequenceRepeat,moreFolderTracks)
             != m_pendingMixItem) {
         cancelPendingMix();
         return;

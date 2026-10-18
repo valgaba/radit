@@ -34,7 +34,7 @@ MeteoClock::MeteoClock(QWidget *parent) : Frame(parent)
 {
     meteoClockInstance=this;
     setObjectName("MeteoClock");
-    setMinimumSize(210, 180);
+    setMinimumSize(170, 180);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_weather = new WeatherService(this);
     m_systemLocation = new SystemLocation(this);

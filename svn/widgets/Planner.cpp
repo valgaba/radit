@@ -56,6 +56,7 @@
 #include <QDateTime>
 #include <QShowEvent>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QPointer>
 #include <QGuiApplication>
 #include <QScreen>
@@ -228,7 +229,8 @@ private:
 class StandbyListEventDialog final : public QDialog
 {
 public:
-    StandbyListEventDialog(const QTime &time, const QString &path, QWidget *parent = nullptr)
+    StandbyListEventDialog(const QTime &time, const QString &path, bool disabled = false,
+                           QWidget *parent = nullptr)
         : QDialog(parent)
     {
         setObjectName("StandbyListEventDialog");
@@ -236,10 +238,15 @@ public:
         setWindowModality(Qt::WindowModal);
         setModal(true);
         setWindowTitle(tr("Standby list event"));
-        resize(410,160);
+        resize(410,185);
         setStyleSheet(QStringLiteral(
             "QDialog#StandbyListEventDialog { background:#181e2c; border:1px solid #77859a; }"
             "QDialog#StandbyListEventDialog QLabel { color:#8a8d96; background:transparent; }"
+            "QDialog#StandbyListEventDialog QCheckBox { color:#8a8d96; spacing:6px; }"
+            "QDialog#StandbyListEventDialog QCheckBox::indicator { width:13px; height:13px;"
+            " border:1px solid #5b6070; background:#202635; }"
+            "QDialog#StandbyListEventDialog QCheckBox::indicator:checked {"
+            " background:#4e4d7a; border:1px solid #8a8d96; }"
             "QDialog#StandbyListEventDialog QLineEdit, QTimeEdit { color:#80A4AE; background:#282f40;"
             " border:1px solid #3c4558; padding:3px; }"
             "QDialog#StandbyListEventDialog QTimeEdit::up-button, QTimeEdit::down-button { width:0; }"
@@ -283,7 +290,7 @@ public:
         form->addWidget(timeLabel,0,0);
         form->addWidget(m_time,0,1,1,2);
         auto *listLabel=new Label(body);
-        listLabel->setText(tr("Standby list"));
+        listLabel->setText(tr("Standby file"));
         m_path=new QLineEdit(path,body);
         m_path->setReadOnly(true);
         auto *browse=new Button(body);
@@ -292,9 +299,14 @@ public:
         form->addWidget(listLabel,1,0);
         form->addWidget(m_path,1,1);
         form->addWidget(browse,1,2);
+        m_disabled=new QCheckBox(tr("Disable this event"),body);
+        m_disabled->setObjectName("StandbyEventDisabledCheckBox");
+        m_disabled->setChecked(disabled);
+        form->addWidget(m_disabled,2,1,1,2);
         connect(browse,&QPushButton::clicked,this,[this]() {
             const QString selected=QFileDialog::getOpenFileName(
-                this,tr("Choose standby list"),m_path->text(),tr("Radit List (*.list);;All files (*)"));
+                this,tr("Choose a Standby file"),m_path->text(),
+                tr("Radit Standby (*.standby)"));
             if (!selected.isEmpty()) m_path->setText(QFileInfo(selected).absoluteFilePath());
         });
         root->addWidget(body,1);
@@ -320,10 +332,12 @@ public:
 
     QTime entryTime() const { return m_time->time(); }
     QString listPath() const { return m_path->text(); }
+    bool isDisabled() const { return m_disabled->isChecked(); }
 
 private:
     QTimeEdit *m_time = nullptr;
     QLineEdit *m_path = nullptr;
+    QCheckBox *m_disabled = nullptr;
 };
 
 void showPopupBelow(QWidget *anchor, QWidget *popup)
@@ -596,7 +610,7 @@ public:
         }
         if (chosen==addStandbyEventAction) {
             const int clickedSecond=qBound(0,qRound(timelinePosition.y()*3600.0/m_pixelsPerHour),24*60*60-1);
-            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(clickedSecond),QString(),window());
+            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(clickedSecond),QString(),false,window());
             if (eventOptions.exec()!=QDialog::Accepted)
                 return;
             const QTime time=eventOptions.entryTime();
@@ -608,6 +622,7 @@ public:
             }
             ScheduleSlot *event=addSlot(time.toString("HH:mm:ss"),second);
             event->setStandbyListPath(eventOptions.listPath());
+            event->setScheduleDisabled(eventOptions.isDisabled());
             event->setAccentColor(QColor("#3C5C8A"));
             markDocumentModified();
             if (m_focusSlot) m_focusSlot(event);
@@ -873,7 +888,8 @@ private:
         connect(slot,&ScheduleSlot::propertiesRequested,this,[this](ScheduleSlot *editedSlot) {
             const QTime currentTime=QTime(0,0).addSecs(editedSlot->entrySecond());
             if (editedSlot->isStandbyListChangeEvent()) {
-                StandbyListEventDialog options(currentTime,editedSlot->standbyListPath(),window());
+                StandbyListEventDialog options(currentTime,editedSlot->standbyListPath(),
+                                               editedSlot->isScheduleDisabled(),window());
                 if (options.exec()==QDialog::Accepted) {
                     const QTime time=options.entryTime();
                     const int second=time.hour()*3600+time.minute()*60+time.second();
@@ -884,6 +900,7 @@ private:
                     }
                     editedSlot->setEntryTime(second);
                     editedSlot->setStandbyListPath(options.listPath());
+                    editedSlot->setScheduleDisabled(options.isDisabled());
                     markDocumentModified();
                 }
                 return;
@@ -1475,13 +1492,13 @@ public:
 
         if (auto *plannerContents=qobject_cast<PlannerContents*>(m_standbyContents)) {
             connect(plannerContents,&PlannerContents::contentAdded,this,[this]() {
-                markDocumentModified();
+                markStandbyContentsModified();
             });
             connect(plannerContents,&PlannerContents::contentDurationsChanged,this,[this]() {
-                markDocumentModified();
+                markStandbyContentsModified();
             });
             connect(plannerContents,&PlannerContents::contentModified,this,[this]() {
-                markDocumentModified();
+                markStandbyContentsModified();
             });
         }
 
@@ -1535,6 +1552,18 @@ public:
     {
         if (!m_loadingDocument)
             m_documentModified=true;
+    }
+
+    void markStandbyContentsModified()
+    {
+        if (m_loadingDocument)
+            return;
+        markDocumentModified();
+        QWidget *owner=this;
+        while (owner && !qobject_cast<Planner*>(owner))
+            owner=owner->parentWidget();
+        if (auto *planner=qobject_cast<Planner*>(owner))
+            planner->markStandbyFileModified();
     }
 
     bool confirmDocumentChanges()
@@ -1681,6 +1710,7 @@ public:
         m_documentModified=false;
         if (auto *planner=qobject_cast<Planner*>(owner))
         {
+            planner->setStandbyFileName({});
             planner->refreshAfterContentLoad();
             planner->setDocumentFileName(m_plannerFileName);
         }
@@ -2157,13 +2187,12 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
             if (engine==m_standbyEngine && m_waitingForStandbySlot
-                && seekable && duration>0.0) {
-                auto *folder=qobject_cast<AudioItemFolderMaxi*>(
-                    m_standbyEngine->getCurrentItem());
-                if (folder && folder->mixEnabled()) {
+                && duration>0.0) {
+                auto *item=m_standbyEngine->getCurrentItem();
+                if (item && item->mixEnabled()) {
                     const double remaining=duration-position;
-                    if (remaining<=folder->mixSeconds()) {
-                        const int configuredMixMs=qMax(100,qRound(folder->mixSeconds()*1000.0));
+                    if (remaining<=item->mixSeconds()) {
+                        const int configuredMixMs=qMax(100,qRound(item->mixSeconds()*1000.0));
                         const int remainingMs=qMax(100,qRound(remaining*1000.0));
                         startWaitingSlotCrossfade(qMin(configuredMixMs,remainingMs));
                     }
@@ -2171,13 +2200,13 @@ Planner::Planner(QWidget *parent) : Frame(parent)
             }
             if (engine==m_activeScheduleEngine && m_activeScheduleSlot
                 && !m_pendingScheduleSlot && !m_fadeTimer->isActive()
-                && seekable && duration>0.0
-                && engine->isCurrentFolderTrackLastInSequence()) {
-                auto *folder=qobject_cast<AudioItemFolderMaxi*>(engine->getCurrentItem());
-                if (folder && folder->mixEnabled()) {
+                && duration>0.0
+                && engine->isCurrentItemLastInSequence()) {
+                auto *item=engine->getCurrentItem();
+                if (item && item->mixEnabled()) {
                     const double remaining=duration-position;
-                    if (remaining<=folder->mixSeconds()) {
-                        const int configuredMixMs=qMax(100,qRound(folder->mixSeconds()*1000.0));
+                    if (remaining<=item->mixSeconds()) {
+                        const int configuredMixMs=qMax(100,qRound(item->mixSeconds()*1000.0));
                         const int remainingMs=qMax(100,qRound(remaining*1000.0));
                         startStandbyCrossfadeForActiveSlot(qMin(configuredMixMs,remainingMs));
                     }
@@ -2556,6 +2585,161 @@ void Planner::setDocumentFileName(const QString &filename)
     m_titleLabel->setText(baseName.isEmpty() ? tr("Planner [noname]")
                                              : tr("Planner [%1]").arg(baseName));
     m_titleLabel->setToolTip(filename);
+}
+
+void Planner::setStandbyFileName(const QString &filename)
+{
+    m_standbyFileName=filename.isEmpty() ? QString() : QFileInfo(filename).absoluteFilePath();
+    m_standbyFileModified=false;
+    updateStandbyBarTitle();
+}
+
+void Planner::markStandbyFileModified()
+{
+    m_standbyFileModified=true;
+    markDocumentModified();
+}
+
+bool Planner::saveStandbyFile(bool saveAs)
+{
+    if (!m_fallbackContents)
+        return false;
+
+    QString filename=m_standbyFileName;
+    if (saveAs || filename.isEmpty()) {
+        QFileDialog dialog(this,tr("Save Standby As"),filename);
+        dialog.setAcceptMode(QFileDialog::AcceptSave);
+        dialog.setFileMode(QFileDialog::AnyFile);
+        dialog.setNameFilters({tr("Radit Standby (*.standby)"),tr("All files (*)")});
+        dialog.setDefaultSuffix(QStringLiteral("standby"));
+        if (dialog.exec()!=QDialog::Accepted || dialog.selectedFiles().isEmpty())
+            return false;
+        filename=dialog.selectedFiles().first();
+    }
+
+    const QJsonObject root{
+        {"format",QStringLiteral("radit-standby")},
+        {"version",1},
+        {"listFile",m_fallbackContents->listFileName()},
+        {"items",Io::serializeItems(m_fallbackContents->layout)}
+    };
+    const QByteArray data=QJsonDocument(root).toJson(QJsonDocument::Indented);
+    QSaveFile file(filename);
+    if (!file.open(QIODevice::WriteOnly) || file.write(data)!=data.size() || !file.commit()) {
+        QMessageBox::warning(this,tr("Save Standby"),
+                             tr("Could not save Standby: %1").arg(file.errorString()));
+        return false;
+    }
+
+    m_standbyFileName=QFileInfo(filename).absoluteFilePath();
+    m_standbyFileModified=false;
+    updateStandbyBarTitle();
+    return true;
+}
+
+bool Planner::confirmStandbyFileChanges()
+{
+    if (!m_standbyFileModified)
+        return true;
+
+    QMessageBox prompt(QMessageBox::Warning,tr("Unsaved Standby changes"),
+                       tr("Save the changes to this Standby?"),
+                       QMessageBox::NoButton,this);
+    QPushButton *saveButton=prompt.addButton(tr("Save"),QMessageBox::AcceptRole);
+    QPushButton *discardButton=prompt.addButton(tr("Discard"),QMessageBox::DestructiveRole);
+    prompt.addButton(QMessageBox::Cancel);
+    prompt.setDefaultButton(saveButton);
+    prompt.exec();
+    if (prompt.clickedButton()==saveButton)
+        return saveStandbyFile(false);
+    return prompt.clickedButton()==discardButton;
+}
+
+void Planner::loadStandbyFile()
+{
+    const QString filename=QFileDialog::getOpenFileName(
+        this,tr("Load Standby"),m_standbyFileName,
+        tr("Radit Standby (*.standby);;All files (*)"));
+    if (filename.isEmpty() || !m_fallbackContents)
+        return;
+
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this,tr("Load Standby"),file.errorString());
+        return;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document=QJsonDocument::fromJson(file.readAll(),&parseError);
+    if (parseError.error!=QJsonParseError::NoError || !document.isObject()) {
+        QMessageBox::warning(this,tr("Load Standby"),tr("Invalid Standby file."));
+        return;
+    }
+    const QJsonObject root=document.object();
+    const QJsonArray items=root.value("items").toArray();
+    if (root.value("format").toString()!=QLatin1String("radit-standby")
+        || root.value("version").toInt()!=1 || !root.value("items").isArray()
+        || !root.value("listFile").isString() || !Io::validateItems(items,this)) {
+        QMessageBox::warning(this,tr("Load Standby"),tr("Invalid Standby file."));
+        return;
+    }
+    if (m_running && (m_fadeAction!=0 || m_pendingScheduleSlot
+                      || m_pendingScheduleEngine || m_waitingForStandbySlot)) {
+        QMessageBox::information(this,tr("Load Standby"),
+            tr("Wait for the scheduled transition to finish before loading a Standby file."));
+        return;
+    }
+    if (!confirmStandbyFileChanges())
+        return;
+
+    PlannerContents staged;
+    QString error;
+    if (!Io::loadItems(&staged,items,&error)) {
+        QMessageBox::warning(this,tr("Load Standby"),error);
+        return;
+    }
+
+    const bool standbyWasPlaying=m_running && m_standbyEngine
+        && m_standbyEngine->getCurrentItem();
+    if (standbyWasPlaying)
+        m_standbyEngine->stopSequentialPlayback();
+
+    QList<AudioItemMaxi*> oldItems;
+    if (m_fallbackContents->layout) {
+        for (int index=0; index<m_fallbackContents->layout->count(); ++index) {
+            if (auto *item=qobject_cast<AudioItemMaxi*>(
+                    m_fallbackContents->layout->itemAt(index)->widget()))
+                oldItems.append(item);
+        }
+    }
+    for (AudioItemMaxi *item : oldItems)
+        m_fallbackContents->deleteItem(item);
+
+    QList<AudioItemMaxi*> stagedItems;
+    if (staged.layout) {
+        for (int index=0; index<staged.layout->count(); ++index) {
+            if (auto *item=qobject_cast<AudioItemMaxi*>(staged.layout->itemAt(index)->widget()))
+                stagedItems.append(item);
+        }
+    }
+    for (AudioItemMaxi *item : stagedItems) {
+        staged.layout->removeWidget(item);
+        m_fallbackContents->createItem(item);
+    }
+
+    m_fallbackContents->setListFileName(root.value("listFile").toString());
+    m_standbyFileName=QFileInfo(filename).absoluteFilePath();
+    m_standbyFileModified=false;
+    markDocumentModified();
+
+    const bool scheduleOwnsPlayback=m_activeScheduleEngine || m_pendingScheduleSlot
+        || m_fadeAction==1 || m_fadeAction==2;
+    if (standbyWasPlaying && !scheduleOwnsPlayback && m_running) {
+        m_standbyEngine->setDevicePlay(m_devicePlay);
+        m_standbyEngine->setVolume(m_volume);
+        m_standbyStartAttempted=true;
+        m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
+    }
+    refreshAfterContentLoad();
 }
 
 void Planner::checkSchedule()
@@ -2985,9 +3169,11 @@ void Planner::updateStandbyBarTitle()
 {
     if (!m_standbyTitle)
         return;
-    const QString listPath=m_fallbackContents ? m_fallbackContents->listFileName() : QString();
-    const QString baseName=listPath.isEmpty()
-        ? QStringLiteral("noname") : QFileInfo(listPath).completeBaseName();
+    const QString titlePath=!m_standbyFileName.isEmpty()
+        ? m_standbyFileName
+        : (m_fallbackContents ? m_fallbackContents->listFileName() : QString());
+    const QString baseName=titlePath.isEmpty()
+        ? QStringLiteral("noname") : QFileInfo(titlePath).completeBaseName();
     const QString title=tr("Standby [%1]").arg(baseName.isEmpty() ? QStringLiteral("noname") : baseName);
     if (m_standbyTitle->text()!=title)
         m_standbyTitle->setText(title);
@@ -2999,7 +3185,7 @@ bool Planner::applyStandbyListChange(const QString &path, QString *error)
 {
     if (error) error->clear();
     if (!m_fallbackContents || path.trimmed().isEmpty()) {
-        if (error) *error=tr("Choose a valid Radit list file.");
+        if (error) *error=tr("Choose a valid Standby file.");
         return false;
     }
 
@@ -3010,9 +3196,32 @@ bool Planner::applyStandbyListChange(const QString &path, QString *error)
     }
 
     PlannerContents staged;
-    Io io;
     QString loadError;
-    if (!io.LoadListPlayer(&staged,path,&loadError)) {
+    if (QFileInfo(path).suffix().compare(QStringLiteral("standby"),Qt::CaseInsensitive)!=0) {
+        if (error) *error=tr("Choose a valid Standby file.");
+        return false;
+    }
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (error) *error=file.errorString();
+        return false;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document=QJsonDocument::fromJson(file.readAll(),&parseError);
+    if (parseError.error!=QJsonParseError::NoError || !document.isObject()) {
+        if (error) *error=tr("Invalid Standby file.");
+        return false;
+    }
+    const QJsonObject root=document.object();
+    const QJsonArray items=root.value("items").toArray();
+    if (root.value("format").toString()!=QLatin1String("radit-standby")
+        || root.value("version").toInt()!=1 || !root.value("items").isArray()
+        || !root.value("listFile").isString() || !Io::validateItems(items,this)) {
+        if (error) *error=tr("Invalid Standby file.");
+        return false;
+    }
+    const QString savedListFile=root.value("listFile").toString();
+    if (!Io::loadItems(&staged,items,&loadError)) {
         if (error) *error=loadError;
         return false;
     }
@@ -3046,7 +3255,8 @@ bool Planner::applyStandbyListChange(const QString &path, QString *error)
             staged.layout->removeWidget(item);
         m_fallbackContents->createItem(item);
     }
-    m_fallbackContents->setListFileName(QFileInfo(path).absoluteFilePath());
+    m_standbyFileName=QFileInfo(path).absoluteFilePath();
+    m_fallbackContents->setListFileName(savedListFile);
     updateStandbyBarTitle();
 
     const bool scheduleOwnsPlayback=m_activeScheduleEngine || m_pendingScheduleSlot

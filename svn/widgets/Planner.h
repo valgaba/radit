@@ -36,6 +36,11 @@ public:
     void setDevicePlay(int device);
     void setDeviceCue(int device) { m_deviceCue=device; }
     bool setVolume(float volume);
+    bool saveStandbyFile(bool saveAs);
+    void loadStandbyFile();
+    void markStandbyFileModified();
+    bool confirmStandbyFileChanges();
+    void setStandbyFileName(const QString &filename);
     void refreshAudioDurations();
     void stopPlaybackForContentLoad();
     void refreshAfterContentLoad();
@@ -91,6 +96,7 @@ private:
     QElapsedTimer m_fadeClock;
     QSet<QString> m_triggeredSlots;
     QString m_pendingStandbyListPath;
+    QString m_standbyFileName;
     QString m_triggeredDate;
     QDate m_lastObservedDate;
     QDateTime m_lastScheduleCheckTime;
@@ -99,6 +105,7 @@ private:
     bool m_standbyStartAttempted = false;
     bool m_userIsSeeking = false;
     bool m_standbyBlinkPhase = false;
+    bool m_standbyFileModified = false;
     double m_positionDuration = 0.0;
     double m_currentPlaybackPosition = 0.0;
     double m_currentPlaybackDuration = 0.0;

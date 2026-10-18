@@ -48,7 +48,9 @@ class FileExploreModel : public QAbstractItemModel
 public:
     explicit FileExploreModel(const QStringList &filters, QObject *parent)
         : QAbstractItemModel(parent), m_filters(filters),
-          m_folder(":/icons/folder.svg"), m_audio(":/icons/audiofile.svg")
+          m_folder(":/icons/folder.svg"), m_audio(":/icons/audiofile.svg"),
+          m_list(":/icons/list2.svg"), m_standby(":/icons/pending_actions.svg"),
+          m_player(":/icons/tab.svg")
     {
         m_root = std::make_shared<Node>();
         m_root->entry.directory = true;
@@ -135,7 +137,14 @@ public:
         if (!index.isValid()) return {};
         const auto &entry = nodeFor(index)->entry;
         if (role == Qt::DisplayRole) return entry.name;
-        if (role == Qt::DecorationRole) return entry.directory ? m_folder : m_audio;
+        if (role == Qt::DecorationRole) {
+            if (entry.directory) return m_folder;
+            const QString suffix=QFileInfo(entry.name).suffix().toCaseFolded();
+            if (suffix==QLatin1String("list")) return m_list;
+            if (suffix==QLatin1String("standby")) return m_standby;
+            if (suffix==QLatin1String("player")) return m_player;
+            return m_audio;
+        }
         if (role == Qt::ToolTipRole) return QDir::toNativeSeparators(entry.path);
         return {};
     }
@@ -360,7 +369,7 @@ private:
     }
 
     QStringList m_filters;
-    QIcon m_folder, m_audio;
+    QIcon m_folder, m_audio, m_list, m_standby, m_player;
     std::shared_ptr<Node> m_root;
     QTimer m_poll;
     bool m_created = false, m_polling = false;

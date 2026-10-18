@@ -78,9 +78,9 @@ QJsonArray saveItems(QLayout *layout)
         };
         if (belongsToScheduleSlot(item))
             object["enabled"] = item->isEnabledForPlayback();
+        object["mixEnabled"] = item->mixEnabled();
+        object["mixSeconds"] = item->mixSeconds();
         if (auto *folder = qobject_cast<AudioItemFolderMaxi*>(item)) {
-            object["mixEnabled"] = folder->mixEnabled();
-            object["mixSeconds"] = folder->mixSeconds();
             object["songsPerTurn"] = folder->songsPerTurn();
             object["introAnnouncement"] = folder->introAnnouncement();
             object["outroAnnouncement"] = folder->outroAnnouncement();
@@ -140,7 +140,6 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             } else {
                 folderItem->setFolderPath(path);
             }
-            folderItem->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
             folderItem->setSongsPerTurn(object["songsPerTurn"].toInt(1));
             folderItem->setAnnouncementTexts(object["introAnnouncement"].toString(),
                                              object["outroAnnouncement"].toString(),
@@ -154,6 +153,7 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
                                    object["sweeperAtEntry"].toBool(true),
                                    object["sweeperAtExit"].toBool(true));
         }
+        item->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
         if (meteo) {
             auto *meteoItem=static_cast<AudioItemMeteoClockMaxi*>(item);
             if (!path.isEmpty()) meteoItem->setVoicePackPath(path);

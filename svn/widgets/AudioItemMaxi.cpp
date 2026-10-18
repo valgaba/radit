@@ -396,6 +396,26 @@ void AudioItemMaxi::setPlannerEnableControlVisible(bool visible)
     btnPlannerEnabled->setVisible(visible);
 }
 
+void AudioItemMaxi::setPlannerTypeIcon(const QString &iconPath)
+{
+    if (iconPath.isEmpty()) {
+        if (m_plannerTypeIcon)
+            m_plannerTypeIcon->hide();
+        return;
+    }
+    if (!m_plannerTypeIcon) {
+        m_plannerTypeIcon=new QLabel(framecenterright);
+        m_plannerTypeIcon->setFixedSize(18,18);
+        m_plannerTypeIcon->setAlignment(Qt::AlignCenter);
+        m_plannerTypeIcon->setStyleSheet(QStringLiteral("QLabel { border:none; background:transparent; }"));
+        m_plannerTypeIcon->setAttribute(Qt::WA_TransparentForMouseEvents);
+        layoutcenterright->insertWidget(layoutcenterright->indexOf(labelnombre),m_plannerTypeIcon);
+    }
+    m_plannerTypeIcon->setPixmap(QIcon(iconPath).pixmap(16,16));
+    m_plannerTypeIcon->setToolTip(labelnombre->text());
+    m_plannerTypeIcon->show();
+}
+
 void AudioItemMaxi::setEnabledForPlayback(bool enabled)
 {
     if (m_isEnabled==enabled) return;
