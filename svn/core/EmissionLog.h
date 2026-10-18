@@ -34,6 +34,7 @@ public:
     QString startPlayback(const QString &source, const QString &title, const QString &path);
     void finishPlayback(const QString &id, const QString &result, const QString &details = {});
     QVector<EmissionRecord> recordsBetween(const QDate &from, const QDate &to) const;
+    bool clearHistory(QString *error = nullptr);
     bool exportCsv(const QString &filename, const QDate &from, const QDate &to,
                    const QString &searchText = {}, QString *error = nullptr) const;
 

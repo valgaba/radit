@@ -23,6 +23,7 @@ private:
     QTableWidget *m_table = nullptr;
     void refresh();
     void exportCsv();
+    void clearHistory();
 
 protected:
     void showEvent(QShowEvent *event) override;

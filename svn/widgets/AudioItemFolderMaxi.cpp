@@ -14,6 +14,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <algorithm>
 #include <utility>
 #include <QDateTime>
 #include <QFutureWatcher>
@@ -536,6 +537,100 @@ bool AudioItemFolderMaxi::setOrderedListPath(const QString &path, QString *error
                    .arg(m_orderedListPath).arg(m_tracks.size()));
     emit scanFinished();
     return true;
+}
+
+bool AudioItemFolderMaxi::refreshOrderedList(QString *error)
+{
+    if (!m_orderedList || m_orderedListPath.isEmpty()) {
+        if (error) *error=tr("This item is not a Radit list.");
+        return false;
+    }
+
+    const QString path=m_orderedListPath;
+    const QVector<Track> oldTracks=m_tracks;
+    const int oldNextTrack=m_nextOrderedTrack;
+    const QString currentTrack=m_currentTrack;
+    const bool currentTrackActive=isPlaying() || m_trackPrepared;
+    const bool trackPrepared=m_trackPrepared;
+    QString nextTrack;
+    if (oldNextTrack>=0 && oldNextTrack<oldTracks.size())
+        nextTrack=oldTracks.at(oldNextTrack).path;
+
+    if (!setOrderedListPath(path,error))
+        return false;
+
+    if (currentTrackActive) {
+        const auto current=std::find_if(m_tracks.cbegin(),m_tracks.cend(),
+            [&currentTrack](const Track &track) { return track.path==currentTrack; });
+        if (current!=m_tracks.cend()) {
+            m_nextOrderedTrack=int(current-m_tracks.cbegin())+1;
+            setSecond(current->seconds);
+            setTiempoFile(current->seconds);
+        } else {
+            const auto next=std::find_if(m_tracks.cbegin(),m_tracks.cend(),
+                [&nextTrack](const Track &track) { return track.path==nextTrack; });
+            m_nextOrderedTrack=next!=m_tracks.cend() ? int(next-m_tracks.cbegin())
+                : qBound(0,oldNextTrack,m_tracks.size());
+        }
+        m_currentTrack=currentTrack;
+        m_trackPrepared=trackPrepared;
+    } else {
+        const auto next=std::find_if(m_tracks.cbegin(),m_tracks.cend(),
+            [&nextTrack](const Track &track) { return track.path==nextTrack; });
+        m_nextOrderedTrack=next!=m_tracks.cend() ? int(next-m_tracks.cbegin())
+            : qBound(0,oldNextTrack,m_tracks.size());
+        m_currentTrack.clear();
+        m_trackPrepared=false;
+    }
+    return true;
+}
+
+QStringList AudioItemFolderMaxi::orderedTrackPaths() const
+{
+    QStringList paths;
+    if (!m_orderedList)
+        return paths;
+    paths.reserve(m_tracks.size());
+    for (const Track &track : m_tracks)
+        paths.append(track.path);
+    return paths;
+}
+
+QPair<int, int> AudioItemFolderMaxi::updateOrderedTrackDurations(
+    const QHash<QString, double> &durations)
+{
+    if (!m_orderedList)
+        return {0,0};
+
+    double totalSeconds=0.0;
+    int refreshed=0;
+    int failed=0;
+    for (Track &track : m_tracks) {
+        const auto duration=durations.constFind(track.path);
+        if (duration!=durations.cend() && std::isfinite(duration.value())
+            && duration.value()>0.0) {
+            track.seconds=duration.value();
+            ++refreshed;
+        } else {
+            ++failed;
+        }
+        totalSeconds+=track.seconds;
+    }
+
+    const bool currentTrackActive=isPlaying() || m_trackPrepared;
+    if (currentTrackActive) {
+        const auto current=std::find_if(m_tracks.cbegin(),m_tracks.cend(),
+            [this](const Track &track) { return track.path==m_currentTrack; });
+        if (current!=m_tracks.cend()) {
+            setSecond(current->seconds);
+            setTiempoFile(current->seconds);
+        }
+    } else {
+        setSecond(totalSeconds);
+        setTiempoFile(totalSeconds);
+    }
+    setFolderPresentation(tr("%1 files").arg(m_tracks.size()),!m_tracks.isEmpty());
+    return {refreshed,failed};
 }
 
 void AudioItemFolderMaxi::resetOrderedListPlayback()

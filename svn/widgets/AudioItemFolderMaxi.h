@@ -2,6 +2,7 @@
 #define AUDIOITEMFOLDERMAXI_H
 #include "widgets/AudioItemMaxi.h"
 #include <QDateTime>
+#include <QPair>
 #include <QVector>
 #include <QPointer>
 #include <QHash>
@@ -19,6 +20,9 @@ public:
     ~AudioItemFolderMaxi() override;
     void setFolderPath(const QString &path);
     bool setOrderedListPath(const QString &path, QString *error = nullptr);
+    bool refreshOrderedList(QString *error = nullptr);
+    QStringList orderedTrackPaths() const;
+    QPair<int, int> updateOrderedTrackDurations(const QHash<QString, double> &durations);
     bool isOrderedList() const { return m_orderedList; }
     QString orderedListPath() const { return m_orderedList ? m_orderedListPath : QString(); }
     void resetOrderedListPlayback();

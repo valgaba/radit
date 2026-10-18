@@ -2332,7 +2332,9 @@ void Planner::refreshAudioDurations()
         return;
 
     const QList<AudioItemFileMaxi*> fileItems=findChildren<AudioItemFileMaxi*>();
+    const QList<AudioItemFolderMaxi*> folderItems=findChildren<AudioItemFolderMaxi*>();
     QVector<QPointer<AudioItemFileMaxi>> targets;
+    QVector<QPointer<AudioItemFolderMaxi>> orderedLists;
     QStringList paths;
     QSet<QString> uniquePaths;
     for (AudioItemFileMaxi *item : fileItems) {
@@ -2344,7 +2346,24 @@ void Planner::refreshAudioDurations()
             paths.append(item->filePath());
         }
     }
-    if (targets.isEmpty()) {
+    int failedLists=0;
+    for (AudioItemFolderMaxi *item : folderItems) {
+        if (!item || !item->isOrderedList())
+            continue;
+        QString error;
+        if (!item->refreshOrderedList(&error)) {
+            ++failedLists;
+            continue;
+        }
+        orderedLists.append(item);
+        for (const QString &path : item->orderedTrackPaths()) {
+            if (path.isEmpty() || uniquePaths.contains(path))
+                continue;
+            uniquePaths.insert(path);
+            paths.append(path);
+        }
+    }
+    if (targets.isEmpty() && orderedLists.isEmpty()) {
         QMessageBox::information(this,tr("Update audio times"),
                                  tr("There are no audio files to update."));
         return;
@@ -2360,14 +2379,14 @@ void Planner::refreshAudioDurations()
 
     auto *watcher=new QFutureWatcher<QVector<QPair<QString,double>>>(this);
     connect(watcher,&QFutureWatcher<QVector<QPair<QString,double>>>::finished,
-            this,[this,watcher,progress,targets]() {
+            this,[this,watcher,progress,targets,orderedLists,failedLists]() {
         const auto results=watcher->result();
         QHash<QString,double> durations;
         for (const auto &result : results)
             durations.insert(result.first,result.second);
 
         int refreshed=0;
-        int failed=0;
+        int failed=failedLists;
         QSet<PlannerContents*> changedContents;
         for (const QPointer<AudioItemFileMaxi> &item : targets) {
             if (!item)
@@ -2391,6 +2410,21 @@ void Planner::refreshAudioDurations()
                 changedContents.insert(contents);
         }
 
+        int refreshedLists=0;
+        for (const QPointer<AudioItemFolderMaxi> &item : orderedLists) {
+            if (!item)
+                continue;
+            const auto listDurations=item->updateOrderedTrackDurations(durations);
+            refreshed+=listDurations.first;
+            failed+=listDurations.second;
+            ++refreshedLists;
+            QWidget *owner=item->parentWidget();
+            while (owner && !qobject_cast<PlannerContents*>(owner))
+                owner=owner->parentWidget();
+            if (auto *contents=qobject_cast<PlannerContents*>(owner))
+                changedContents.insert(contents);
+        }
+
         for (PlannerContents *contents : changedContents) {
             emit contents->contentDurationsChanged();
             emit contents->contentModified();
@@ -2401,7 +2435,8 @@ void Planner::refreshAudioDurations()
         progress->deleteLater();
         watcher->deleteLater();
         QMessageBox::information(this,tr("Update audio times"),
-            tr("Updated %1 audio item(s). Could not read %2.").arg(refreshed).arg(failed));
+            tr("Updated %1 audio item(s) and refreshed %2 list(s). Could not read %3.")
+                .arg(refreshed).arg(refreshedLists).arg(failed));
     });
 
     watcher->setFuture(QtConcurrent::run([paths]() {

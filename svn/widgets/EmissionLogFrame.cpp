@@ -75,6 +75,10 @@ EmissionLogFrame::EmissionLogFrame(EmissionLog *log, QWidget *parent)
     auto *searchRow=new QHBoxLayout;
     searchRow->setContentsMargins(5,0,5,2);
     searchRow->addWidget(m_search);
+    auto *clearButton=new QPushButton(tr("Clear history"),this);
+    clearButton->setObjectName(QStringLiteral("EmissionLogClearButton"));
+    connect(clearButton,&QPushButton::clicked,this,&EmissionLogFrame::clearHistory);
+    searchRow->addWidget(clearButton);
     root->addLayout(searchRow);
 
     m_table=new QTableWidget(this);
@@ -153,4 +157,21 @@ void EmissionLogFrame::exportCsv()
     if (!m_log->exportCsv(filename,m_fromDate->date(),m_toDate->date(),m_search->text(),&error))
         QMessageBox::warning(this,tr("Export emission log"),
                              tr("Could not export the log: %1").arg(error));
+}
+
+void EmissionLogFrame::clearHistory()
+{
+    if (!m_log)
+        return;
+    const QMessageBox::StandardButton answer=QMessageBox::question(
+        this,tr("Clear emission history"),
+        tr("Are you sure you want to delete the entire emission history? This cannot be undone."),
+        QMessageBox::Yes | QMessageBox::No,QMessageBox::No);
+    if (answer!=QMessageBox::Yes)
+        return;
+
+    QString error;
+    if (!m_log->clearHistory(&error))
+        QMessageBox::warning(this,tr("Clear emission history"),
+                             tr("Could not clear the entire emission history: %1").arg(error));
 }

@@ -223,6 +223,30 @@ QVector<EmissionRecord> EmissionLog::recordsBetween(const QDate &from, const QDa
     return records;
 }
 
+bool EmissionLog::clearHistory(QString *error)
+{
+    const QDir directory(m_directory);
+    const QStringList files=directory.entryList({QStringLiteral("*.jsonl")},QDir::Files);
+    QStringList failures;
+    for (const QString &name : files) {
+        if (!QFile::remove(directory.filePath(name)))
+            failures.append(name);
+    }
+
+    // The corresponding start records may have been removed, so do not append
+    // orphan finish events when currently playing items complete.
+    m_activeRecords.clear();
+    m_currentByEngine.clear();
+    emit recordsChanged();
+
+    if (!failures.isEmpty()) {
+        if (error)
+            *error=tr("Could not delete log files: %1").arg(failures.join(QStringLiteral(", ")));
+        return false;
+    }
+    return true;
+}
+
 bool EmissionLog::exportCsv(const QString &filename, const QDate &from, const QDate &to,
                             const QString &searchText, QString *error) const
 {
