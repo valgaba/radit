@@ -36,6 +36,8 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QFrame>
+#include <QGraphicsDropShadowEffect>
+#include <QLabel>
 #include <QEvent>
 #include <QResizeEvent>
 #include <QScrollArea>
@@ -387,9 +389,29 @@ public:
         setPalette(linePalette);
         setStyleSheet(QStringLiteral(
             "QFrame#PlannerCurrentTimeLine { background-color: white; border: none; }"));
+        m_timeLabel=new QLabel(timelineCanvas);
+        m_timeLabel->setObjectName("PlannerCurrentTimeLabel");
+        m_timeLabel->setAlignment(Qt::AlignLeft|Qt::AlignVCenter);
+        m_timeLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+        m_timeLabel->setAttribute(Qt::WA_AlwaysStackOnTop);
+        m_timeLabel->setStyleSheet(QStringLiteral(
+            "QLabel#PlannerCurrentTimeLabel { color: white; background-color: #181e2c; "
+            "border: 1px solid white; padding-left: 2px; font-size: 14px; font-weight: bold; }"));
+        auto *timeTextShadow=new QGraphicsDropShadowEffect(m_timeLabel);
+        timeTextShadow->setBlurRadius(3.0);
+        timeTextShadow->setOffset(0.0,0.0);
+        timeTextShadow->setColor(QColor(24,30,44));
+        m_timeLabel->setGraphicsEffect(timeTextShadow);
         timelineCanvas->installEventFilter(this);
         updateLineGeometry();
         hide();
+        m_timeLabel->hide();
+    }
+
+    void setDisplayedTime(const QTime &time)
+    {
+        if (m_timeLabel)
+            m_timeLabel->setText(time.toString(QStringLiteral("HH:mm:ss")));
     }
 
     void setTimePosition(qreal y)
@@ -407,6 +429,10 @@ public:
                 if (!isVisible())
                     show();
                 raise();
+                if (m_timeLabel) {
+                    m_timeLabel->show();
+                    m_timeLabel->raise();
+                }
             }
             return;
         }
@@ -414,8 +440,14 @@ public:
         if (active) {
             show();
             raise();
+            if (m_timeLabel) {
+                m_timeLabel->show();
+                m_timeLabel->raise();
+            }
         } else {
             hide();
+            if (m_timeLabel)
+                m_timeLabel->hide();
         }
     }
 
@@ -435,8 +467,15 @@ private:
             return;
         const int y=qBound(0,qRound(m_y),qMax(0,canvas->height()-height()));
         setGeometry(0,y,canvas->width(),height());
+        if (m_timeLabel) {
+            const int labelHeight=24;
+            const int labelY=qBound(0,y-labelHeight/2,
+                                    qMax(0,canvas->height()-labelHeight));
+            m_timeLabel->setGeometry(0,labelY,qMin(72,canvas->width()),labelHeight);
+        }
     }
 
+    QLabel *m_timeLabel = nullptr;
     qreal m_y = 0.0;
     bool m_active = false;
 };
@@ -1871,6 +1910,7 @@ public:
         m_playbackActive=playbackActive;
         const qint64 elapsedMilliseconds=now.time().msecsSinceStartOfDay();
         const qreal y=static_cast<qreal>(elapsedMilliseconds)*m_pixelsPerHour/3600000.0;
+        m_currentTimeLine->setDisplayedTime(now.time());
         m_currentTimeLine->setTimePosition(y);
         m_currentTimeLine->setLineActive(playbackActive);
         if (playbackActive && centerInViewport) {
