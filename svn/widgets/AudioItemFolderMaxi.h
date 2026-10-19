@@ -22,6 +22,7 @@ public:
     bool setOrderedListPath(const QString &path, QString *error = nullptr);
     bool refreshOrderedList(QString *error = nullptr);
     QStringList orderedTrackPaths() const;
+    double orderedListDurationSeconds(bool *known = nullptr) const;
     QPair<int, int> updateOrderedTrackDurations(const QHash<QString, double> &durations);
     bool isOrderedList() const { return m_orderedList; }
     QString orderedListPath() const { return m_orderedList ? m_orderedListPath : QString(); }

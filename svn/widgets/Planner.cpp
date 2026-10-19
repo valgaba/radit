@@ -1272,7 +1272,12 @@ private:
                     continue;
                 hasContents=true;
                 double itemDuration=0.0;
-                if (auto *audio=qobject_cast<AudioItemFilePlanner*>(content))
+                if (auto *list=qobject_cast<AudioItemFolderMaxi*>(content);
+                    list && list->isOrderedList()) {
+                    bool listDurationKnown=false;
+                    itemDuration=list->orderedListDurationSeconds(&listDurationKnown);
+                    durationIsKnown=durationIsKnown && listDurationKnown;
+                } else if (auto *audio=qobject_cast<AudioItemFilePlanner*>(content))
                     itemDuration=audio->second();
                 else if (auto *radio=qobject_cast<AudioItemNetPlanner*>(content))
                     itemDuration=radio->connectionDurationSeconds();

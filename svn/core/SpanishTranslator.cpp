@@ -412,7 +412,7 @@ QString SpanishTranslator::translate(const char *context, const char *sourceText
         {QStringLiteral("Remove this folder from favorites: %1"),QStringLiteral("Quitar esta carpeta de favoritos: %1")},
         {QStringLiteral("Reset User Interface"),QStringLiteral("Restablecer interfaz")},
         {QStringLiteral("Save the changes to this Planner?"),QStringLiteral("¿Quieres guardar los cambios de este Planner?")},
-        {QStringLiteral("Save the changes to this Player?"),QStringLiteral("¿Quieres guardar los cambios de este reproductor?")},
+        {QStringLiteral("Save the changes to %1?"),QStringLiteral("¿Quieres guardar los cambios de %1?")},
         {QStringLiteral("Save the changes to this Standby?"),QStringLiteral("¿Quieres guardar los cambios de este Standby?")},
         {QStringLiteral("Select a location and click Apply."),QStringLiteral("Selecciona una ubicación y pulsa Aplicar.")},
         {QStringLiteral("Show Emission Log"),QStringLiteral("Mostrar log de emisión")},

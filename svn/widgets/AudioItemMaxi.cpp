@@ -219,12 +219,12 @@ AudioItemMaxi::AudioItemMaxi(QWidget *parent):AudioItem(parent){
 
         labeltiempo = new Label;
         labeltiempo->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        labeltiempo->setFixedWidth(125);   // Fija solo el ancho
         // Cambiar tamaño de fuente
         QFont font = labeltiempo->font();
         font.setPointSize(16); //16
         font.setBold(true);
         labeltiempo->setFont(font);
+        labeltiempo->setFixedWidth(labeltiempo->fontMetrics().horizontalAdvance(QStringLiteral("00:00:00.00"))+16);
 
         QFont fontnombre = labelnombre->font();
         fontnombre.setPointSize(12);
@@ -351,7 +351,6 @@ void AudioItemMaxi::setCompactPresentation(bool showProperties)
     framecenterleft->hide();
     labelnombre->setFixedHeight(26);
     labeltiempo->setFixedHeight(26);
-    labeltiempo->setFixedWidth(78);
     labeltiempo->setWordWrap(false);
 
     QFont compactNameFont=labelnombre->font();
@@ -363,6 +362,7 @@ void AudioItemMaxi::setCompactPresentation(bool showProperties)
     compactTimeFont.setPointSize(10);
     compactTimeFont.setBold(false);
     labeltiempo->setFont(compactTimeFont);
+    labeltiempo->setFixedWidth(labeltiempo->fontMetrics().horizontalAdvance(QStringLiteral("00:00:00.00"))+12);
 
     layouttop->removeWidget(btnproperties);
     if (showProperties) {

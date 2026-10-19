@@ -297,7 +297,6 @@ Player::Player(QWidget *parent) : Frame(parent) {
       labelnombre->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
       labeltiempo = new Label;
       labeltiempo->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-      labeltiempo->setFixedWidth(125);   // Fija solo el ancho
       labelnombre->setObjectName("labelnombre");
       labeltiempo->setObjectName("labeltiempo");
 
@@ -306,6 +305,7 @@ Player::Player(QWidget *parent) : Frame(parent) {
       font.setPointSize(16);
       font.setBold(true);
       labeltiempo->setFont(font);
+      labeltiempo->setFixedWidth(labeltiempo->fontMetrics().horizontalAdvance(QStringLiteral("00:00:00.00"))+16);
       labeltiempo->setText("00:00:00.00");
 
       labeltiempo->setFixedHeight(25); //45

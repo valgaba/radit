@@ -32,6 +32,7 @@
 #include "core/io.h"
 
 #include "widgets/TabPlayer.h"
+#include "widgets/Player.h"
 #include "widgets/TapPlayerMenu.h"
 #include "widgets/tabbar.h"
 #include "widgets/container.h"
@@ -273,8 +274,20 @@ bool TabPlayer::confirmSaveChanges()
 {
     if (!m_modified)
         return true;
-    QMessageBox prompt(QMessageBox::Warning,tr("Unsaved Player changes"),
-                       tr("Save the changes to this Player?"),QMessageBox::NoButton,this);
+    QString playerTitle;
+    for (QWidget *owner=parentWidget(); owner; owner=owner->parentWidget()) {
+        if (auto *player=qobject_cast<Player*>(owner)) {
+            playerTitle=player->title();
+            break;
+        }
+    }
+    if (playerTitle.isEmpty())
+        playerTitle=tr("Player");
+
+    QMessageBox prompt(QMessageBox::Warning,
+                       tr("Unsaved Player changes")+QStringLiteral(" — ")+playerTitle,
+                       tr("Save the changes to %1?").arg(playerTitle),
+                       QMessageBox::NoButton,this);
     QPushButton *saveButton=prompt.addButton(tr("Save"),QMessageBox::AcceptRole);
     QPushButton *discardButton=prompt.addButton(tr("Discard"),QMessageBox::DestructiveRole);
     prompt.addButton(QMessageBox::Cancel);

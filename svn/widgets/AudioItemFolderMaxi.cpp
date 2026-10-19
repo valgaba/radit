@@ -596,6 +596,25 @@ QStringList AudioItemFolderMaxi::orderedTrackPaths() const
     return paths;
 }
 
+double AudioItemFolderMaxi::orderedListDurationSeconds(bool *known) const
+{
+    if (known)
+        *known=m_orderedList && !m_tracks.isEmpty();
+    if (!m_orderedList)
+        return 0.0;
+
+    double totalSeconds=0.0;
+    for (const Track &track : m_tracks) {
+        if (!std::isfinite(track.seconds) || track.seconds<=0.0) {
+            if (known)
+                *known=false;
+            continue;
+        }
+        totalSeconds+=track.seconds;
+    }
+    return totalSeconds;
+}
+
 QPair<int, int> AudioItemFolderMaxi::updateOrderedTrackDurations(
     const QHash<QString, double> &durations)
 {
