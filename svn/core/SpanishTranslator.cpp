@@ -269,6 +269,8 @@ QString SpanishTranslator::translate(const char *context, const char *sourceText
         {QStringLiteral("Version %1"),QStringLiteral("Versión %1")},
         {QStringLiteral("Installed version: %1"),QStringLiteral("Versión instalada: %1")},
         {QStringLiteral("Latest available version: %1"),QStringLiteral("Última versión disponible: %1")},
+        {QStringLiteral("Donate to the project"),QStringLiteral("Donar al proyecto")},
+        {QStringLiteral("Support the Radit project"),QStringLiteral("Apoya el proyecto Radit")},
         {QStringLiteral("Checking…"),QStringLiteral("Consultando…")},
         {QStringLiteral("View/Edit ID3 tags..."),QStringLiteral("Ver/editar etiquetas ID3...")},
         {QStringLiteral("Visit website"),QStringLiteral("Visitar sitio web")},

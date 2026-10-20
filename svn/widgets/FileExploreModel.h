@@ -3,6 +3,7 @@
 
 #include <QAbstractItemModel>
 #include <QDateTime>
+#include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
 #include <QFutureWatcher>
@@ -17,14 +18,62 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
+#if defined(Q_OS_WIN)
+#include <objbase.h>
+#include <shobjidl.h>
+#endif
+
+namespace {
+QString resolveShellShortcut(const QString &path)
+{
+#if defined(Q_OS_WIN)
+    const HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const bool uninitialize = SUCCEEDED(initialized);
+    if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE)
+        return {};
+
+    QString target;
+    IShellLinkW *shellLink = nullptr;
+    HRESULT result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
+                                      IID_IShellLinkW, reinterpret_cast<void **>(&shellLink));
+    if (SUCCEEDED(result) && shellLink) {
+        IPersistFile *persistFile = nullptr;
+        result = shellLink->QueryInterface(IID_IPersistFile,
+                                           reinterpret_cast<void **>(&persistFile));
+        if (SUCCEEDED(result) && persistFile) {
+            const std::wstring nativePath = QDir::toNativeSeparators(path).toStdWString();
+            result = persistFile->Load(nativePath.c_str(), STGM_READ);
+            if (SUCCEEDED(result)) {
+                std::vector<wchar_t> buffer(32768, L'\0');
+                WIN32_FIND_DATAW findData{};
+                result = shellLink->GetPath(buffer.data(), static_cast<int>(buffer.size()),
+                                            &findData, SLGP_RAWPATH);
+                if (SUCCEEDED(result) && buffer.front() != L'\0')
+                    target = QString::fromWCharArray(buffer.data());
+            }
+            persistFile->Release();
+        }
+        shellLink->Release();
+    }
+
+    if (uninitialize)
+        CoUninitialize();
+    return target;
+#else
+    Q_UNUSED(path);
+    return {};
+#endif
+}
+}
 
 // Filesystem access and sorting run on workers. Only small, unsorted insertion
 // batches reach the GUI; no QFileSystemModel gatherer or shell icons are used.
 class FileExploreModel : public QAbstractItemModel
 {
     struct Entry {
-        QString path, name;
+        QString path, name, linkTarget;
         bool directory = false;
         QFile::Permissions permissions;
         QDateTime date;
@@ -160,7 +209,7 @@ public:
         QList<QUrl> urls;
         for (const auto &index : indexes) {
             if (!index.isValid()) continue;
-            const QUrl url = QUrl::fromLocalFile(filePath(index));
+            const QUrl url = QUrl::fromLocalFile(activationPath(index));
             if (!urls.contains(url)) urls.append(url);
         }
         mime->setUrls(urls);
@@ -168,6 +217,11 @@ public:
     }
     Qt::DropActions supportedDragActions() const override { return Qt::CopyAction; }
     QString filePath(const QModelIndex &index) const { return nodeFor(index)->entry.path; }
+    QString activationPath(const QModelIndex &index) const
+    {
+        const Entry &entry = nodeFor(index)->entry;
+        return entry.linkTarget.isEmpty() ? entry.path : entry.linkTarget;
+    }
     QString fileName(const QModelIndex &index) const { return nodeFor(index)->entry.name; }
     bool isDir(const QModelIndex &index) const { return nodeFor(index)->entry.directory; }
     QFile::Permissions permissions(const QModelIndex &index) const { return nodeFor(index)->entry.permissions; }
@@ -234,12 +288,24 @@ private:
                 while (!cancel->load() && iterator.hasNext()) {
                     iterator.next();
                     const QFileInfo info = iterator.fileInfo();
+                    const bool shortcut = info.suffix().compare(QStringLiteral("lnk"), Qt::CaseInsensitive) == 0;
                     const bool isDir = info.isDir();
-                    if (!isDir && !QDir::match(filters, info.fileName())) continue;
+                    if (!isDir && !shortcut && !QDir::match(filters, info.fileName())) continue;
                     Entry entry;
                     entry.path = info.absoluteFilePath();
                     entry.name = info.fileName();
                     entry.directory = isDir;
+                    if (shortcut) {
+                        entry.linkTarget = resolveShellShortcut(entry.path);
+                        if (!entry.linkTarget.isEmpty()) {
+                            const QFileInfo targetInfo(entry.linkTarget);
+                            entry.directory = targetInfo.isDir();
+                            entry.name = targetInfo.fileName().isEmpty()
+                                ? info.completeBaseName() : targetInfo.fileName();
+                            if (entry.directory)
+                                entry.permissions = targetInfo.permissions();
+                        }
+                    }
                     // File permissions are not used by the browser. Avoid an
                     // extra metadata query for every audio file on network shares.
                     if (isDir) entry.permissions = info.permissions();

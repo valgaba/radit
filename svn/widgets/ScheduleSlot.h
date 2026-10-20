@@ -36,6 +36,8 @@ public:
     void setTotalDuration(double seconds, bool known);
     void setAccentColor(const QColor &color);
     void setTimelineHeight(int height);
+    void fitContentsToHeight(int maxHeight);
+    void fitContentsToAvailableHeight();
     void setScheduleDisabled(bool disabled);
     void setPriority(bool priority);
     void setStandbyTrackWait(bool enabled);

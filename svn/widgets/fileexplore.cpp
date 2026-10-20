@@ -103,6 +103,7 @@ QStringList explorerNameFilters()
     filters.append("*.standby");
     filters.append("*.player");
     filters.append("*.zip");
+    filters.append("*.lnk");
     filters.removeDuplicates();
     return filters;
 }
@@ -548,7 +549,7 @@ FileExplore::FileExplore(QWidget *parent) : Frame(parent)
     });
     connect(m_tree, &QTreeView::activated, this, [this](const QModelIndex &index) {
         const QModelIndex source = m_filter->mapToSource(index);
-        const QString path = m_model->filePath(source);
+        const QString path = m_model->activationPath(source);
         if (m_model->isDir(source))
             setPath(path);
         else

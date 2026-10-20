@@ -319,26 +319,88 @@ void PlannerContents::dropEvent(QDropEvent *event)
     }
 
     if (!draggedItems.isEmpty() && allFromPlannerLists) {
-        // Reorder within a slot or move between Planner slots without duplicating.
-        ContentsPlayer::dropEvent(event);
-        QList<PlannerContents*> affectedLists=sourceLists;
-        if (!affectedLists.contains(this))
-            affectedLists.append(this);
-        for (PlannerContents *list : std::as_const(affectedLists)) {
-            QWidget *slot=list;
-            while (slot && !qobject_cast<ScheduleSlot*>(slot))
-                slot=slot->parentWidget();
-            for (AudioItemMaxi *item : list->findChildren<AudioItemMaxi*>()) {
-                item->setPlannerEnableControlVisible(slot!=nullptr);
-                if (!slot)
-                    item->setEnabledForPlayback(true);
+        if (sourceLists.size()==1 && sourceLists.constFirst()==this) {
+            // Reorder within the same ScheduleSlot; normalize the insertion
+            // index after removing the dragged widgets. In particular, dropping
+            // at the end starts with count(), which is too large after removal.
+            QList<AudioItemMaxi*> movingItems;
+            for (AudioItem *source : std::as_const(draggedItems)) {
+                if (auto *item=qobject_cast<AudioItemMaxi*>(source))
+                    movingItems.append(item);
             }
+
+            QList<AudioItemMaxi*> orderedItems;
+            for (int i=0; i<layout->count(); ++i) {
+                auto *item=qobject_cast<AudioItemMaxi*>(layout->itemAt(i)->widget());
+                if (item && movingItems.contains(item))
+                    orderedItems.append(item);
+            }
+
+            QWidget *targetWidget=childAt(event->position().toPoint());
+            while (targetWidget && !qobject_cast<AudioItemMaxi*>(targetWidget))
+                targetWidget=targetWidget->parentWidget();
+            int targetIndex=targetWidget ? layout->indexOf(targetWidget) : layout->count();
+            if (targetIndex<0)
+                targetIndex=layout->count();
+
+            int movingBeforeTarget=0;
+            for (int i=0; i<targetIndex; ++i) {
+                auto *item=qobject_cast<AudioItemMaxi*>(layout->itemAt(i)->widget());
+                if (item && movingItems.contains(item))
+                    ++movingBeforeTarget;
+            }
+            int insertIndex=qBound(0,targetIndex-movingBeforeTarget,layout->count());
+            for (AudioItemMaxi *item : std::as_const(orderedItems))
+                layout->removeWidget(item);
+            insertIndex=qBound(0,insertIndex,layout->count());
+            for (AudioItemMaxi *item : std::as_const(orderedItems)) {
+                layout->insertWidget(insertIndex++,item);
+                item->setParent(this);
+                item->setIsSelect(false);
+            }
+
+            emit contentsModified();
+            emit contentModified();
+            emit contentDurationsChanged();
+            event->acceptProposedAction();
+            return;
         }
-        for (PlannerContents *sourceList : sourceLists) {
-            if (sourceList!=this)
-                emit sourceList->contentDurationsChanged();
+
+        // A cross-slot drop must keep Planner item subclasses. The generic
+        // ContentsPlayer handler converts these to Maxi items, which leaves
+        // non-Planner widgets inside a ScheduleSlot and breaks its playback/UI
+        // assumptions. Clone through the Planner copy path, then remove sources.
+        QWidget *targetWidget=childAt(event->position().toPoint());
+        while (targetWidget && !qobject_cast<AudioItemMaxi*>(targetWidget))
+            targetWidget=targetWidget->parentWidget();
+        int insertIndex=targetWidget ? layout->indexOf(targetWidget) : layout->count();
+        if (insertIndex<0)
+            insertIndex=layout->count();
+
+        for (AudioItem *source : std::as_const(draggedItems)) {
+            auto *audioSource=qobject_cast<AudioItemMaxi*>(source);
+            if (!audioSource)
+                continue;
+
+            QWidget *owner=audioSource->parentWidget();
+            while (owner && !qobject_cast<ContentsPlayer*>(owner))
+                owner=owner->parentWidget();
+            auto *sourceContents=qobject_cast<PlannerContents*>(owner);
+            if (!sourceContents)
+                continue;
+
+            AudioItemMaxi *plannerCopy=makePlannerItem(audioSource,this);
+            AudioItemMaxi *created=plannerCopy ? createItem(plannerCopy) : nullptr;
+            if (!created)
+                continue;
+
+            layout->removeWidget(created);
+            layout->insertWidget(qBound(0,insertIndex,layout->count()),created);
+            ++insertIndex;
+            sourceContents->deleteItem(audioSource);
         }
-        emit contentDurationsChanged();
+
+        event->acceptProposedAction();
         return;
     }
 

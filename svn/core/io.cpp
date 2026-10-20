@@ -37,7 +37,7 @@
 #include "widgets/AudioItemListMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include "widgets/contentsbase.h"
-#include "widgets/AudioItemFilemaxi.h"
+#include "widgets/AudioItemFileMaxi.h"
 #include "widgets/TabPlayer.h"
 #include "widgets/PlannerContents.h"
 #include "widgets/tabbar.h"

@@ -154,7 +154,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 # -------------------------------------------------
 # mis lib
 # -------------------------------------------------
-win32:LIBS += -lcrypt32
+win32:LIBS += -lcrypt32 -lole32 -luuid
 
 
 win32 {

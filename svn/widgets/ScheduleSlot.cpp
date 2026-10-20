@@ -369,6 +369,36 @@ void ScheduleSlot::setTimelineHeight(int height)
     setFixedHeight(m_contentsVisible ? m_timelineHeight : m_header->height()+2);
 }
 
+void ScheduleSlot::fitContentsToHeight(int maxHeight)
+{
+    if (m_standbyListEvent)
+        return;
+
+    if (!m_contentsVisible)
+        setContentsVisible(true);
+
+    if (m_contents && m_contents->layout)
+        m_contents->layout->activate();
+    const int contentsHeight=m_contents && m_contents->layout
+        ? m_contents->layout->sizeHint().height() : 0;
+    const int desiredHeight=m_header->height()+qMax(0,contentsHeight)+4;
+    const int minimumHeight=m_header->height()+2;
+    m_timelineHeight=qBound(minimumHeight,desiredHeight,qMax(minimumHeight,maxHeight));
+    setFixedHeight(m_timelineHeight);
+}
+
+void ScheduleSlot::fitContentsToAvailableHeight()
+{
+    int maxHeight=height();
+    QWidget *ancestor=parentWidget();
+    while (ancestor && !qobject_cast<QScrollArea*>(ancestor))
+        ancestor=ancestor->parentWidget();
+    if (auto *scrollArea=qobject_cast<QScrollArea*>(ancestor))
+        maxHeight=qMax(m_header->height()+2,
+                       qRound(scrollArea->viewport()->height()*0.72));
+    fitContentsToHeight(maxHeight);
+}
+
 void ScheduleSlot::setScheduleDisabled(bool disabled)
 {
     if (m_disabled==disabled)
@@ -460,6 +490,7 @@ bool ScheduleSlot::eventFilter(QObject *watched, QEvent *event)
 {
     if ((watched==m_header || watched==m_time)
         && event->type()==QEvent::MouseButtonDblClick) {
+        fitContentsToAvailableHeight();
         emit focusRequested(this);
     }
     return Frame::eventFilter(watched,event);

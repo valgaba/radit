@@ -17,6 +17,7 @@
 
 #include <QDebug>
 #include <QDateTime>
+#include <QFont>
 #include <QSpacerItem>
 #include <QTimer>
 #include <QGraphicsOpacityEffect>
@@ -427,6 +428,14 @@ void AudioItemMaxi::setEnabledForPlayback(bool enabled)
 
 void AudioItemMaxi::updatePlannerEnabledAppearance()
 {
+    if (labelnombre) {
+        QFont nameFont = labelnombre->font();
+        const bool strikeOut = !m_isEnabled;
+        if (nameFont.strikeOut() != strikeOut) {
+            nameFont.setStrikeOut(strikeOut);
+            labelnombre->setFont(nameFont);
+        }
+    }
     if (!btnPlannerEnabled) return;
     btnPlannerEnabled->setIcon(QIcon(m_isEnabled ? ":/icons/CheckBox.svg" : ":/icons/Disabled.svg"));
     btnPlannerEnabled->setToolTip(m_isEnabled ? tr("Disable this scheduled item")

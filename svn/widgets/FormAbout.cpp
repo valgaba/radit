@@ -19,6 +19,7 @@
 #include <QCoreApplication>
 #include <QDate>
 #include <QDateTime>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QKeyEvent>
@@ -70,6 +71,12 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     website->setOpenExternalLinks(true);
     website->setToolTip(tr("Visit the Radit website"));
     left->addWidget(website);
+    auto *donate = label(QStringLiteral("<a href=\"https://www.paypal.com/donate?hosted_button_id=LPGEM5WJTL5HW\" style=\"color:#80A4AE;text-decoration:none\">♥ %1</a>")
+                             .arg(tr("Donate to the project")), "AboutDonate");
+    donate->setOpenExternalLinks(true);
+    donate->setToolTip(tr("Support the Radit project"));
+    donate->setStyleSheet(QStringLiteral("font-size: 16px; font-weight: bold;"));
+    left->addWidget(donate);
     columns->addLayout(left, 1);
 
     auto *center = new QVBoxLayout;
@@ -101,10 +108,18 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
     center->addWidget(logo, 0, Qt::AlignHCenter);
     center->addWidget(label("radit", "AboutName"));
     center->addStretch();
-    const QDate buildDate = QLocale(QLocale::English).toDate(
-        QString::fromLatin1(__DATE__).simplified(), QStringLiteral("MMM d yyyy"));
-    const QTime buildTime = QLocale(QLocale::C).toTime(
-        QString::fromLatin1(__TIME__).simplified(), QStringLiteral("HH:mm:ss"));
+    QDateTime buildDateTime = QFileInfo(QCoreApplication::applicationFilePath()).lastModified();
+    if (!buildDateTime.isValid()) {
+        const QDate buildDateFallback = QLocale(QLocale::English).toDate(
+            QString::fromLatin1(__DATE__).simplified(), QStringLiteral("MMM d yyyy"));
+        const QTime buildTimeFallback = QLocale(QLocale::C).toTime(
+            QString::fromLatin1(__TIME__).simplified(), QStringLiteral("HH:mm:ss"));
+        if (buildDateFallback.isValid() && buildTimeFallback.isValid())
+            buildDateTime = QDateTime(buildDateFallback, buildTimeFallback);
+    }
+    buildDateTime = buildDateTime.toLocalTime();
+    const QDate buildDate = buildDateTime.date();
+    const QTime buildTime = buildDateTime.time();
     const QString version = QCoreApplication::applicationVersion().isEmpty()
         ? QStringLiteral("1.0.0") : QCoreApplication::applicationVersion();
     const QString revision = buildDate.isValid() && buildTime.isValid()

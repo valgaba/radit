@@ -692,7 +692,7 @@ public:
         slot->setTimeText(timeText);
         slot->setEntryTime(secondsAfterMidnight);
         attachSlot(slot);
-        updateSlotPositions();
+        updateSlotPositions(true);
         slot->show();
         return slot;
     }
@@ -731,7 +731,7 @@ public:
         }
         slot->hide();
         slot->deleteLater();
-        updateSlotPositions();
+        updateSlotPositions(false);
     }
 
     bool hasSlotStartingWithin(int nowMilliseconds, int windowMilliseconds) const
@@ -822,7 +822,7 @@ public:
             delete entry.widget;
         }
         m_slots.clear();
-        updateSlotPositions();
+        updateSlotPositions(false);
     }
 
     bool loadSlots(const QJsonArray &slotArray, QString *error)
@@ -849,7 +849,7 @@ public:
             }
         }
         m_contentAutoFocusEnabled=true;
-        updateSlotPositions();
+        updateSlotPositions(true);
         return true;
     }
 
@@ -858,19 +858,19 @@ private:
     {
         m_slots.append({slot});
         connect(slot,&ScheduleSlot::entryTimeChanged,this,[this]() {
-            updateSlotPositions();
+            updateSlotPositions(false);
             markDocumentModified();
         });
         connect(slot,&ScheduleSlot::accentColorChanged,this,[this]() {
-            updateSlotPositions();
+            updateSlotPositions(false);
             markDocumentModified();
         });
         connect(slot,&ScheduleSlot::disabledChanged,this,[this]() {
-            updateSlotPositions();
+            updateSlotPositions(false);
             markDocumentModified();
         });
         connect(slot->contents(),&PlannerContents::contentDurationsChanged,this,[this]() {
-            updateSlotPositions();
+            updateSlotPositions(false);
             markDocumentModified();
         });
         connect(slot->contents(),&PlannerContents::contentModified,this,[this]() {
@@ -882,8 +882,11 @@ private:
                 return;
             QPointer<ScheduleSlot> pendingFocus=slot;
             QTimer::singleShot(0,this,[this,pendingFocus]() {
-                if (pendingFocus && m_focusSlot)
+                if (pendingFocus && m_focusSlot) {
+                    pendingFocus->fitContentsToAvailableHeight();
+                    updateSlotPositions(false);
                     m_focusSlot(pendingFocus);
+                }
             });
         });
         connect(slot,&ScheduleSlot::closeRequested,this,[this](ScheduleSlot *closingSlot) {
@@ -909,7 +912,7 @@ private:
             }
             closingSlot->hide();
             closingSlot->deleteLater();
-            updateSlotPositions();
+            updateSlotPositions(false);
             markDocumentModified();
         });
         connect(slot,&ScheduleSlot::copyRequested,this,[this](ScheduleSlot *source) {
@@ -958,6 +961,7 @@ private:
             }
         });
         connect(slot,&ScheduleSlot::focusRequested,this,[this](ScheduleSlot *focusedSlot) {
+            updateSlotPositions(false);
             if (m_focusSlot)
                 m_focusSlot(focusedSlot);
         });
@@ -983,14 +987,14 @@ public:
     {
         m_pixelsPerHour=pixelsPerHour;
         setFixedHeight(24*pixelsPerHour+1);
-        updateSlotPositions();
+        updateSlotPositions(true);
     }
 
 protected:
     void resizeEvent(QResizeEvent *event) override
     {
         QWidget::resizeEvent(event);
-        updateSlotPositions();
+        updateSlotPositions(false);
     }
 
     struct TimedSlot {
@@ -1283,7 +1287,7 @@ private:
             markDocumentModified();
     }
 
-    void updateSlotPositions()
+    void updateSlotPositions(bool resizeToDuration = false)
     {
         struct Placement {
             ScheduleSlot *widget = nullptr;
@@ -1296,9 +1300,13 @@ private:
         for (const TimedSlot &entry : m_slots) {
             if (entry.widget->isStandbyListChangeEvent()) {
                 entry.widget->setTotalDuration(0.0,true);
-                entry.widget->setTimelineHeight(27);
+                if (resizeToDuration)
+                    entry.widget->setTimelineHeight(27);
                 const int second=entry.widget->entrySecond();
-                placements.append({entry.widget,second,second+1,0});
+                const int displayedDurationSeconds=qMax(1,static_cast<int>(std::ceil(
+                    entry.widget->height()*3600.0/m_pixelsPerHour)));
+                placements.append({entry.widget,second,
+                                   qMin(24*60*60,second+displayedDurationSeconds),0});
                 continue;
             }
             double durationSeconds=0.0;
@@ -1328,19 +1336,20 @@ private:
             }
             entry.widget->setTotalDuration(durationSeconds,
                                            hasContents && durationIsKnown && durationSeconds>0.0);
-            if (entry.widget->isStandbyListChangeEvent())
-                durationSeconds=1.0;
-            else if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
-                durationSeconds=15.0*60.0;
+            if (resizeToDuration) {
+                if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
+                    durationSeconds=15.0*60.0;
+                const int startSeconds=entry.widget->entrySecond();
+                durationSeconds=qMin(durationSeconds,
+                                     double(qMax(1,24*60*60-startSeconds)));
+                const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
+                entry.widget->setTimelineHeight(slotHeight);
+            }
             const int startSeconds=entry.widget->entrySecond();
-            durationSeconds=qMin(durationSeconds,double(qMax(1,24*60*60-startSeconds)));
-            const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
-            entry.widget->setTimelineHeight(slotHeight);
-            const int endSeconds=qMin(24*60*60,startSeconds+qMax(1,qRound(durationSeconds)));
             const int displayedDurationSeconds=qMax(1,static_cast<int>(std::ceil(
                 entry.widget->height()*3600.0/m_pixelsPerHour)));
             placements.append({entry.widget,startSeconds,
-                               qMin(24*60*60,qMax(endSeconds,startSeconds+displayedDurationSeconds)),0});
+                               qMin(24*60*60,startSeconds+displayedDurationSeconds),0});
         }
 
         std::sort(placements.begin(),placements.end(),[](const Placement &left,const Placement &right) {
@@ -1500,17 +1509,6 @@ public:
                     dayButton->setChecked(true);
                 m_pages->setCurrentIndex(index);
                 m_timeRuler->setSlotIntervals(dayPage->slotIntervals());
-
-                const int viewportHeight=qMax(1,m_scrollArea->viewport()->height());
-                const double durationMinutes=slot->height()*60.0/qMax(1,m_pixelsPerHour);
-                const double targetHeight=viewportHeight*0.72;
-                int targetScale=m_pixelsPerHour;
-                while (targetScale<6400
-                       && durationMinutes*targetScale/60.0<targetHeight) {
-                    targetScale=qMin(6400,targetScale*2);
-                }
-                if (targetScale!=m_pixelsPerHour)
-                    setZoom(targetScale,false);
 
                 QPointer<ScheduleSlot> pendingSlot=slot;
                 QTimer::singleShot(0,this,[this,pendingSlot]() {
