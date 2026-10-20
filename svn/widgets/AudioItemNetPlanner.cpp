@@ -13,7 +13,7 @@ AudioItemNetPlanner::AudioItemNetPlanner(QWidget *parent)
 {
     setObjectName("AudioItemNetPlanner");
     setCompactPresentation(true);
-    setTiempoFile(m_connectionDurationSeconds);
+    setTiempoFile(m_connectionDurationSeconds,false);
 }
 
 AudioItemNetPlanner::AudioItemNetPlanner(const AudioItemNetMaxi &source, QWidget *parent)
@@ -43,7 +43,7 @@ void AudioItemNetPlanner::setConnectionDurationSeconds(int seconds)
     if (boundedSeconds==m_connectionDurationSeconds)
         return;
     m_connectionDurationSeconds=boundedSeconds;
-    setTiempoFile(m_connectionDurationSeconds);
+    setTiempoFile(m_connectionDurationSeconds,false);
     emit connectionDurationChanged();
 }
 

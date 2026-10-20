@@ -33,6 +33,7 @@
 #include <QButtonGroup>
 #include <QStackedWidget>
 #include <QFontMetrics>
+#include <QDebug>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QFrame>
@@ -492,9 +493,11 @@ public:
         setContextMenuPolicy(Qt::CustomContextMenu);
     }
 
-    void setPixelsPerHour(int pixelsPerHour)
+    void setTimelineScale(int pixelsPerHour, int endSeconds)
     {
-        setFixedHeight(24*pixelsPerHour+1);
+        m_pixelsPerHour=pixelsPerHour;
+        m_endSeconds=qMax(24*60*60,endSeconds);
+        setFixedHeight(qRound(m_endSeconds*m_pixelsPerHour/3600.0)+1);
         update();
     }
 
@@ -504,11 +507,19 @@ public:
         update();
     }
 
+    void setNextDayName(const QString &name)
+    {
+        if (m_nextDayName==name)
+            return;
+        m_nextDayName=name;
+        update();
+    }
+
 protected:
     void mouseMoveEvent(QMouseEvent *event) override
     {
-        const int usableHeight=qMax(1,height()-1);
-        const int second=qBound(0,qRound(event->position().y()*24.0*60*60/usableHeight),24*60*60-1);
+        const int second=qBound(0,qRound(event->position().y()*3600.0/m_pixelsPerHour),
+                                m_endSeconds-1);
         const QTime time(0,0);
         QToolTip::showText(mapToGlobal(event->position().toPoint()),
                            time.addSecs(second).toString("HH:mm:ss"),this);
@@ -532,21 +543,41 @@ protected:
         const QFontMetrics metrics(font());
         painter.setFont(font());
 
+        if (m_endSeconds>24*60*60) {
+            const int midnightY=qBound(0,qRound((24*60*60)*m_pixelsPerHour/3600.0),
+                                       rulerBottom);
+            painter.fillRect(QRect(0,midnightY,width(),height()-midnightY),
+                             QColor("#202b3a"));
+            QPen nextDaySeparator(QColor("#80A4AE"));
+            nextDaySeparator.setStyle(Qt::DashLine);
+            painter.setPen(nextDaySeparator);
+            painter.drawLine(0,midnightY,width()-2,midnightY);
+
+            const QRect nextDayLabel(3,midnightY+4,labelRight-3,metrics.height());
+            painter.fillRect(nextDayLabel,QColor("#35465a"));
+            painter.setPen(QColor("#c3d2d7"));
+            QFont nextDayFont=font();
+            nextDayFont.setPointSize(qMax(7,nextDayFont.pointSize()-1));
+            painter.setFont(nextDayFont);
+            const QString label=QFontMetrics(nextDayFont).elidedText(
+                m_nextDayName,Qt::ElideRight,nextDayLabel.width());
+            painter.drawText(nextDayLabel,Qt::AlignLeft|Qt::AlignVCenter,label);
+            painter.setFont(font());
+        }
+
         painter.setPen(QColor("#333b4f"));
         painter.drawLine(width()-1,0,width()-1,rulerBottom);
-        for (int quarter=0; quarter<=96; ++quarter) {
-            const int y=qMin(rulerBottom,quarter*(height()-1)/96);
-            const bool hour=(quarter%4)==0;
-            const bool halfHour=(quarter%2)==0 && !hour;
-            const int tickWidth=hour ? 10 : (halfHour ? 8 : (quarter%2==0 ? 6 : 3));
+        for (int second=0; second<=m_endSeconds; second+=15*60) {
+            const int y=qMin(rulerBottom,qRound(second*m_pixelsPerHour/3600.0));
+            const bool hour=(second%(60*60))==0;
+            const bool halfHour=(second%(30*60))==0 && !hour;
+            const int tickWidth=hour ? 10 : (halfHour ? 8 : 3);
             painter.setPen(hour ? QColor("#80A4AE") : QColor("#535b6a"));
             painter.drawLine(width()-tickWidth,y,width()-2,y);
             if (!hour && !halfHour)
                 continue;
 
-            const int hourNumber=quarter/4;
-            const QString label=QString("%1:%2").arg(hourNumber,2,10,QLatin1Char('0'))
-                .arg(halfHour ? "30" : "00");
+            const QString label=QTime(0,0).addSecs(second).toString("HH:mm");
             int textY=y-metrics.height()/2;
             textY=qBound(0,textY,height()-metrics.height());
             painter.setPen(QColor("#80A4AE"));
@@ -567,17 +598,15 @@ protected:
             QPen durationPen(markerColor);
             durationPen.setWidth(2);
             painter.setPen(durationPen);
-            const int startY=qBound(0,static_cast<int>(qint64(interval.startSeconds)*(height()-1)/(24*60*60)),rulerBottom);
-            const int endY=qBound(startY,static_cast<int>(qint64(interval.endSeconds)*(height()-1)/(24*60*60)),rulerBottom);
+            const int startY=qBound(0,qRound(interval.startSeconds*m_pixelsPerHour/3600.0),rulerBottom);
+            const int endY=qBound(startY,qRound(interval.endSeconds*m_pixelsPerHour/3600.0),rulerBottom);
             painter.drawLine(markerX,startY,markerX,endY);
             painter.drawLine(width()-11,startY,width()-2,startY);
             painter.drawLine(width()-11,endY,width()-2,endY);
 
             const QString endLabel=!interval.durationKnown
                 ? QStringLiteral("--:--:--")
-                : interval.endSeconds>=24*60*60
-                    ? QStringLiteral("24:00:00")
-                    : QTime(0,0).addSecs(interval.endSeconds).toString("HH:mm:ss");
+                : QTime(0,0).addSecs(interval.endSeconds).toString("HH:mm:ss");
             int textY=endY-metrics.height()/2;
             textY=qBound(0,textY,height()-metrics.height());
             const QRect labelRect(3,textY,labelRight-3,metrics.height());
@@ -590,6 +619,9 @@ protected:
 
 private:
     QList<PlannerSlotInterval> m_slotIntervals;
+    QString m_nextDayName;
+    int m_pixelsPerHour = 100;
+    int m_endSeconds = 24*60*60;
 };
 
 class PlannerDayPage final : public QWidget
@@ -614,6 +646,10 @@ public:
         QAction *addSlotAction=menu.addAction(QIcon(":/icons/Add.svg"),tr("Add schedule slot"));
         QAction *addStandbyEventAction=menu.addAction(QIcon(":/icons/ActionPaste.svg"),
                                                        tr("Add standby list event"));
+        const int clickedSecond=qRound(timelinePosition.y()*3600.0/m_pixelsPerHour);
+        const bool nextDayContinuation=clickedSecond>=24*60*60;
+        addSlotAction->setEnabled(!nextDayContinuation);
+        addStandbyEventAction->setEnabled(!nextDayContinuation);
         QAction *pasteSlotAction=nullptr;
         QAction *pasteSpecialAction=nullptr;
         if (g_scheduleSlotClipboard) {
@@ -648,8 +684,8 @@ public:
             return;
         }
         if (chosen==addStandbyEventAction) {
-            const int clickedSecond=qBound(0,qRound(timelinePosition.y()*3600.0/m_pixelsPerHour),24*60*60-1);
-            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(clickedSecond),QString(),false,window());
+            const int scheduledSecond=qBound(0,clickedSecond,24*60*60-1);
+            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(scheduledSecond),QString(),false,window());
             if (eventOptions.exec()!=QDialog::Accepted)
                 return;
             const QTime time=eventOptions.entryTime();
@@ -670,9 +706,9 @@ public:
         if (chosen!=addSlotAction)
             return;
 
-        const int clickedSecond=qBound(0,qRound(timelinePosition.y()*3600.0/m_pixelsPerHour),24*60*60-1);
+        const int scheduledSecond=qBound(0,clickedSecond,24*60*60-1);
         const QTime suggestedTime(0,0);
-        ScheduleSlotOptionsDialog options(suggestedTime.addSecs(clickedSecond),window());
+        ScheduleSlotOptionsDialog options(suggestedTime.addSecs(scheduledSecond),window());
         if (options.exec()!=QDialog::Accepted)
             return;
 
@@ -753,6 +789,8 @@ public:
     {
         if (nowMilliseconds<previousMilliseconds)
             return nullptr;
+        ScheduleSlot *latestDueSlot=nullptr;
+        int latestDueSecond=-1;
         for (const TimedSlot &entry : m_slots) {
             ScheduleSlot *slot=entry.widget;
             if (!slot || slot->isScheduleDisabled()
@@ -760,10 +798,15 @@ public:
                 continue;
             const int start=slot->entrySecond()*1000;
             if (start>previousMilliseconds && start<=nowMilliseconds
-                && nowMilliseconds-start<=maximumLatenessMilliseconds)
-                return slot;
+                && nowMilliseconds-start<=maximumLatenessMilliseconds
+                && start>latestDueSecond) {
+                latestDueSlot=slot;
+                latestDueSecond=start;
+            }
         }
-        return nullptr;
+        // If the UI was briefly busy across multiple starts, the latest slot
+        // is the one that still represents the schedule at the current time.
+        return latestDueSlot;
     }
 
     int dayIndex() const
@@ -986,8 +1029,33 @@ public:
     void setPixelsPerHour(int pixelsPerHour)
     {
         m_pixelsPerHour=pixelsPerHour;
-        setFixedHeight(24*pixelsPerHour+1);
+        setFixedHeight(qRound(m_timelineEndSeconds*pixelsPerHour/3600.0)+1);
         updateSlotPositions(true);
+    }
+
+    void setTimelineEndSeconds(int endSeconds)
+    {
+        m_timelineEndSeconds=qMax(24*60*60,endSeconds);
+        setFixedHeight(qRound(m_timelineEndSeconds*m_pixelsPerHour/3600.0)+1);
+    }
+
+    int visualEndSeconds() const
+    {
+        int endSeconds=24*60*60;
+        for (const TimedSlot &entry : m_slots) {
+            const ScheduleSlot *slot=entry.widget;
+            if (slot->isStandbyListChangeEvent()) {
+                endSeconds=qMax(endSeconds,slot->entrySecond()+1);
+                continue;
+            }
+            const bool durationKnown=slot->totalDurationKnown()
+                && slot->totalDurationSeconds()>0.0;
+            const int durationSeconds=durationKnown
+                ? qRound(slot->totalDurationSeconds())
+                : qMax(1,qRound(slot->height()*3600.0/m_pixelsPerHour));
+            endSeconds=qMax(endSeconds,slot->entrySecond()+durationSeconds);
+        }
+        return endSeconds;
     }
 
 protected:
@@ -1015,14 +1083,14 @@ public:
                 && entry.widget->totalDurationSeconds()>0.0;
             if (entry.widget->isStandbyListChangeEvent()) {
                 intervals.append({entry.widget->entrySecond(),
-                                  qMin(24*60*60,entry.widget->entrySecond()+1),
+                                  entry.widget->entrySecond()+1,
                                   false,true,entry.widget});
                 continue;
             }
             const int durationSeconds=durationKnown
                 ? qRound(entry.widget->totalDurationSeconds())
                 : qMax(1,qRound(entry.widget->height()*3600.0/m_pixelsPerHour));
-            intervals.append({startSeconds,qMin(24*60*60,startSeconds+durationSeconds),
+            intervals.append({startSeconds,startSeconds+durationSeconds,
                               false,durationKnown,entry.widget});
         }
 
@@ -1305,8 +1373,7 @@ private:
                 const int second=entry.widget->entrySecond();
                 const int displayedDurationSeconds=qMax(1,static_cast<int>(std::ceil(
                     entry.widget->height()*3600.0/m_pixelsPerHour)));
-                placements.append({entry.widget,second,
-                                   qMin(24*60*60,second+displayedDurationSeconds),0});
+                placements.append({entry.widget,second,second+displayedDurationSeconds,0});
                 continue;
             }
             double durationSeconds=0.0;
@@ -1339,9 +1406,6 @@ private:
             if (resizeToDuration) {
                 if (!hasContents || !durationIsKnown || durationSeconds<=0.0)
                     durationSeconds=15.0*60.0;
-                const int startSeconds=entry.widget->entrySecond();
-                durationSeconds=qMin(durationSeconds,
-                                     double(qMax(1,24*60*60-startSeconds)));
                 const int slotHeight=qMax(1,qRound(durationSeconds*m_pixelsPerHour/3600.0));
                 entry.widget->setTimelineHeight(slotHeight);
             }
@@ -1349,7 +1413,7 @@ private:
             const int displayedDurationSeconds=qMax(1,static_cast<int>(std::ceil(
                 entry.widget->height()*3600.0/m_pixelsPerHour)));
             placements.append({entry.widget,startSeconds,
-                               qMin(24*60*60,startSeconds+displayedDurationSeconds),0});
+                               startSeconds+displayedDurationSeconds,0});
         }
 
         std::sort(placements.begin(),placements.end(),[](const Placement &left,const Placement &right) {
@@ -1397,6 +1461,7 @@ private:
 
     QList<TimedSlot> m_slots;
     int m_pixelsPerHour = 100;
+    int m_timelineEndSeconds = 24*60*60;
     QScrollArea *m_scrollArea = nullptr;
     QList<ContentsPlayer *> &m_dayContents;
     std::function<void()> m_intervalsChanged;
@@ -1501,13 +1566,16 @@ public:
             });
             dayPage->setModifiedCallback([this]() { markDocumentModified(); });
             dayPage->setIntervalsChangedCallback([this,index,dayPage]() {
-                if (m_pages->currentIndex()==index)
+                if (m_pages->currentIndex()==index) {
+                    updateTimelineExtent();
                     m_timeRuler->setSlotIntervals(dayPage->slotIntervals());
+                }
             });
             dayPage->setFocusSlotCallback([this,index,dayPage](ScheduleSlot *slot) {
                 if (QAbstractButton *dayButton=m_dayGroup->button(index))
                     dayButton->setChecked(true);
                 m_pages->setCurrentIndex(index);
+                updateTimelineExtent();
                 m_timeRuler->setSlotIntervals(dayPage->slotIntervals());
 
                 QPointer<ScheduleSlot> pendingSlot=slot;
@@ -1523,6 +1591,7 @@ public:
             m_pages->addWidget(dayPage);
             connect(button,&QPushButton::clicked,m_pages,[this,index]() {
                 m_pages->setCurrentIndex(index);
+                updateTimelineExtent();
                 m_timeRuler->setSlotIntervals(
                     static_cast<PlannerDayPage*>(m_pages->widget(index))->slotIntervals());
             });
@@ -1979,12 +2048,13 @@ private:
         const int oldScale=m_pixelsPerHour;
         const int oldScroll=m_scrollArea->verticalScrollBar()->value();
         m_pixelsPerHour=qBound(25,pixelsPerHour,6400);
-        const int contentHeight=24*m_pixelsPerHour+1;
+        const int contentHeight=qRound(m_timelineEndSeconds*m_pixelsPerHour/3600.0)+1;
         m_timelineCanvas->setFixedHeight(contentHeight);
-        m_timeRuler->setPixelsPerHour(m_pixelsPerHour);
+        m_timeRuler->setTimelineScale(m_pixelsPerHour,m_timelineEndSeconds);
         for (int index=0; index<m_pages->count(); ++index) {
             static_cast<PlannerDayPage*>(m_pages->widget(index))->setPixelsPerHour(m_pixelsPerHour);
         }
+        updateTimelineExtent();
         m_zoomOut->setEnabled(m_pixelsPerHour>25);
         m_zoomIn->setEnabled(m_pixelsPerHour<6400);
 
@@ -1996,6 +2066,39 @@ private:
                 m_scrollArea->verticalScrollBar()->setValue(target);
             });
         }
+    }
+
+    void updateTimelineExtent()
+    {
+        if (!m_pages || !m_timelineCanvas || !m_timeRuler)
+            return;
+
+        auto *day=static_cast<PlannerDayPage*>(m_pages->currentWidget());
+        int endSeconds=day ? day->visualEndSeconds() : 24*60*60;
+
+        const int selectedDay=m_pages->currentIndex();
+        if (selectedDay>=0 && m_dayGroup) {
+            if (QAbstractButton *nextDayButton=m_dayGroup->button((selectedDay+1)%7))
+                m_timeRuler->setNextDayName(nextDayButton->text());
+        }
+
+        // Keep room for the complete following day at most. The display remains
+        // manageable if a malformed or unusually long duration is loaded.
+        endSeconds=qMin(2*24*60*60,endSeconds);
+        if (endSeconds>24*60*60) {
+            constexpr int scaleStepSeconds=30*60;
+            endSeconds=((endSeconds+scaleStepSeconds-1)/scaleStepSeconds)*scaleStepSeconds;
+        }
+        if (endSeconds==m_timelineEndSeconds)
+            return;
+
+        m_timelineEndSeconds=endSeconds;
+        const int contentHeight=qRound(m_timelineEndSeconds*m_pixelsPerHour/3600.0)+1;
+        m_timelineCanvas->setFixedHeight(contentHeight);
+        m_timeRuler->setTimelineScale(m_pixelsPerHour,m_timelineEndSeconds);
+        for (int index=0; index<m_pages->count(); ++index)
+            static_cast<PlannerDayPage*>(m_pages->widget(index))->setTimelineEndSeconds(
+                m_timelineEndSeconds);
     }
 
     QStackedWidget *m_pages = nullptr;
@@ -2014,6 +2117,7 @@ private:
     bool m_loadingDocument = false;
     QPointer<ScheduleSlot> m_upcomingSlot;
     int m_pixelsPerHour = 100;
+    int m_timelineEndSeconds = 24*60*60;
     bool m_initialTimePositioned = false;
     bool m_playbackActive = false;
 };
@@ -2840,7 +2944,9 @@ void Planner::checkSchedule()
     // Catch a just-crossed start second, but never catch up an old event when
     // Play is pressed late: the previous check is initialized at Play time.
     if (!dueSlot)
-        dueSlot=weekTabs->slotStartingBetween(previousCheck,now,1500);
+        // Recover from short UI stalls while avoiding playback of stale events
+        // after the application or machine has been suspended.
+        dueSlot=weekTabs->slotStartingBetween(previousCheck,now,5000);
     if (dueSlot) {
         if (m_waitingForStandbySlot && m_waitingForStandbySlot!=dueSlot)
             cancelStandbyTrackWait();
@@ -2976,8 +3082,14 @@ void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
     incoming->setEmissionSourceLabel(tr("Planner / %1").arg(slot->name()));
     incoming->setDevicePlay(m_devicePlay);
     incoming->setVolume(0.0f);
-    if (!incoming->startSequentialPlayback(slot->contents(),false))
+    if (!incoming->startSequentialPlayback(slot->contents(),false)) {
+        const QString source=tr("Planner / %1").arg(slot->name());
+        qWarning().noquote() << "No se pudo iniciar la pauta programada:" << slot->name();
+        emit emissionPlaybackStarted(incoming,source,slot->name(),QString());
+        emit emissionPlaybackFinished(incoming,tr("Error"),
+                                      tr("No enabled audio item could be started; Standby remains on air."));
         return;
+    }
 
     Player *outgoing=m_activeScheduleEngine;
     if (!outgoing && m_standbyEngine->getCurrentItem())

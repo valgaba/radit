@@ -103,7 +103,7 @@ public:
 
     void playColor(bool playing);
     void setNameFile(const QString &NameFile);
-    void setTiempoFile(double segundos);
+    void setTiempoFile(double segundos, bool showCentiseconds = true);
 
     const QString& nameFile() const;
 

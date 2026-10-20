@@ -531,8 +531,19 @@ void AudioItemMaxi::setNameFile(const QString &nombre)
 }
 
 
-void AudioItemMaxi::setTiempoFile(double segundos){
-        this->labeltiempo->setText(SecondToTime(segundos));
+void AudioItemMaxi::setTiempoFile(double segundos, bool showCentiseconds){
+        QString text=SecondToTime(segundos);
+        if (!showCentiseconds && std::isfinite(segundos) && segundos>=0.0) {
+            const qint64 totalSeconds=qRound64(segundos);
+            const qint64 hours=totalSeconds/3600;
+            const qint64 minutes=(totalSeconds%3600)/60;
+            const qint64 seconds=totalSeconds%60;
+            text=QStringLiteral("%1:%2:%3")
+                .arg(hours,2,10,QLatin1Char('0'))
+                .arg(minutes,2,10,QLatin1Char('0'))
+                .arg(seconds,2,10,QLatin1Char('0'));
+        }
+        this->labeltiempo->setText(text);
 }
 
 
