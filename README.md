@@ -18,7 +18,7 @@ Audio devices may need to be selected in the player options on your computer.
 
 ## Build from source: FFmpeg
 
-The source repository includes `locution/es_latino.zip`; copy the `locution` folder beside `radit.exe` if your build does not copy it automatically. The source repository does not include FFmpeg binaries. Download a Windows FFmpeg build separately and copy `ffmpeg.exe` plus all DLLs supplied with that build into an `ffmpeg` folder next to the compiled `radit.exe`. The expected executable path is `ffmpeg/ffmpeg.exe`. See [`ffmpeg/README.md`](ffmpeg/README.md) for details. Do not use Windows binaries for Linux builds. The `capture/` directory is an empty placeholder; recordings created while running Radit stay local.
+The source repository keeps runtime folders under `bin/`: `bin/locution/es_latino.zip`, `bin/capture/` and `bin/ffmpeg/`. Copy those folders beside the compiled `radit.exe` if your build output does not do so automatically. FFmpeg binaries are downloaded separately; copy `ffmpeg.exe` and its DLLs into `bin/ffmpeg/` (or the equivalent `ffmpeg/` beside `radit.exe`). See [`bin/ffmpeg/README.md`](bin/ffmpeg/README.md). Do not use Windows binaries for Linux builds. The `bin/capture/` placeholder is empty; recordings created while running Radit stay local.
 
 ## Screenshots
 
@@ -60,7 +60,7 @@ Radit es un proyecto de software libre para la automatización de emisoras de ra
 
 **Las descargas son versiones de desarrollo en fase de pruebas. Pueden contener errores y funciones incompletas.**
 
-El repositorio incluye `locution/es_latino.zip`; copia la carpeta `locution` junto a `radit.exe` si la compilación no la copia automáticamente. Para compilar desde el código fuente, FFmpeg se descarga por separado: el repositorio no incluye sus binarios. En Windows, copia `ffmpeg.exe` y todas las DLL que acompañan esa compilación dentro de `ffmpeg`, junto al `radit.exe` compilado. Consulta [`ffmpeg/README.md`](ffmpeg/README.md). No uses binarios de Windows en Linux. La carpeta `capture/` se incluye vacía; las grabaciones que genere Radit permanecen en el equipo.
+El repositorio guarda los recursos de ejecución dentro de `bin/`: `bin/locution/es_latino.zip`, `bin/capture/` y `bin/ffmpeg/`. Copia esas carpetas junto al `radit.exe` compilado si la compilación no lo hace automáticamente. FFmpeg se descarga por separado; en Windows, copia `ffmpeg.exe` y sus DLL dentro de `bin/ffmpeg/` (o de `ffmpeg/` junto a `radit.exe`). Consulta [`bin/ffmpeg/README.md`](bin/ffmpeg/README.md). No uses binarios de Windows en Linux. `bin/capture/` se incluye vacía; las grabaciones que genere Radit permanecen en el equipo.
 
 Descarga la [versión actual para Windows](https://github.com/valgaba/radit/releases/download/radit-1.0.0/radit_1_0_0.zip) (`radit_1_0_0.zip`), extrae el ZIP; se creará la carpeta `radit_1_0_0` con el programa y sus subcarpetas. Ejecuta `radit_1_0_0/radit.exe`. Conserva las bibliotecas y subcarpetas incluidas, especialmente `locution/es_latino.zip` para la locución de MeteoClock. El paquete es portable para Windows de 64 bits y no requiere Qt Creator. Selecciona los dispositivos de audio desde las opciones del reproductor si es necesario.
 
