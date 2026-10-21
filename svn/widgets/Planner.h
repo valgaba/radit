@@ -7,6 +7,7 @@
 #include <QPointer>
 #include <QSet>
 #include <QElapsedTimer>
+#include <QVector>
 #include "widgets/frame.h"
 
 class ContentsPlayer;
@@ -33,6 +34,11 @@ public:
     int devicePlay() const { return m_devicePlay; }
     int deviceCue() const { return m_deviceCue; }
     float volume() const { return m_volume; }
+    QString schedulerSweeperFolder() const { return m_schedulerSweeperFolder; }
+    int schedulerSweeperMaxWindowSeconds() const { return m_schedulerSweeperMaxWindowSeconds; }
+    int schedulerSweeperOverrunSeconds() const { return m_schedulerSweeperOverrunSeconds; }
+    bool setSchedulerSweeperSettings(const QString &folder, int maximumWindowSeconds,
+                                     int allowedOverrunSeconds);
     void setDevicePlay(int device);
     void setDeviceCue(int device) { m_deviceCue=device; }
     bool setVolume(float volume);
@@ -102,6 +108,15 @@ private:
     QDateTime m_lastScheduleCheckTime;
     bool m_running = false;
     bool m_refreshingAudioDurations = false;
+    QString m_schedulerSweeperFolder;
+    int m_schedulerSweeperMaxWindowSeconds = 60;
+    int m_schedulerSweeperOverrunSeconds = 3;
+    QVector<QPair<QString,double>> m_schedulerSweeperIndex;
+    QSet<QString> m_schedulerSweeperUsed;
+    QPointer<ScheduleSlot> m_schedulerSweeperTargetSlot;
+    QString m_schedulerSweeperQueuedPath;
+    int m_schedulerSweeperTargetEntrySecond = -1;
+    bool m_schedulerSweeperTargetDue = false;
     bool m_standbyStartAttempted = false;
     bool m_userIsSeeking = false;
     bool m_standbyBlinkPhase = false;
@@ -127,6 +142,10 @@ private:
     void startPendingScheduleCrossfade(Player *engine);
     void cancelPendingScheduleStart();
     bool continuePendingScheduleFromStandby(Player *finishedEngine);
+    void rebuildSchedulerSweeperIndex();
+    QString chooseSchedulerSweeper(double secondsUntilEvent);
+    void updateQueuedSchedulerSweeper(double position, double duration);
+    void finishSchedulerSweeper();
     void startWaitingSlotCrossfade(int crossfadeDurationMs);
     void startStandbyCrossfadeForActiveSlot(int crossfadeDurationMs);
     void returnToStandby();

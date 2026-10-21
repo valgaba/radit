@@ -434,9 +434,23 @@ void ScheduleSlot::setPriority(bool priority)
 
 void ScheduleSlot::setStandbyTrackWait(bool enabled)
 {
-    if (m_waitForStandbyTrackEnd==enabled)
+    if (m_waitForStandbyTrackEnd==enabled
+        && (!enabled || !m_useSchedulerSweeper))
         return;
     m_waitForStandbyTrackEnd=enabled;
+    if (enabled)
+        m_useSchedulerSweeper=false;
+    updateTimingIndicator();
+}
+
+void ScheduleSlot::setUseSchedulerSweeper(bool enabled)
+{
+    if (m_useSchedulerSweeper==enabled
+        && (!enabled || !m_waitForStandbyTrackEnd))
+        return;
+    m_useSchedulerSweeper=enabled;
+    if (enabled)
+        m_waitForStandbyTrackEnd=false;
     updateTimingIndicator();
 }
 
@@ -445,12 +459,15 @@ void ScheduleSlot::updateTimingIndicator()
     if (!m_timingIndicator)
         return;
 
-    const QColor color=m_waitForStandbyTrackEnd
-        ? QColor(QStringLiteral("#43b581"))
-        : QColor(QStringLiteral("#e5484d"));
-    const QString description=m_waitForStandbyTrackEnd
+    const QColor color=m_useSchedulerSweeper
+        ? QColor(QStringLiteral("#80A4AE"))
+        : (m_waitForStandbyTrackEnd ? QColor(QStringLiteral("#43b581"))
+                                    : QColor(QStringLiteral("#e5484d")));
+    const QString description=m_useSchedulerSweeper
+        ? tr("Use a scheduler sweeper before this event")
+        : (m_waitForStandbyTrackEnd
         ? tr("Delayed until the current Standby track ends")
-        : tr("Starts at the scheduled time");
+        : tr("Starts at the scheduled time"));
     m_timingIndicator->setStyleSheet(QStringLiteral(
         "QLabel#ScheduleSlotTimingIndicator { background-color:%1; border:none; }")
         .arg(color.name(QColor::HexRgb)));

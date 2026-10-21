@@ -15,17 +15,20 @@ public:
     explicit ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent = nullptr,
                                        bool disabled = false, bool editing = false,
                                        const QString &name = QString(),
-                                       bool waitForStandbyTrackEnd = false);
+                                       bool waitForStandbyTrackEnd = false,
+                                       bool useSchedulerSweeper = false);
     QTime entryTime() const;
     QString name() const;
     bool isDisabled() const;
     bool waitsForStandbyTrackEnd() const;
+    bool usesSchedulerSweeper() const;
 
 private:
     QTimeEdit *m_entryTime = nullptr;
     QCheckBox *m_disabled = nullptr;
     QLineEdit *m_name = nullptr;
     QCheckBox *m_waitForStandbyTrackEnd = nullptr;
+    QCheckBox *m_useSchedulerSweeper = nullptr;
 };
 
 #endif // SCHEDULESLOTOPTIONSDIALOG_H

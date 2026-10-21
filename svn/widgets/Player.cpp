@@ -24,6 +24,7 @@
 #include "widgets/vumeter.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemFileMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include <cmath>
 #include <algorithm>
@@ -487,7 +488,8 @@ void Player::bindMediaManager()
 
            if (m_sequenceContents) {
                if (auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem)) {
-                   if (!folder->isLoop() && m_folderTurnItem==folder
+                   if (m_nextSequenceOverridePath.isEmpty()
+                       && !folder->isLoop() && m_folderTurnItem==folder
                        && m_folderTurnTracksStarted < folder->songsPerTurn()) {
                        playItem(folder);
                        return;
@@ -876,12 +878,35 @@ void Player::stopSequentialPlayback()
     m_sequenceIndex=-1;
     m_folderTurnItem.clear();
     m_folderTurnTracksStarted=0;
+    m_nextSequenceOverridePath.clear();
+    m_nextSequenceOverrideName.clear();
+    m_stopAfterSequenceOverride=false;
+    m_playingSequenceOverride=false;
+    if (m_sequenceOverrideItem) {
+        m_sequenceOverrideItem->deleteLater();
+        m_sequenceOverrideItem.clear();
+    }
     // A sequence can be stopped while its first item is still preparing and
     // currentItem is null. Invalidate its callback as well, or it may start
     // playing after Planner has already moved on.
     m_preparingPlaybackItem.clear();
     if (currentItem)
         stopMain();
+}
+
+void Player::setNextSequenceOverride(const QString &path, const QString &name,
+                                     bool stopAfterOverride)
+{
+    m_nextSequenceOverridePath=path.trimmed();
+    m_nextSequenceOverrideName=name;
+    m_stopAfterSequenceOverride=stopAfterOverride;
+}
+
+void Player::clearNextSequenceOverride()
+{
+    m_nextSequenceOverridePath.clear();
+    m_nextSequenceOverrideName.clear();
+    m_stopAfterSequenceOverride=false;
 }
 
 bool Player::stopSequentialPlaybackAtTrackEnd()
@@ -956,9 +981,23 @@ void Player::advanceSequence()
         return;
     }
     const int count=contents->layout->count();
+    const bool finishingOverride=m_playingSequenceOverride
+        && currentItem==m_sequenceOverrideItem;
     const int currentLayoutIndex=contents->layout->indexOf(currentItem);
-    if (currentLayoutIndex>=0)
+    if (!finishingOverride && currentLayoutIndex>=0)
         m_sequenceIndex=currentLayoutIndex;
+    if (finishingOverride) {
+        m_playingSequenceOverride=false;
+        if (m_sequenceOverrideItem) {
+            m_sequenceOverrideItem->deleteLater();
+            m_sequenceOverrideItem.clear();
+        }
+        if (m_stopAfterSequenceOverride) {
+            stopSequentialPlayback();
+            emit sequenceOverrideFinished();
+            return;
+        }
+    }
     const int next=m_sequenceIndex+1;
     if (count<=0 || (next>=count && !m_sequenceRepeat)) {
         stopMain();
@@ -975,6 +1014,24 @@ void Player::advanceSequence()
         }
     }
     stopMain();
+    if (!finishingOverride && !m_nextSequenceOverridePath.isEmpty()) {
+        const QString path=m_nextSequenceOverridePath;
+        const QString name=m_nextSequenceOverrideName;
+        m_nextSequenceOverridePath.clear();
+        m_nextSequenceOverrideName.clear();
+        auto *sweeper=new AudioItemFileMaxi(this);
+        sweeper->setFilePath(path);
+        sweeper->setNameFile(name.isEmpty() ? QFileInfo(path).completeBaseName() : name);
+        sweeper->setToolTip(path);
+        m_sequenceOverrideItem=sweeper;
+        m_playingSequenceOverride=true;
+        playItem(sweeper);
+        if (currentItem==sweeper)
+            return;
+        m_playingSequenceOverride=false;
+        m_sequenceOverrideItem.clear();
+        sweeper->deleteLater();
+    }
     if (playSequenceFrom(next))
         return;
 
@@ -992,7 +1049,8 @@ bool Player::tryItemMix(const AudioFrame &frame)
     // Once Planner has requested a clean track boundary, do not launch another
     // overlapping track. Otherwise continuous folder mixing can keep moving the
     // active manager forward before its natural end is reported.
-    if (m_stopSequenceAtTrackEnd || !source || !source->mixEnabled()
+    if (m_stopSequenceAtTrackEnd || !m_nextSequenceOverridePath.isEmpty()
+        || !source || !source->mixEnabled()
         || m_outgoingManager || m_pendingMixManager || m_mixAttempted
         || !mediamanager->isPlaying()) return false;
     const double remaining = m_duration - frame.position;

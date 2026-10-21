@@ -80,6 +80,8 @@
 #include <functional>
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <QRandomGenerator>
 
 namespace {
 QPointer<ScheduleSlot> g_scheduleSlotClipboard;
@@ -843,6 +845,7 @@ public:
                     ? slot->accentColor().name(QColor::HexArgb) : QString()},
                 {"disabled",slot->isScheduleDisabled()}, {"priority",slot->isPriority()},
                 {"waitForStandbyTrackEnd",slot->waitsForStandbyTrackEnd()},
+                {"useSchedulerSweeper",slot->usesSchedulerSweeper()},
                 {"contentsVisible",slot->contentsVisible()},
                 {"standbyListPath",slot->standbyListPath()},
                 {"items",Io::serializeItems(slot->contents()->layout)}
@@ -881,6 +884,7 @@ public:
             slot->setScheduleDisabled(object.value("disabled").toBool());
             slot->setPriority(object.value("priority").toBool());
             slot->setStandbyTrackWait(object.value("waitForStandbyTrackEnd").toBool());
+            slot->setUseSchedulerSweeper(object.value("useSchedulerSweeper").toBool());
             slot->setStandbyListPath(object.value("standbyListPath").toString());
             if (!slot->isStandbyListChangeEvent()) {
                 m_dayContents.append(slot->contents());
@@ -993,13 +997,15 @@ private:
             ScheduleSlotOptionsDialog options(currentTime,window(),
                                                editedSlot->isScheduleDisabled(),true,
                                                editedSlot->name(),
-                                               editedSlot->waitsForStandbyTrackEnd());
+                                               editedSlot->waitsForStandbyTrackEnd(),
+                                               editedSlot->usesSchedulerSweeper());
             if (options.exec()==QDialog::Accepted) {
                 const QTime time=options.entryTime();
                 editedSlot->setEntryTime(time.hour()*3600+time.minute()*60+time.second());
                 editedSlot->setName(options.name());
                 editedSlot->setScheduleDisabled(options.isDisabled());
                 editedSlot->setStandbyTrackWait(options.waitsForStandbyTrackEnd());
+                editedSlot->setUseSchedulerSweeper(options.usesSchedulerSweeper());
                 markDocumentModified();
             }
         });
@@ -1127,6 +1133,7 @@ private:
         copy->setAccentColor(source->accentColor());
         copy->setScheduleDisabled(source->isScheduleDisabled());
         copy->setStandbyTrackWait(source->waitsForStandbyTrackEnd());
+        copy->setUseSchedulerSweeper(source->usesSchedulerSweeper());
         copy->setStandbyListPath(source->standbyListPath());
         QVBoxLayout *sourceLayout=source->contents()->layout;
         for (int index=0; index<sourceLayout->count(); ++index) {
@@ -1795,6 +1802,8 @@ public:
                     || !slot.value("disabled").isBool() || !slot.value("priority").isBool()
                     || (slot.contains("waitForStandbyTrackEnd")
                         && !slot.value("waitForStandbyTrackEnd").isBool())
+                    || (slot.contains("useSchedulerSweeper")
+                        && !slot.value("useSchedulerSweeper").isBool())
                     || !slot.value("contentsVisible").isBool()
                     || !slot.value("standbyListPath").isString() || !slot.value("items").isArray()
                     || (!color.isEmpty() && !QColor(color).isValid())
@@ -1937,6 +1946,44 @@ public:
         auto *nextDay=static_cast<PlannerDayPage*>(m_pages->widget(nextDayIndex));
         return nextDay && nextDay->hasSlotStartingWithin(
             0,windowMilliseconds-millisecondsUntilMidnight);
+    }
+
+    QPair<ScheduleSlot *,int> nextSchedulerSweeperSlot(const QDateTime &dateTime) const
+    {
+        const int todayIndex=qBound(0,dateTime.date().dayOfWeek()-1,6);
+        const int nowSecond=dateTime.time().hour()*3600
+            +dateTime.time().minute()*60+dateTime.time().second();
+        ScheduleSlot *best=nullptr;
+        int bestSeconds=std::numeric_limits<int>::max();
+        for (int dayOffset=0; dayOffset<=1; ++dayOffset) {
+            const int dayIndex=(todayIndex+dayOffset)%7;
+            auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+            if (!day)
+                continue;
+            for (const PlannerSlotInterval &interval : day->slotIntervals(false)) {
+                ScheduleSlot *slot=interval.slot;
+                if (!slot || slot->isScheduleDisabled() || slot->isStandbyListChangeEvent()
+                    || !slot->usesSchedulerSweeper())
+                    continue;
+                const int seconds=dayOffset*24*60*60+slot->entrySecond()-nowSecond;
+                if (seconds<=0 || seconds>=bestSeconds)
+                    continue;
+                bool hasPlayableItem=false;
+                for (int index=0; index<slot->contents()->layout->count(); ++index) {
+                    auto *item=qobject_cast<AudioItemMaxi*>(
+                        slot->contents()->layout->itemAt(index)->widget());
+                    if (item && item->isEnabledForPlayback()) {
+                        hasPlayableItem=true;
+                        break;
+                    }
+                }
+                if (!hasPlayableItem)
+                    continue;
+                best=slot;
+                bestSeconds=seconds;
+            }
+        }
+        return {best,best ? bestSeconds : -1};
     }
 
     ScheduleSlot *slotContaining(const QDateTime &dateTime)
@@ -2170,6 +2217,15 @@ Planner::Planner(QWidget *parent) : Frame(parent)
 {
     setObjectName("Planner");
     setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
+    {
+        QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
+        m_schedulerSweeperFolder=settings.value(
+            QStringLiteral("Planner/schedulerSweeperFolder")).toString();
+        m_schedulerSweeperMaxWindowSeconds=qBound(1,settings.value(
+            QStringLiteral("Planner/schedulerSweeperMaxWindowSeconds"),60).toInt(),600);
+        m_schedulerSweeperOverrunSeconds=qBound(0,settings.value(
+            QStringLiteral("Planner/schedulerSweeperOverrunSeconds"),3).toInt(),30);
+    }
 
     auto *root=new QVBoxLayout(this);
     root->setContentsMargins(0,0,0,0);
@@ -2376,6 +2432,8 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         });
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
+            if (engine==m_standbyEngine && seekable && duration>0.0)
+                updateQueuedSchedulerSweeper(position,duration);
             if (engine==m_standbyEngine && m_waitingForStandbySlot
                 && duration>0.0) {
                 auto *item=m_standbyEngine->getCurrentItem();
@@ -2457,6 +2515,8 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     connect(m_standbyEngine,&Player::sequentialTrackFinished,this,[this]() {
         finishStandbyTrackWait();
     });
+    connect(m_standbyEngine,&Player::sequenceOverrideFinished,
+            this,&Planner::finishSchedulerSweeper);
 
     m_standbyBlinkTimer=new QTimer(this);
     m_standbyBlinkTimer->setInterval(500);
@@ -2485,6 +2545,7 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     });
     m_clockTimer->start();
     updateRemainingTimeLabel();
+    rebuildSchedulerSweeperIndex();
 
     m_fadeTimer=new QTimer(this);
     m_fadeTimer->setInterval(20);
@@ -2514,6 +2575,190 @@ bool Planner::setVolume(float volume)
             m_standbyEngine->setVolume(m_volume);
     }
     return true;
+}
+
+bool Planner::setSchedulerSweeperSettings(const QString &folder,
+                                          int maximumWindowSeconds,
+                                          int allowedOverrunSeconds)
+{
+    const QString normalizedFolder=QDir::cleanPath(folder.trimmed());
+    if (!normalizedFolder.isEmpty() && !QFileInfo(normalizedFolder).isDir())
+        return false;
+    m_schedulerSweeperFolder=normalizedFolder==QStringLiteral(".")
+        ? QString() : normalizedFolder;
+    m_schedulerSweeperMaxWindowSeconds=qBound(1,maximumWindowSeconds,600);
+    m_schedulerSweeperOverrunSeconds=qBound(0,allowedOverrunSeconds,30);
+    QSettings settings(interfaceSettingsPath(),QSettings::IniFormat);
+    settings.setValue(QStringLiteral("Planner/schedulerSweeperFolder"),m_schedulerSweeperFolder);
+    settings.setValue(QStringLiteral("Planner/schedulerSweeperMaxWindowSeconds"),
+                      m_schedulerSweeperMaxWindowSeconds);
+    settings.setValue(QStringLiteral("Planner/schedulerSweeperOverrunSeconds"),
+                      m_schedulerSweeperOverrunSeconds);
+    settings.sync();
+    rebuildSchedulerSweeperIndex();
+    return true;
+}
+
+void Planner::rebuildSchedulerSweeperIndex()
+{
+    const QString folder=m_schedulerSweeperFolder;
+    m_schedulerSweeperIndex.clear();
+    m_schedulerSweeperUsed.clear();
+    if (folder.isEmpty() || !QFileInfo(folder).isDir())
+        return;
+
+    auto *watcher=new QFutureWatcher<QVector<QPair<QString,double>>>(this);
+    connect(watcher,&QFutureWatcher<QVector<QPair<QString,double>>>::finished,
+            this,[this,watcher,folder]() {
+        if (folder==m_schedulerSweeperFolder)
+            m_schedulerSweeperIndex=watcher->result();
+        watcher->deleteLater();
+    });
+    watcher->setFuture(QtConcurrent::run([folder]() {
+        QVector<QPair<QString,double>> indexed;
+        const QDir directory(folder);
+        const QFileInfoList files=directory.entryInfoList(
+            QDir::Files|QDir::Readable|QDir::NoDotAndDotDot,QDir::Name);
+        const QStringList supported={QStringLiteral("mp3"),QStringLiteral("wav"),
+            QStringLiteral("ogg"),QStringLiteral("flac"),QStringLiteral("aac"),
+            QStringLiteral("m4a"),QStringLiteral("wma"),QStringLiteral("opus"),
+            QStringLiteral("mp2"),QStringLiteral("aiff"),QStringLiteral("aif")};
+        for (const QFileInfo &file : files) {
+            if (!supported.contains(file.suffix().toLower()))
+                continue;
+            const double duration=MediaManager::readFileDuration(file.absoluteFilePath());
+            if (duration>0.0)
+                indexed.append({file.absoluteFilePath(),duration});
+        }
+        return indexed;
+    }));
+}
+
+QString Planner::chooseSchedulerSweeper(double secondsUntilEvent)
+{
+    if (secondsUntilEvent<=0.0 || m_schedulerSweeperIndex.isEmpty())
+        return {};
+    QVector<int> candidates;
+    double shortestOverrun=std::numeric_limits<double>::max();
+    for (int index=0; index<m_schedulerSweeperIndex.size(); ++index) {
+        const double duration=m_schedulerSweeperIndex.at(index).second;
+        const double overrun=duration-secondsUntilEvent;
+        // Never choose a clip shorter than the remaining gap: the event must
+        // not start before its scheduled time. The configured overrun is the
+        // only allowed source of lateness.
+        if (overrun < 0.0 || overrun > m_schedulerSweeperOverrunSeconds+0.15)
+            continue;
+        shortestOverrun=qMin(shortestOverrun,overrun);
+        candidates.append(index);
+    }
+    if (candidates.isEmpty())
+        return {};
+
+    QVector<int> bestCandidates;
+    for (int index : candidates) {
+        const double overrun=m_schedulerSweeperIndex.at(index).second-secondsUntilEvent;
+        if (overrun<=shortestOverrun+0.75)
+            bestCandidates.append(index);
+    }
+    QVector<int> unused;
+    for (int index : bestCandidates) {
+        if (!m_schedulerSweeperUsed.contains(m_schedulerSweeperIndex.at(index).first))
+            unused.append(index);
+    }
+    if (unused.isEmpty()) {
+        m_schedulerSweeperUsed.clear();
+        unused=bestCandidates;
+    }
+    const int selected=unused.at(QRandomGenerator::global()->bounded(unused.size()));
+    const QString path=m_schedulerSweeperIndex.at(selected).first;
+    m_schedulerSweeperUsed.insert(path);
+    return path;
+}
+
+void Planner::updateQueuedSchedulerSweeper(double position, double duration)
+{
+    if (!m_running || !m_standbyEngine || m_activeScheduleEngine
+        || m_pendingScheduleSlot || m_waitingForStandbySlot || m_fadeTimer->isActive()
+        || m_standbyEngine->isPlayingSequenceOverride())
+        return;
+    AudioItemMaxi *current=m_standbyEngine->getCurrentItem();
+    if (!current || current->isLiveStream() || current->isLoop()
+        || duration<=position || duration<=0.0) {
+        if (!m_schedulerSweeperQueuedPath.isEmpty()) {
+            m_standbyEngine->clearNextSequenceOverride();
+            m_schedulerSweeperQueuedPath.clear();
+            m_schedulerSweeperTargetSlot.clear();
+            m_schedulerSweeperTargetEntrySecond=-1;
+            m_schedulerSweeperTargetDue=false;
+        }
+        return;
+    }
+
+    auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
+    const QDateTime now=QDateTime::currentDateTime();
+    const auto target=weekTabs->nextSchedulerSweeperSlot(now);
+    const double untilEvent=target.first
+        ? target.second-now.time().msec()/1000.0 : -1.0;
+    const double gap=untilEvent-(duration-position);
+    const bool usable=target.first && gap>=2.0
+        && gap<=m_schedulerSweeperMaxWindowSeconds
+        && QFileInfo(m_schedulerSweeperFolder).isDir();
+    if (!usable) {
+        if (!m_schedulerSweeperQueuedPath.isEmpty()) {
+            m_standbyEngine->clearNextSequenceOverride();
+            m_schedulerSweeperQueuedPath.clear();
+            m_schedulerSweeperTargetSlot.clear();
+            m_schedulerSweeperTargetEntrySecond=-1;
+            m_schedulerSweeperTargetDue=false;
+        }
+        return;
+    }
+    if (m_schedulerSweeperTargetSlot==target.first
+        && m_schedulerSweeperTargetEntrySecond==target.first->entrySecond()
+        && !m_schedulerSweeperQueuedPath.isEmpty()
+        && m_standbyEngine->hasNextSequenceOverride())
+        return;
+
+    m_standbyEngine->clearNextSequenceOverride();
+    m_schedulerSweeperQueuedPath.clear();
+    m_schedulerSweeperTargetSlot.clear();
+    m_schedulerSweeperTargetEntrySecond=-1;
+    m_schedulerSweeperTargetDue=false;
+    const QString selected=chooseSchedulerSweeper(gap);
+    if (selected.isEmpty())
+        return;
+    m_schedulerSweeperTargetSlot=target.first;
+    m_schedulerSweeperTargetEntrySecond=target.first->entrySecond();
+    m_schedulerSweeperTargetDue=false;
+    m_schedulerSweeperQueuedPath=selected;
+    m_standbyEngine->setNextSequenceOverride(
+        selected,QFileInfo(selected).completeBaseName(),true);
+}
+
+void Planner::finishSchedulerSweeper()
+{
+    QPointer<ScheduleSlot> slot=m_schedulerSweeperTargetSlot;
+    const int expectedSecond=m_schedulerSweeperTargetEntrySecond;
+    m_schedulerSweeperTargetSlot.clear();
+    m_schedulerSweeperQueuedPath.clear();
+    m_schedulerSweeperTargetEntrySecond=-1;
+    m_schedulerSweeperTargetDue=false;
+    if (!m_running)
+        return;
+
+    m_standbyStartAttempted=false;
+    if (slot && !slot->isScheduleDisabled() && slot->usesSchedulerSweeper()
+        && slot->entrySecond()==expectedSecond) {
+        const QString dayKey=QDate::currentDate().toString("yyyyMMdd");
+        const QString key=QStringLiteral("%1-%2-%3")
+            .arg(dayKey).arg(quintptr(slot.data()),0,16).arg(slot->entrySecond());
+        m_triggeredSlots.insert(key);
+        if (m_pendingStartSlot==slot)
+            m_pendingStartSlot.clear();
+        startScheduleSlot(slot);
+        return;
+    }
+    startStandbyIfNeeded();
 }
 
 void Planner::refreshAudioDurations()
@@ -2721,6 +2966,10 @@ void Planner::startPlayback()
 void Planner::stopPlayback()
 {
     if (!m_running) return;
+    m_schedulerSweeperTargetSlot.clear();
+    m_schedulerSweeperQueuedPath.clear();
+    m_schedulerSweeperTargetEntrySecond=-1;
+    m_schedulerSweeperTargetDue=false;
     m_standbyResumeTimer->stop();
     cancelStandbyTrackWait();
     if (m_activeScheduleSlot)
@@ -2908,7 +3157,8 @@ void Planner::loadStandbyFile()
         return;
     }
     if (m_running && (m_fadeAction!=0 || m_pendingScheduleSlot
-                      || m_pendingScheduleEngine || m_waitingForStandbySlot)) {
+                      || m_pendingScheduleEngine || m_waitingForStandbySlot
+                      || (m_standbyEngine && m_standbyEngine->isPlayingSequenceOverride()))) {
         QMessageBox::information(this,tr("Load Standby"),
             tr("Wait for the scheduled transition to finish before loading a Standby file."));
         return;
@@ -2994,6 +3244,15 @@ void Planner::checkSchedule()
         if (m_waitingForStandbySlot && m_waitingForStandbySlot!=dueSlot)
             cancelStandbyTrackWait();
         m_pendingStartSlot=dueSlot;
+    }
+    if (m_schedulerSweeperTargetSlot
+        && m_standbyEngine->isPlayingSequenceOverride()) {
+        if (dueSlot==m_schedulerSweeperTargetSlot) {
+            m_pendingStartSlot=m_schedulerSweeperTargetSlot;
+            m_schedulerSweeperTargetDue=true;
+        }
+        if (m_schedulerSweeperTargetDue)
+            return;
     }
     if (m_waitingForStandbySlot
         && (m_waitingForStandbySlot->isScheduleDisabled()

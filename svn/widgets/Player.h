@@ -22,6 +22,7 @@
 class VuMeter;
 class ContentsBase;
 class AudioItemFolderMaxi;
+class AudioItemFileMaxi;
 
 
 
@@ -94,6 +95,11 @@ private:
     QPointer<ContentsBase> m_sequenceContents;
     bool m_sequenceRepeat = false;
     bool m_stopSequenceAtTrackEnd = false;
+    QString m_nextSequenceOverridePath;
+    QString m_nextSequenceOverrideName;
+    QPointer<AudioItemFileMaxi> m_sequenceOverrideItem;
+    bool m_playingSequenceOverride = false;
+    bool m_stopAfterSequenceOverride = false;
     int m_sequenceIndex = -1;
     QPointer<AudioItemFolderMaxi> m_folderTurnItem;
     int m_folderTurnTracksStarted = 0;
@@ -159,6 +165,11 @@ public:
     void stopSequentialPlayback();
     bool stopSequentialPlaybackAtTrackEnd();
     void cancelStopSequentialPlaybackAtTrackEnd();
+    void setNextSequenceOverride(const QString &path, const QString &name,
+                                 bool stopAfterOverride = false);
+    void clearNextSequenceOverride();
+    bool hasNextSequenceOverride() const { return !m_nextSequenceOverridePath.isEmpty(); }
+    bool isPlayingSequenceOverride() const { return m_playingSequenceOverride; }
     void pauseMain();
     void stopMain();
     bool seekPlaybackPosition(double seconds);
@@ -198,6 +209,7 @@ public:
     void configurationChanged();
     void sequentialPlaybackFinished();
     void sequentialTrackFinished();
+    void sequenceOverrideFinished();
     void audioLevelsChanged(float left, float right);
     void playbackProgressChanged(double position, double duration, bool seekable);
     void currentPlaybackNameChanged(const QString &name);

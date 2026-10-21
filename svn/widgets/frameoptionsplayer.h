@@ -11,6 +11,8 @@
 class QSlider;
 class QLabel;
 class Label;
+class QLineEdit;
+class QSpinBox;
 
 
 
@@ -38,9 +40,14 @@ class FrameOptionsPlayer: public Frame
     QComboBox *combocue;
     QSlider *volumeSlider;
     QLabel *volumeValue;
+    QLineEdit *schedulerSweeperFolder = nullptr;
+    QSpinBox *schedulerSweeperMaximumWindow = nullptr;
+    QSpinBox *schedulerSweeperAllowedOverrun = nullptr;
     Label *optionsTitle = nullptr;
     float m_previousVolume = 1.0f;
     bool m_volumeCommitted = false;
+    bool m_isPlannerOptions = false;
+    bool m_folderDialogOpen = false;
 
 
 
@@ -56,11 +63,11 @@ class FrameOptionsPlayer: public Frame
        void UpdateDevice();
        float committedVolume() const;
 
-
     protected:
 
    void showEvent(QShowEvent *event) override;
    void hideEvent(QHideEvent *event) override;
+   bool eventFilter(QObject *watched, QEvent *event) override;
 
 
     private slots:

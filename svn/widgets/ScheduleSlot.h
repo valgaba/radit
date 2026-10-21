@@ -29,6 +29,7 @@ public:
     bool isScheduleDisabled() const { return m_disabled; }
     bool isPriority() const { return m_priority; }
     bool waitsForStandbyTrackEnd() const { return m_waitForStandbyTrackEnd; }
+    bool usesSchedulerSweeper() const { return m_useSchedulerSweeper; }
     bool contentsVisible() const { return m_contentsVisible; }
     QString standbyListPath() const { return m_standbyListPath; }
     bool isStandbyListChangeEvent() const { return !m_standbyListPath.isEmpty(); }
@@ -41,6 +42,7 @@ public:
     void setScheduleDisabled(bool disabled);
     void setPriority(bool priority);
     void setStandbyTrackWait(bool enabled);
+    void setUseSchedulerSweeper(bool enabled);
     void setContentsVisible(bool visible);
     void setStandbyListPath(const QString &path);
     void setUpcoming(bool upcoming);
@@ -76,6 +78,7 @@ private:
     bool m_disabled = false;
     bool m_priority = false;
     bool m_waitForStandbyTrackEnd = false;
+    bool m_useSchedulerSweeper = false;
     bool m_upcoming = false;
     bool m_playing = false;
     bool m_blinkPhase = false;
