@@ -1471,6 +1471,36 @@ private:
     std::function<void()> m_documentModified;
 };
 
+class PlannerDayTabButton final : public Button
+{
+public:
+    using Button::Button;
+
+    void setAccentColor(const QColor &color)
+    {
+        if (m_accentColor==color)
+            return;
+        m_accentColor=color;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Button::paintEvent(event);
+        if (!m_accentColor.isValid() || m_accentColor.alpha()==0)
+            return;
+
+        QPainter painter(this);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(m_accentColor);
+        painter.drawRoundedRect(QRect(4,1,qMax(0,width()-8),3),1,1);
+    }
+
+private:
+    QColor m_accentColor;
+};
+
 class PlannerWeekTabs final : public Frame
 {
 public:
@@ -1540,13 +1570,14 @@ public:
         const QStringList days={tr("Monday"),tr("Tuesday"),tr("Wednesday"),tr("Thursday"),
                                 tr("Friday"),tr("Saturday"),tr("Sunday")};
         for (int index=0; index<days.size(); ++index) {
-            auto *button=new Button(this);
+            auto *button=new PlannerDayTabButton(this);
             button->setObjectName("PlannerDayTab");
             button->setText(days.at(index));
             button->setCheckable(true);
             button->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
             button->setFixedHeight(27);
             group->addButton(button,index);
+            m_dayButtons.append(button);
             tabRow->addWidget(button,1);
 
             auto *dayPage=new PlannerDayPage(m_pages,m_scrollArea,dayContents);
@@ -1600,6 +1631,7 @@ public:
         }
         m_timeRuler->setSlotIntervals(
             static_cast<PlannerDayPage*>(m_pages->widget(0))->slotIntervals());
+        updateTodayAccent(QDate::currentDate());
 
         if (auto *plannerContents=qobject_cast<PlannerContents*>(m_standbyContents)) {
             connect(plannerContents,&PlannerContents::contentAdded,this,[this]() {
@@ -1924,6 +1956,7 @@ public:
     void showDate(const QDate &date)
     {
         const int dayIndex=qBound(0,date.dayOfWeek()-1,6);
+        updateTodayAccent(date);
         if (m_pages->currentIndex()==dayIndex)
             return;
         if (QAbstractButton *dayButton=m_dayGroup->button(dayIndex))
@@ -2021,6 +2054,7 @@ protected:
     void showEvent(QShowEvent *event) override
     {
         Frame::showEvent(event);
+        updateTodayAccent(QDate::currentDate());
         if (m_initialTimePositioned)
             return;
         m_initialTimePositioned=true;
@@ -2043,6 +2077,14 @@ protected:
     }
 
 private:
+    void updateTodayAccent(const QDate &date)
+    {
+        const int todayIndex=qBound(0,date.dayOfWeek()-1,6);
+        const QColor todayRed(184,105,105);
+        for (int index=0; index<m_dayButtons.size(); ++index)
+            m_dayButtons.at(index)->setAccentColor(index==todayIndex ? todayRed : QColor());
+    }
+
     void setZoom(int pixelsPerHour, bool preserveScrollPosition, int anchorViewportY = -1)
     {
         const int oldScale=m_pixelsPerHour;
@@ -2103,6 +2145,7 @@ private:
 
     QStackedWidget *m_pages = nullptr;
     QButtonGroup *m_dayGroup = nullptr;
+    QList<PlannerDayTabButton*> m_dayButtons;
     QWidget *m_timelineCanvas = nullptr;
     QHBoxLayout *m_timelineLayout = nullptr;
     PlannerTimeRuler *m_timeRuler = nullptr;
@@ -2272,7 +2315,7 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     fallbackLayout->addWidget(fallbackBar);
 
     auto *fallbackContents=new PlannerContents(fallbackPanel);
-    fallbackContents->setListFileActionsEnabled(true);
+    fallbackContents->setStandbyFileActionsEnabled(true);
     m_fallbackContents=fallbackContents;
     m_fallbackContents->setObjectName("PlannerFallbackContents");
     fallbackLayout->addWidget(m_fallbackContents,1);

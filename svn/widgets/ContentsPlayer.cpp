@@ -47,6 +47,7 @@
 
 
 #include "widgets/ContentsPlayer.h"
+#include "widgets/PlannerContents.h"
 #include "widgets/button.h"
 #include "widgets/frame.h"
 #include "widgets/label.h"
@@ -341,13 +342,11 @@ void ContentsPlayer::dropEvent(QDropEvent *event)
            for (AudioItemMaxi* oldItem : std::as_const(itemsToDeleteFromSource)) {
                if (!oldItem)
                    continue;
-
-               if (oldItem->parentWidget() && oldItem->parentWidget()->layout()) {
-                   oldItem->parentWidget()->layout()->removeWidget(oldItem);
-               }
-
-              // oldItem->deleteLater();
-                deleteItem(oldItem);   //
+               QWidget *owner=oldItem->parentWidget();
+               while (owner && !qobject_cast<ContentsPlayer*>(owner))
+                   owner=owner->parentWidget();
+               if (auto *sourceContents=qobject_cast<ContentsPlayer*>(owner))
+                   sourceContents->deleteItem(oldItem);
            }
 
            if (!draggedItems.isEmpty())
@@ -386,7 +385,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
             contentsMenu->setloopVisible(false);
             contentsMenu->setselectVisible(false);
 
-            contentsMenu->setPasteVisible(!this->clipboard.lista.isEmpty());
+            contentsMenu->setPasteVisible(this->clipboard.hasItems());
 
             contentsMenu->setLoadVisible(showListOptions);
             contentsMenu->setSaveVisible(showListOptions);
@@ -441,7 +440,7 @@ void ContentsPlayer::contextMenuEvent(QContextMenuEvent *event){
 
 
         // Mostrar u ocultar Paste según clipboard
-        contentsMenu->setPasteVisible(!this->clipboard.lista.isEmpty());
+        contentsMenu->setPasteVisible(this->clipboard.hasItems());
 
         // Mostrar menú nuevo
         contentsMenu->exec(mapToGlobal(mousePos));
@@ -834,30 +833,39 @@ void ContentsPlayer::cutSelected()
 // ContentsPlayer.cpp
 void ContentsPlayer::pasteClipboard()
 {
-    if (clipboard.lista.empty())
+    if (!clipboard.hasItems())
         return;
 
     bool isCutOperation = clipboard.lista.constFirst()->property("iscut").toBool();
 
     // deleteItem removes clipboard entries. Iterate over a snapshot when cutting.
     const auto copiedItems = clipboard.lista;
-    for (QWidget *widget : copiedItems) {
+    for (const QPointer<QWidget> &widget : copiedItems) {
+        if (!widget)
+            continue;
         if (auto *itemBase = qobject_cast<AudioItemMaxi*>(widget)) {
-            AudioItemMaxi *newItem = itemBase->copy(this);
+            const bool plannerDestination=qobject_cast<PlannerContents*>(this)!=nullptr;
+            AudioItemMaxi *newItem=plannerDestination ? itemBase->copy(this)
+                                                       : makeMaxiItem(itemBase,this);
+            if (!newItem)
+                newItem=itemBase->copy(this);
             createItem(newItem);
 
             newItem->setIsSelect(false); // deseleccionar pegado
 
             if (isCutOperation) {
-               //itemBase->deleteLater();
-                 deleteItem(itemBase);   //
+                QWidget *owner=itemBase->parentWidget();
+                while (owner && !qobject_cast<ContentsPlayer*>(owner))
+                    owner=owner->parentWidget();
+                if (auto *sourceContents=qobject_cast<ContentsPlayer*>(owner))
+                    sourceContents->deleteItem(itemBase);
             }
         }
     }
 
     // limpiar selección de los originales
-    for (auto it = clipboard.lista.begin(); it != clipboard.lista.end(); ++it) {
-        if (auto *item = qobject_cast<AudioItemMaxi*>(*it)) {
+    for (const QPointer<QWidget> &widget : std::as_const(clipboard.lista)) {
+        if (auto *item = qobject_cast<AudioItemMaxi*>(widget.data())) {
             item->setIsSelect(false);
         }
     }

@@ -3,6 +3,7 @@
 
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/Player.h"
+#include "widgets/Planner.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleValidator>
@@ -15,6 +16,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QRandomGenerator>
 #include <QSlider>
 #include <QShortcut>
 #include <QWindow>
@@ -206,16 +208,6 @@ public:
         introText->setToolTip(tr("Use [artist], [title] and [album] for the ID3 artist, track title and album."));
         form->addRow(tr("Opening announcement"), introText);
 
-        auto *expressiveSample = new Button(this);
-        expressiveSample->setObjectName("InsertExpressiveAnnouncementSample");
-        expressiveSample->setText(tr("Insert expressive test text"));
-        expressiveSample->setToolTip(tr("Inserts an Eleven v3 sample using [excited]. The first playback generates a new clip and uses the normal TTS credits."));
-        expressiveSample->setFixedHeight(24);
-        form->addRow(QString(), expressiveSample);
-        connect(expressiveSample, &Button::clicked, introText, [introText]() {
-            introText->setText(QStringLiteral("[excited] ¡Sigues en tu emisora favorita! Te dejamos con [artist] y su tema [title]."));
-        });
-
         auto *outroText = new QLineEdit(item->outroAnnouncement().isEmpty()
             ? QString()
             : item->outroAnnouncement(), this);
@@ -234,12 +226,17 @@ public:
         auto *testVoice = new Button(this);
         testVoice->setText(tr("Test cached voice + music"));
         testVoice->setObjectName("TestCachedFolderVoice");
-        testVoice->setFixedSize(160, 24);
+        testVoice->setFixedSize(145, 24);
+        auto *testSweeper = new Button(this);
+        testSweeper->setText(tr("Test sweeper + music"));
+        testSweeper->setObjectName("TestFolderSweeper");
+        testSweeper->setFixedSize(145, 24);
         buttons->addStretch();
         auto *cancel = new Button(this); cancel->setText(tr("Cancel"));
         auto *save = new Button(this); save->setText(tr("Save")); save->setObjectName("SaveFolderProperties");
         cancel->setFixedSize(70, 24); save->setFixedSize(70, 24);
-        buttons->addWidget(testVoice); buttons->addWidget(cancel); buttons->addWidget(save);
+        buttons->addWidget(testVoice); buttons->addWidget(testSweeper);
+        buttons->addWidget(cancel); buttons->addWidget(save);
         layout->addLayout(buttons);
         connect(browse, &Button::clicked, this, [this, folder, orderedList]() {
             const QString path = orderedList
@@ -264,6 +261,7 @@ public:
             introText->setEnabled(speak);
             outroText->setEnabled(speak);
             testVoice->setEnabled(speak);
+            testSweeper->setEnabled(useSweeper && QFileInfo(sweeperFolder->text()).isDir());
             const QFileInfo sourceInfo(folder->text());
             const bool sourceValid = orderedList ? (sourceInfo.isFile()
                     && sourceInfo.suffix().compare("list", Qt::CaseInsensitive) == 0)
@@ -321,52 +319,69 @@ public:
                                        introDelay->text().toInt());
             close();
         });
-        connect(testVoice, &Button::clicked, this, [=]() {
-            if (introText->text().trimmed() != item->introAnnouncement()) {
-                QMessageBox::information(this, tr("Test cached voice"),
-                    tr("Save this text and play the folder once to generate its voice. The test button only replays cached audio and never contacts the selected AI voice provider."));
-                return;
+        const auto previewClipWithMusic = [=](const QString &clipPath, const QString &titleText) {
+            QString musicPath = item->playbackPath();
+            if (musicPath.isEmpty() || !QFileInfo::exists(musicPath)) {
+                QStringList availableTracks = item->isOrderedList()
+                    ? item->orderedTrackPaths() : item->indexedTrackPaths();
+                if (availableTracks.isEmpty() && !item->isOrderedList()) {
+                    const QFileInfoList entries = QDir(item->folderPath()).entryInfoList(
+                        MediaManager::supportedAudioNameFilters(),
+                        QDir::Files | QDir::Readable, QDir::Name);
+                    for (const QFileInfo &entry : entries)
+                        availableTracks.append(entry.absoluteFilePath());
+                }
+                if (!availableTracks.isEmpty())
+                    musicPath = availableTracks.at(
+                        QRandomGenerator::global()->bounded(availableTracks.size()));
             }
-            const QString voicePath = item->introAnnouncementPath();
-            const QString musicPath = item->playbackPath();
-            if (voicePath.isEmpty() || !QFileInfo::exists(voicePath)
+            if (clipPath.isEmpty() || !QFileInfo::exists(clipPath)
                 || musicPath.isEmpty() || !QFileInfo::exists(musicPath)) {
-                QMessageBox::information(this, tr("Test cached voice"),
-                    tr("A cached voice and its music track are required. Play this folder once to generate the voice. This test never contacts the selected AI voice provider or uses credits."));
+                QMessageBox::information(this, titleText,
+                    tr("Radit could not find a music track or the selected audio clip for this test."));
                 return;
             }
-            QWidget *owner = item->parentWidget();
-            while (owner && !qobject_cast<Player*>(owner)) owner = owner->parentWidget();
-            auto *player = qobject_cast<Player*>(owner);
-            const int device = player ? player->devicePlay() : 0;
+            Player *player = nullptr;
+            Planner *planner = nullptr;
+            QWidget *owner = item;
+            while (owner && !player && !planner) {
+                player = qobject_cast<Player*>(owner);
+                planner = qobject_cast<Planner*>(owner);
+                if (!player && !planner)
+                    owner = owner->parentWidget();
+            }
+            const int device = player ? player->devicePlay()
+                : planner ? planner->devicePlay() : 0;
             if (player && player->getCurrentItem() == item
-                && player->previewFolderAnnouncement(voicePath, voiceVolume->value(),
+                && player->previewFolderAnnouncement(clipPath, voiceVolume->value(),
                     musicVolume->value(), recovery->text().toDouble()))
                 return;
             auto *musicPreview = new MediaManager(this);
-            auto *voicePreview = new MediaManager(this);
-            if (!musicPreview->setDevice(device) || !voicePreview->setDevice(device)
-                || !musicPreview->loadFile(musicPath) || !voicePreview->loadFile(voicePath)) {
-                QMessageBox::warning(this, tr("Test cached voice"), tr("The cached voice or music track could not be opened."));
+            auto *clipPreview = new MediaManager(this);
+            if (!musicPreview->setDevice(device) || !clipPreview->setDevice(device)
+                || !musicPreview->loadFile(musicPath) || !clipPreview->loadFile(clipPath)) {
+                QMessageBox::warning(this, titleText, tr("The selected audio clip or music track could not be opened."));
                 musicPreview->deleteLater();
-                voicePreview->deleteLater();
+                clipPreview->deleteLater();
                 return;
             }
-            const float normalMusicGain = player ? player->volume() : 1.0f;
+            const float masterGain = player ? player->volume()
+                : planner ? planner->volume() : 1.0f;
+            const float normalMusicGain = masterGain;
             const float initialMusicGain = normalMusicGain * musicVolume->value() / 100.0f;
             const int recoveryMs = qRound(recovery->text().toDouble() * 1000.0);
             musicPreview->setVolume(initialMusicGain);
-            voicePreview->setVolume(voiceVolume->value() / 100.0f);
+            clipPreview->setVolume(masterGain * voiceVolume->value() / 100.0f);
             auto *recoveryTimer = new QTimer(this);
             recoveryTimer->setInterval(25);
             auto recoveryClock = std::make_shared<QElapsedTimer>();
-            connect(voicePreview, &MediaManager::playbackFinished, this,
+            connect(clipPreview, &MediaManager::playbackFinished, this,
                     [=]() {
                 if (recoveryMs <= 100) {
                     musicPreview->stop();
-                    voicePreview->stop();
+                    clipPreview->stop();
                     musicPreview->deleteLater();
-                    voicePreview->deleteLater();
+                    clipPreview->deleteLater();
                     recoveryTimer->deleteLater();
                     return;
                 }
@@ -381,22 +396,42 @@ public:
                 if (progress >= 1.0f) {
                     recoveryTimer->stop();
                     musicPreview->stop();
-                    voicePreview->stop();
+                    clipPreview->stop();
                     musicPreview->deleteLater();
-                    voicePreview->deleteLater();
+                    clipPreview->deleteLater();
                     recoveryTimer->deleteLater();
                 }
             });
-            connect(voicePreview, &MediaManager::playbackError, this, [=](const QString &) {
+            connect(clipPreview, &MediaManager::playbackError, this, [=](const QString &) {
                 recoveryTimer->stop();
                 musicPreview->stop();
-                voicePreview->stop();
+                clipPreview->stop();
                 musicPreview->deleteLater();
-                voicePreview->deleteLater();
+                clipPreview->deleteLater();
                 recoveryTimer->deleteLater();
             });
             musicPreview->play();
-            voicePreview->play();
+            clipPreview->play();
+        };
+        connect(testVoice, &Button::clicked, this, [=]() {
+            if (introText->text().trimmed() != item->introAnnouncement()) {
+                QMessageBox::information(this, tr("Test cached voice"),
+                    tr("Save this text and play the folder once to generate its voice. The test button only replays cached audio and never contacts the selected AI voice provider."));
+                return;
+            }
+            previewClipWithMusic(item->introAnnouncementPath(), tr("Test cached voice"));
+        });
+        connect(testSweeper, &Button::clicked, this, [=]() {
+            const QFileInfoList sweepers = QDir(sweeperFolder->text()).entryInfoList(
+                MediaManager::supportedAudioNameFilters(), QDir::Files | QDir::Readable,
+                QDir::Name);
+            if (sweepers.isEmpty()) {
+                QMessageBox::information(this, tr("Test sweeper"),
+                    tr("The selected sweeper folder does not contain any supported audio files."));
+                return;
+            }
+            const int index = QRandomGenerator::global()->bounded(sweepers.size());
+            previewClipWithMusic(sweepers.at(index).absoluteFilePath(), tr("Test sweeper"));
         });
     }
 protected:

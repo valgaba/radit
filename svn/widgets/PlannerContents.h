@@ -11,7 +11,7 @@ public:
     explicit PlannerContents(QWidget *parent = nullptr);
     AudioItemMaxi *createItem(AudioItemMaxi *item) override;
     void deleteItem(AudioItemMaxi *item) override;
-    void setListFileActionsEnabled(bool enabled) { m_listFileActionsEnabled=enabled; }
+    void setStandbyFileActionsEnabled(bool enabled) { m_standbyFileActionsEnabled=enabled; }
 
 signals:
     void contentDurationsChanged();
@@ -19,7 +19,7 @@ signals:
     void contentModified();
 
 private:
-    bool m_listFileActionsEnabled = false;
+    bool m_standbyFileActionsEnabled = false;
 
 protected:
     AudioItemMaxi *createFolderItem() override;

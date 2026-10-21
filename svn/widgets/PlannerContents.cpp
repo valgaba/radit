@@ -29,28 +29,44 @@
 namespace {
 AudioItemMaxi *makePlannerItem(AudioItemMaxi *source, QWidget *parent)
 {
+    AudioItemMaxi *item=nullptr;
     if (auto *listItem=qobject_cast<AudioItemListMaxi*>(source))
-        return new AudioItemListPlanner(*listItem,parent);
-    if (auto *fileItem=qobject_cast<AudioItemFileMaxi*>(source)) {
+        item=new AudioItemListPlanner(*listItem,parent);
+    else if (auto *fileItem=qobject_cast<AudioItemFileMaxi*>(source)) {
         if (auto *plannerItem=qobject_cast<AudioItemFilePlanner*>(fileItem))
-            return plannerItem->copy(parent);
-        auto *item=new AudioItemFilePlanner(parent);
-        item->setNameFile(fileItem->nameFile());
-        item->setFilePath(fileItem->filePath());
-        item->setSecond(fileItem->second());
-        item->setTiempoFile(fileItem->second());
-        item->setSecondStart(fileItem->secondStart());
-        item->setEnabledForPlayback(fileItem->isEnabledForPlayback());
-        item->setToolTip(fileItem->toolTip());
-        return item;
+            item=plannerItem->copy(parent);
+        else {
+            auto *file=new AudioItemFilePlanner(parent);
+            file->setNameFile(fileItem->nameFile());
+            file->setFilePath(fileItem->filePath());
+            file->setSecond(fileItem->second());
+            file->setTiempoFile(fileItem->second());
+            file->setSecondStart(fileItem->secondStart());
+            item=file;
+        }
     }
-    if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(source))
-        return new AudioItemFolderPlanner(*folderItem,parent);
-    if (auto *netItem=qobject_cast<AudioItemNetMaxi*>(source))
-        return new AudioItemNetPlanner(*netItem,parent);
-    if (auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(source))
-        return new AudioItemMeteoClockPlanner(*meteoItem,parent);
-    return nullptr;
+    else if (auto *folderItem=qobject_cast<AudioItemFolderMaxi*>(source))
+        item=new AudioItemFolderPlanner(*folderItem,parent);
+    else if (auto *netItem=qobject_cast<AudioItemNetMaxi*>(source))
+        item=new AudioItemNetPlanner(*netItem,parent);
+    else if (auto *meteoItem=qobject_cast<AudioItemMeteoClockMaxi*>(source))
+        item=new AudioItemMeteoClockPlanner(*meteoItem,parent);
+
+    if (item) {
+        // Keep shared playback settings when converting Player/Standby items
+        // into the compact Planner representation.
+        item->setMixSettings(source->mixEnabled(),source->mixSeconds());
+        if (source->playbackLimitSeconds()>0.0)
+            item->setPlaybackLimitSeconds(source->playbackLimitSeconds());
+        item->setIsLoop(source->isLoop());
+        item->setIsPurge(source->isPurge());
+        item->setIsPlayNext(source->isPlayNext());
+        item->setEnabledForPlayback(source->isEnabledForPlayback());
+        item->setColor(source->color());
+        item->setToolTip(source->toolTip());
+        item->setIsSelect(false);
+    }
+    return item;
 }
 
 bool isPlannerItem(AudioItemMaxi *item)
@@ -62,16 +78,6 @@ bool isPlannerItem(AudioItemMaxi *item)
         || qobject_cast<AudioItemMeteoClockPlanner*>(item);
 }
 
-void refreshPlannerStandbyTitle(QWidget *widget, bool modified)
-{
-    while (widget && !qobject_cast<Planner*>(widget))
-        widget=widget->parentWidget();
-    if (auto *planner=qobject_cast<Planner*>(widget)) {
-        if (modified)
-            planner->markDocumentModified();
-        planner->refreshAfterContentLoad();
-    }
-}
 }
 
 PlannerContents::PlannerContents(QWidget *parent) : ContentsPlayer(parent)
@@ -180,21 +186,14 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     QAction *deleteAction=menu.addAction(QIcon(":/icons/Remove.svg"),tr("Delete"));
     menu.addSeparator();
     QAction *propertiesAction=menu.addAction(QIcon(":/icons/settings.svg"),tr("Properties"));
-    QAction *loadListAction=nullptr;
-    QAction *saveListAction=nullptr;
-    QAction *saveListAsAction=nullptr;
     QAction *loadStandbyAction=nullptr;
     QAction *saveStandbyAction=nullptr;
     QAction *saveStandbyAsAction=nullptr;
-    if (m_listFileActionsEnabled) {
+    if (m_standbyFileActionsEnabled) {
         menu.addSeparator();
         loadStandbyAction=menu.addAction(tr("Load Standby"));
         saveStandbyAction=menu.addAction(tr("Save Standby"));
         saveStandbyAsAction=menu.addAction(tr("Save Standby As"));
-        menu.addSeparator();
-        loadListAction=menu.addAction(tr("Load list"));
-        saveListAction=menu.addAction(tr("Save list"));
-        saveListAsAction=menu.addAction(tr("Save as list"));
     }
 
     const bool hasTarget=contextItem!=nullptr;
@@ -210,7 +209,7 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
     cutAction->setEnabled(hasActionTarget);
     deleteAction->setEnabled(hasActionTarget);
     propertiesAction->setEnabled(hasActionTarget);
-    pasteAction->setEnabled(!clipboard.lista.isEmpty());
+    pasteAction->setEnabled(clipboard.hasItems());
 
     QAction *chosen=menu.exec(mapToGlobal(event->pos()));
     if (chosen==addOnlineRadioAction) {
@@ -257,30 +256,6 @@ void PlannerContents::contextMenuEvent(QContextMenuEvent *event)
                 planner->loadStandbyFile();
             else
                 planner->saveStandbyFile(chosen==saveStandbyAsAction);
-        }
-    }
-    else if (loadListAction && chosen==loadListAction) {
-        const int oldItemCount=findChildren<AudioItemMaxi*>().size();
-        const QString oldListFile=listFileName();
-        loadItems();
-        refreshPlannerStandbyTitle(this,oldItemCount!=findChildren<AudioItemMaxi*>().size()
-                                      || oldListFile!=listFileName());
-    }
-    else if (saveListAction && chosen==saveListAction) {
-        saveItems();
-        refreshPlannerStandbyTitle(this,false);
-    }
-    else if (saveListAsAction && chosen==saveListAsAction) {
-        const QString oldListFile=listFileName();
-        saveAsItems();
-        const bool changedListFile=oldListFile!=listFileName();
-        refreshPlannerStandbyTitle(this,changedListFile);
-        if (changedListFile) {
-            QWidget *owner=parentWidget();
-            while (owner && !qobject_cast<Planner*>(owner))
-                owner=owner->parentWidget();
-            if (auto *planner=qobject_cast<Planner*>(owner))
-                planner->markStandbyFileModified();
         }
     }
     event->accept();
@@ -404,13 +379,25 @@ void PlannerContents::dropEvent(QDropEvent *event)
         return;
     }
 
-    for (AudioItem *source : draggedItems) {
+    QWidget *targetWidget=childAt(event->position().toPoint());
+    while (targetWidget && !qobject_cast<AudioItemMaxi*>(targetWidget))
+        targetWidget=targetWidget->parentWidget();
+    int insertIndex=targetWidget ? layout->indexOf(targetWidget) : layout->count();
+    if (insertIndex<0)
+        insertIndex=layout->count();
+
+    for (AudioItem *source : std::as_const(draggedItems)) {
         auto *audioSource=qobject_cast<AudioItemMaxi*>(source);
         if (!audioSource)
             continue;
         AudioItemMaxi *compact=makePlannerItem(audioSource,this);
-        if (!compact || !createItem(compact))
+        AudioItemMaxi *created=compact ? createItem(compact) : nullptr;
+        if (!created)
             continue;
+
+        layout->removeWidget(created);
+        layout->insertWidget(qBound(0,insertIndex,layout->count()),created);
+        ++insertIndex;
 
         QWidget *owner=audioSource->parentWidget();
         while (owner && !qobject_cast<ContentsPlayer*>(owner))

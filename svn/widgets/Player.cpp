@@ -754,7 +754,9 @@ void Player::startFolderAnnouncement(const QString &audioPath, int voiceVolumePe
         : folder ? folder->announcementRecoverySeconds() : 1.0;
     m_announcementRecoveryDurationMs = qRound(recovery * 1000.0);
     m_announcementVoiceGain = voiceVolume;
-    voice->setVolume(voiceVolume);
+    // The Player volume is the master gain for every sound routed through it,
+    // including announcements and sweepers.
+    voice->setVolume(m_playerVolume * voiceVolume);
     m_announcementManager=voice;
     const float musicGain = folderAnnouncementMusicGain();
     m_announcementRecoveryGain=musicGain;
@@ -1381,7 +1383,7 @@ bool Player::setVolume(float volume)
     if (m_outgoingManager)
         result = m_outgoingManager->setVolume(m_playerVolume * gains.outgoing * announcementGain) && result;
     if (m_announcementManager) {
-        result = m_announcementManager->setVolume(m_announcementVoiceGain) && result;
+        result = m_announcementManager->setVolume(m_playerVolume * m_announcementVoiceGain) && result;
     }
     return result;
 }

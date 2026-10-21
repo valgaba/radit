@@ -596,6 +596,15 @@ QStringList AudioItemFolderMaxi::orderedTrackPaths() const
     return paths;
 }
 
+QStringList AudioItemFolderMaxi::indexedTrackPaths() const
+{
+    QStringList paths;
+    paths.reserve(m_tracks.size());
+    for (const Track &track : m_tracks)
+        paths.append(track.path);
+    return paths;
+}
+
 double AudioItemFolderMaxi::orderedListDurationSeconds(bool *known) const
 {
     if (known)
