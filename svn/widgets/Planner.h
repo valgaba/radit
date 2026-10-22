@@ -120,6 +120,7 @@ private:
     void startPlayback();
     void stopPlayback();
     void startStandbyIfNeeded();
+    void ensureStandbyPlayback();
     void checkSchedule();
     void cancelStandbyTrackWait();
     void finishStandbyTrackWait();

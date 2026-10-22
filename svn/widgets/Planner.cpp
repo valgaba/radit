@@ -2782,6 +2782,28 @@ void Planner::startStandbyIfNeeded()
     m_standbyEngine->startSequentialPlayback(m_fallbackContents,true);
 }
 
+void Planner::ensureStandbyPlayback()
+{
+    if (!m_running || !m_standbyEngine || m_pendingScheduleEngine
+        || m_pendingScheduleSlot || (m_fadeTimer && m_fadeTimer->isActive()))
+        return;
+    if (m_activeScheduleEngine && m_activeScheduleEngine->getCurrentItem())
+        return;
+
+    if (m_activeScheduleSlot)
+        m_activeScheduleSlot->setPlaying(false);
+    m_activeScheduleEngine=nullptr;
+    m_activeScheduleSlot.clear();
+    if (m_standbyEngine->getCurrentItem())
+        return;
+
+    // A waiting event can stop Standby at the track boundary. If that event
+    // has since become empty/disabled or cannot start, reopen Standby instead
+    // of leaving the automation silent for the rest of the day.
+    m_standbyStartAttempted=false;
+    startStandbyIfNeeded();
+}
+
 void Planner::refreshAfterContentLoad()
 {
     updateStandbyBarTitle();
@@ -3075,13 +3097,18 @@ void Planner::cancelStandbyTrackWait()
 void Planner::finishStandbyTrackWait()
 {
     QPointer<ScheduleSlot> slot=m_waitingForStandbySlot;
-    if (!slot)
+    const int expectedEntrySecond=m_waitingStandbyEntrySecond;
+    if (!slot) {
+        ensureStandbyPlayback();
         return;
+    }
     m_waitingForStandbySlot.clear();
     m_waitingStandbyEntrySecond=-1;
-    if (!m_running || slot->isScheduleDisabled()) {
+    if (!m_running || slot->isScheduleDisabled()
+        || slot->entrySecond()!=expectedEntrySecond) {
         if (m_pendingStartSlot==slot)
             m_pendingStartSlot.clear();
+        ensureStandbyPlayback();
         return;
     }
 
@@ -3098,8 +3125,11 @@ void Planner::finishStandbyTrackWait()
 
 void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
 {
-    if (!slot || slot->contents()->layout->count()==0)
+    if (!slot || !slot->contents() || !slot->contents()->layout
+        || slot->contents()->layout->count()==0) {
+        ensureStandbyPlayback();
         return;
+    }
     bool hasEnabledItem=false;
     for (int index=0; index<slot->contents()->layout->count(); ++index) {
         auto *item=qobject_cast<AudioItemMaxi*>(slot->contents()->layout->itemAt(index)->widget());
@@ -3108,8 +3138,10 @@ void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
             break;
         }
     }
-    if (!hasEnabledItem)
+    if (!hasEnabledItem) {
+        ensureStandbyPlayback();
         return;
+    }
     m_standbyResumeTimer->stop();
     if (m_fadeTimer->isActive()) {
         m_fadeTimer->stop();
@@ -3131,6 +3163,7 @@ void Planner::startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs)
         emit emissionPlaybackStarted(incoming,source,slot->name(),QString());
         emit emissionPlaybackFinished(incoming,tr("Error"),
                                       tr("No enabled audio item could be started; Standby remains on air."));
+        ensureStandbyPlayback();
         return;
     }
 
@@ -3215,6 +3248,7 @@ void Planner::startWaitingSlotCrossfade(int crossfadeDurationMs)
 {
     QPointer<ScheduleSlot> slot=m_waitingForStandbySlot;
     if (!slot || !m_running || slot->isScheduleDisabled()
+        || slot->entrySecond()!=m_waitingStandbyEntrySecond
         || m_activeScheduleEngine || m_fadeTimer->isActive())
         return;
 
