@@ -6,6 +6,8 @@
 #include "widgets/Player.h"
 #include "widgets/FolderPropertiesFrame.h"
 #include "core/ElevenLabsTts.h"
+#include "core/AudioSettings.h"
+#include "core/MediaManager.h"
 #include <cmath>
 #include <QDir>
 #include <QDirIterator>
@@ -15,10 +17,12 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <algorithm>
+#include <numeric>
 #include <utility>
 #include <QDateTime>
 #include <QFutureWatcher>
 #include <QRandomGenerator>
+#include <QRegularExpression>
 #include <QSet>
 #include <QtConcurrent/QtConcurrentRun>
 #ifdef Q_OS_WIN
@@ -62,17 +66,21 @@ QString nextRandomSweeper(const QString &folderPath)
     // same configured directory and is accessed from the GUI thread.
     static QHash<QString,SweeperSequence> sequences;
     SweeperSequence &sequence=sequences[key];
+    const auto shuffleRemaining=[](QStringList &remaining) {
+        for (int i=remaining.size()-1;i>0;--i) {
+            const int j=QRandomGenerator::global()->bounded(i+1);
+            remaining.swapItemsAt(i,j);
+        }
+    };
     if (sequence.files!=files) {
         sequence.files=files;
         sequence.remaining=files;
+        shuffleRemaining(sequence.remaining);
         sequence.lastFile.clear();
     }
     if (sequence.remaining.isEmpty()) {
         sequence.remaining=sequence.files;
-        for (int i=sequence.remaining.size()-1;i>0;--i) {
-            const int j=QRandomGenerator::global()->bounded(i+1);
-            sequence.remaining.swapItemsAt(i,j);
-        }
+        shuffleRemaining(sequence.remaining);
         if (sequence.remaining.size()>1 && sequence.remaining.constFirst()==sequence.lastFile) {
             const int other=1+QRandomGenerator::global()->bounded(sequence.remaining.size()-1);
             sequence.remaining.swapItemsAt(0,other);
@@ -194,6 +202,14 @@ FolderScan enumerateAudioTracks(
 #endif
     return result;
 }
+
+QString artistFromFilename(const QString &path)
+{
+    const QString baseName=QFileInfo(path).completeBaseName();
+    const QRegularExpression separator(QStringLiteral("\\s+[-–—]\\s+"));
+    const auto match=separator.match(baseName);
+    return match.hasMatch() ? baseName.left(match.capturedStart()).simplified() : QString();
+}
 }
 
 AudioItemFolderMaxi::AudioItemFolderMaxi(QWidget *parent) : AudioItemMaxi(parent)
@@ -298,11 +314,8 @@ QString AudioItemFolderMaxi::resolvedOutroAnnouncement() const
     return text.trimmed();
 }
 
-void AudioItemFolderMaxi::setSweeper(bool enabled, const QString &folderPath,
-                                     bool atEntry, bool atExit)
+void AudioItemFolderMaxi::setSweeper(bool enabled, bool atEntry, bool atExit)
 {
-    m_sweeperFolderPath = folderPath.trimmed().isEmpty()
-        ? QString() : QDir::cleanPath(QFileInfo(folderPath).absoluteFilePath());
     m_sweeperEnabled = enabled;
     m_sweeperAtEntry = atEntry;
     m_sweeperAtExit = atExit;
@@ -319,12 +332,16 @@ bool AudioItemFolderMaxi::prepareAnnouncementAudio()
     const QString outro = m_announcementsEnabled ? resolvedOutroAnnouncement() : QString();
     m_sweeperIntroAudioPath.clear();
     m_sweeperOutroAudioPath.clear();
-    if (m_sweeperEnabled && !m_sweeperFolderPath.isEmpty()) {
+    const QString commonSweeperFolder = AudioSettings::sweeperFolder();
+    if (m_sweeperEnabled && QFileInfo(commonSweeperFolder).isDir()) {
         if (m_sweeperAtEntry)
-            m_sweeperIntroAudioPath=nextRandomSweeper(m_sweeperFolderPath);
+            m_sweeperIntroAudioPath=nextRandomSweeper(commonSweeperFolder);
         if (m_sweeperAtExit)
-            m_sweeperOutroAudioPath=nextRandomSweeper(m_sweeperFolderPath);
+            m_sweeperOutroAudioPath=nextRandomSweeper(commonSweeperFolder);
     }
+    if (!m_sweeperIntroAudioPath.isEmpty()
+        && m_sweeperIntroAudioPath == m_sweeperOutroAudioPath)
+        m_sweeperOutroAudioPath.clear();
     m_announcementRequests = int(!intro.isEmpty()) + int(!outro.isEmpty());
     if (m_announcementRequests==0) return true;
     m_announcementPreparing=true;
@@ -395,6 +412,10 @@ void AudioItemFolderMaxi::updateSequence(const QVector<Track> &tracks)
     }
     for (auto it = available.cbegin(); it != available.cend(); ++it) {
         if (!played.contains(it.key()) && !queued.contains(it.key())) remaining.append(it.key());
+    }
+    for (auto it=m_sequence->artistByTrack.begin(); it!=m_sequence->artistByTrack.end();) {
+        if (!available.contains(it.key())) it=m_sequence->artistByTrack.erase(it);
+        else ++it;
     }
     m_sequence->tracks = available;
     m_sequence->played = played;
@@ -799,8 +820,53 @@ bool AudioItemFolderMaxi::preparePlayback()
         sequence.remaining = sequence.tracks.keys();
     }
     ++sequence.revision;
+    const auto artistKeyForTrack=[&sequence](const QString &key,const Track &track) {
+        auto cached=sequence.artistByTrack.constFind(key);
+        if (cached!=sequence.artistByTrack.cend())
+            return cached.value();
+        QString artist=MediaManager::readAudioFileArtist(track.path).simplified();
+        if (artist.isEmpty())
+            artist=artistFromFilename(track.path);
+        artist=artist.simplified().toCaseFolded();
+        sequence.artistByTrack.insert(key,artist);
+        return artist;
+    };
+    const QStringList recentArtists=m_avoidArtistRepeats
+        ? sequence.recentArtists.mid(qMax(0,sequence.recentArtists.size()-m_artistRepeatDistance))
+        : QStringList();
+    const auto isRecentArtist=[&](const QString &artist) {
+        return m_avoidArtistRepeats && !artist.isEmpty() && recentArtists.contains(artist);
+    };
     while (!sequence.remaining.isEmpty()) {
-        int index = QRandomGenerator::global()->bounded(int(sequence.remaining.size()));
+        int index=-1;
+        QString selectedArtist;
+        if (m_avoidArtistRepeats && !recentArtists.isEmpty()) {
+            QVector<int> candidateOrder(sequence.remaining.size());
+            std::iota(candidateOrder.begin(),candidateOrder.end(),0);
+            for (int i=candidateOrder.size()-1;i>0;--i) {
+                const int other=QRandomGenerator::global()->bounded(i+1);
+                candidateOrder.swapItemsAt(i,other);
+            }
+            const int maxArtistChecks=qMin(int(candidateOrder.size()),24);
+            for (int attempt=0;attempt<maxArtistChecks;++attempt) {
+                const int candidateIndex=candidateOrder.at(attempt);
+                const QString candidateKey=sequence.remaining.at(candidateIndex);
+                const Track candidateTrack=sequence.tracks.value(candidateKey);
+                const QString candidateArtist=artistKeyForTrack(candidateKey,candidateTrack);
+                if (!isRecentArtist(candidateArtist)) {
+                    index=candidateIndex;
+                    selectedArtist=candidateArtist;
+                    break;
+                }
+            }
+        }
+        if (index<0) {
+            index=QRandomGenerator::global()->bounded(int(sequence.remaining.size()));
+            if (m_avoidArtistRepeats) {
+                const QString candidateKey=sequence.remaining.at(index);
+                selectedArtist=artistKeyForTrack(candidateKey,sequence.tracks.value(candidateKey));
+            }
+        }
         // Also avoid an immediate repeat at the boundary between two cycles.
         if (sequence.remaining.size() > 1 && sequence.remaining[index] == sequence.lastTrack)
             index = (index + 1 + QRandomGenerator::global()->bounded(int(sequence.remaining.size()) - 1)) % sequence.remaining.size();
@@ -811,6 +877,14 @@ bool AudioItemFolderMaxi::preparePlayback()
             continue;
         }
         sequence.played.insert(key);
+        if (m_avoidArtistRepeats) {
+            selectedArtist=artistKeyForTrack(key,track);
+            if (!selectedArtist.isEmpty()) {
+                sequence.recentArtists.append(selectedArtist);
+                while (sequence.recentArtists.size()>50)
+                    sequence.recentArtists.removeFirst();
+            }
+        }
         m_currentTrack = track.path; sequence.lastTrack = key;
         setSecond(track.seconds); setTiempoFile(track.seconds); setSecondStart(0);
         m_trackPrepared=true;
@@ -892,14 +966,15 @@ AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
     auto *item = new AudioItemFolderMaxi(newParent);
     item->setMixSettings(m_mixEnabled, m_mixSeconds);
     item->setSongsPerTurn(m_songsPerTurn);
+    item->setAvoidArtistRepeats(m_avoidArtistRepeats);
+    item->setArtistRepeatDistance(m_artistRepeatDistance);
     item->setAnnouncementTexts(m_introAnnouncement, m_outroAnnouncement,
                                m_announcementDelaySeconds);
     item->setAnnouncementsEnabled(m_announcementsEnabled);
     item->setAnnouncementVolumePercent(m_announcementVolumePercent);
     item->setAnnouncementMusicVolumePercent(m_announcementMusicVolumePercent);
     item->setAnnouncementRecoverySeconds(m_announcementRecoverySeconds);
-    item->setSweeper(m_sweeperEnabled, m_sweeperFolderPath,
-                     m_sweeperAtEntry, m_sweeperAtExit);
+    item->setSweeper(m_sweeperEnabled, m_sweeperAtEntry, m_sweeperAtExit);
     item->setIsPurge(isPurge()); item->setIsPlayNext(isPlayNext());
     item->setIsLoop(isLoop()); item->setIsSelect(isSelect()); item->setColor(color());
     item->copyFolderStateFrom(*this);

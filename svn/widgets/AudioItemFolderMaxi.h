@@ -15,7 +15,7 @@ class AudioItemFolderMaxi : public AudioItemMaxi
 {
     Q_OBJECT
 public:
-    struct Track { QString path; double seconds = 0; };
+    struct Track { QString path; double seconds = 0; QString artist; };
     explicit AudioItemFolderMaxi(QWidget *parent = nullptr);
     ~AudioItemFolderMaxi() override;
     void setFolderPath(const QString &path);
@@ -36,6 +36,10 @@ public:
     void setMixSettings(bool enabled, double seconds) override;
     int songsPerTurn() const { return m_orderedList ? m_tracks.size() : m_songsPerTurn; }
     void setSongsPerTurn(int count) { m_songsPerTurn = qBound(1, count, 999); }
+    bool avoidsArtistRepeats() const { return m_avoidArtistRepeats; }
+    void setAvoidArtistRepeats(bool enabled) { m_avoidArtistRepeats=enabled; }
+    int artistRepeatDistance() const { return m_artistRepeatDistance; }
+    void setArtistRepeatDistance(int songs) { m_artistRepeatDistance=qBound(1,songs,50); }
     QString introAnnouncement() const { return m_introAnnouncement; }
     QString outroAnnouncement() const { return m_outroAnnouncement; }
     int announcementDelaySeconds() const { return m_announcementDelaySeconds; }
@@ -50,19 +54,17 @@ public:
     void setAnnouncementRecoverySeconds(double seconds);
     bool hasAnnouncements() const { return (m_announcementsEnabled
         && (!m_introAnnouncement.isEmpty() || !m_outroAnnouncement.isEmpty()))
-        || (m_sweeperEnabled && !m_sweeperFolderPath.isEmpty()); }
+        || m_sweeperEnabled; }
     QString introAnnouncementPath() const { return m_introAudioPath; }
     QString outroAnnouncementPath() const { return m_outroAudioPath; }
     QString resolvedIntroAnnouncement() const;
     QString resolvedOutroAnnouncement() const;
     bool sweeperEnabled() const { return m_sweeperEnabled; }
-    QString sweeperFolderPath() const { return m_sweeperFolderPath; }
     QString sweeperIntroAudioPath() const { return m_sweeperIntroAudioPath; }
     QString sweeperOutroAudioPath() const { return m_sweeperOutroAudioPath; }
     bool sweeperAtEntry() const { return m_sweeperAtEntry; }
     bool sweeperAtExit() const { return m_sweeperAtExit; }
-    void setSweeper(bool enabled, const QString &folderPath,
-                    bool atEntry = true, bool atExit = true);
+    void setSweeper(bool enabled, bool atEntry = true, bool atExit = true);
     AudioItemMaxi *copy(QWidget *newParent) const override;
     bool preparePlayback() override;
     bool isPreparingPlayback() const override { return m_waitingForScan || m_announcementPreparing; }
@@ -81,6 +83,8 @@ private:
         QStringList remaining;
         QSet<QString> played;
         QString lastTrack;
+        QStringList recentArtists;
+        QHash<QString,QString> artistByTrack;
         QHash<QString, QDateTime> directoryStamps;
         quint64 revision = 0;
         qint64 scannedAtMs = 0;
@@ -106,6 +110,8 @@ private:
     bool m_mixEnabled = false;
     double m_mixSeconds = 3.0;
     int m_songsPerTurn = 1;
+    bool m_avoidArtistRepeats = false;
+    int m_artistRepeatDistance = 3;
     QString m_introAnnouncement = QStringLiteral("[excited] ¡Sigues en tu emisora favorita! Te dejamos con [artist] y su tema [title].");
     QString m_outroAnnouncement;
     int m_announcementDelaySeconds = 5;
@@ -117,7 +123,6 @@ private:
     bool m_sweeperEnabled = false;
     bool m_sweeperAtEntry = true;
     bool m_sweeperAtExit = true;
-    QString m_sweeperFolderPath;
     QString m_sweeperIntroAudioPath, m_sweeperOutroAudioPath;
     bool m_announcementPreparing = false;
     bool m_trackPrepared = false;

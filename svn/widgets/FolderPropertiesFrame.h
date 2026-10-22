@@ -4,6 +4,8 @@
 #include "widgets/AudioItemFolderMaxi.h"
 #include "widgets/Player.h"
 #include "widgets/Planner.h"
+#include "widgets/PlannerContents.h"
+#include "core/AudioSettings.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleValidator>
@@ -16,9 +18,11 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QRandomGenerator>
 #include <QSlider>
 #include <QShortcut>
+#include <QTimer>
 #include <QWindow>
 #include <memory>
 
@@ -34,7 +38,7 @@ public:
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowTitle(orderedList ? tr("Audio list properties") : tr("Audio folder properties"));
         setWindowIcon(QIcon(":/icons/properties.svg"));
-        resize(540, 520);
+        resize(540, orderedList ? 520 : 570);
         auto *root = new QVBoxLayout(this);
         root->setContentsMargins(0, 0, 0, 0);
         root->setSpacing(0);
@@ -75,8 +79,13 @@ public:
         folder->setCursorPosition(0);
         folder->setObjectName("FolderPath");
         auto *browse = new Button(this);
-        browse->setText(tr("Browse..."));
-        browse->setFixedHeight(24);
+        browse->SetIcon("folder.svg");
+        browse->setText(QString());
+        browse->setFixedSize(28, 24);
+        browse->setIconSize(QSize(18, 18));
+        browse->setToolTip(tr("Browse..."));
+        browse->setAccessibleName(browse->toolTip());
+        folderRow->setSpacing(10);
         folderRow->addWidget(folder, 1);
         folderRow->addWidget(browse);
         form->addRow(orderedList ? tr("Radit list") : tr("Folder"), folderRow);
@@ -88,6 +97,21 @@ public:
             songsPerTurn->setVisible(false);
         else
             form->addRow(tr("Songs per turn"), songsPerTurn);
+        auto *avoidArtistRepeats = new QCheckBox(tr("Avoid repeating artist"), this);
+        avoidArtistRepeats->setObjectName("FolderAvoidArtistRepeats");
+        avoidArtistRepeats->setChecked(item->avoidsArtistRepeats());
+        avoidArtistRepeats->setToolTip(
+            tr("Uses the ID3 artist, or the filename prefix before ' - '; playback continues if no alternative is found."));
+        auto *artistRepeatDistance = new QLineEdit(
+            QString::number(item->artistRepeatDistance()), this);
+        artistRepeatDistance->setObjectName("FolderArtistRepeatDistance");
+        artistRepeatDistance->setValidator(new QIntValidator(1, 50, artistRepeatDistance));
+        artistRepeatDistance->setToolTip(
+            tr("Minimum number of other songs before an artist can be selected again."));
+        if (!orderedList) {
+            form->addRow(avoidArtistRepeats);
+            form->addRow(tr("Minimum spacing between artists (songs)"), artistRepeatDistance);
+        }
         auto *enabled = new QCheckBox(tr("Mix before the audio ends"), this);
         enabled->setObjectName("MixEnabled");
         enabled->setChecked(item->mixEnabled());
@@ -104,20 +128,7 @@ public:
         sweeperEnabled->setObjectName("FolderSweeperEnabled");
         sweeperEnabled->setChecked(item->sweeperEnabled());
         form->addRow(sweeperEnabled);
-        auto *sweeperFolderRow = new QWidget(this);
-        auto *sweeperFolderLayout = new QHBoxLayout(sweeperFolderRow);
-        sweeperFolderLayout->setContentsMargins(0, 0, 0, 0);
-        sweeperFolderLayout->setSpacing(6);
-        auto *sweeperFolder = new QLineEdit(item->sweeperFolderPath(), sweeperFolderRow);
-        sweeperFolder->setObjectName("FolderSweeperFolder");
-        sweeperFolder->setPlaceholderText(tr("Folder containing sweeper audio clips"));
-        sweeperFolder->setToolTip(tr("A random clip is mixed over the track at the selected positions."));
-        auto *browseSweeper = new Button(sweeperFolderRow);
-        browseSweeper->setText(tr("Browse..."));
-        browseSweeper->setFixedSize(68, 24);
-        sweeperFolderLayout->addWidget(sweeperFolder, 1);
-        sweeperFolderLayout->addWidget(browseSweeper);
-        form->addRow(tr("Sweeper folder"), sweeperFolderRow);
+        sweeperEnabled->setToolTip(tr("Uses the common folder configured in Tools > General options."));
         auto *sweeperPlacement = new QComboBox(this);
         sweeperPlacement->setObjectName("Combo");
         sweeperPlacement->addItem(tr("Entry and exit"), 0);
@@ -132,12 +143,6 @@ public:
         announcementsEnabled->setObjectName("FolderAnnouncementsEnabled");
         announcementsEnabled->setChecked(item->announcementsEnabled());
         form->addRow(announcementsEnabled);
-        connect(browseSweeper, &Button::clicked, this, [this, sweeperFolder]() {
-            const QString path = QFileDialog::getExistingDirectory(
-                this, tr("Select sweeper folder"), sweeperFolder->text());
-            if (!path.isEmpty()) sweeperFolder->setText(QDir::toNativeSeparators(path));
-        });
-
         auto *introDelay = new QLineEdit(QString::number(item->announcementDelaySeconds()), this);
         introDelay->setObjectName("FolderAnnouncementDelay");
         introDelay->setValidator(new QIntValidator(0, 30, introDelay));
@@ -247,12 +252,11 @@ public:
         });
         const auto validate = [=]() {
             seconds->setEnabled(enabled->isChecked());
+            artistRepeatDistance->setEnabled(avoidArtistRepeats->isChecked());
             const bool speak = announcementsEnabled->isChecked();
             const bool useSweeper = sweeperEnabled->isChecked();
             const bool useVoiceMix = speak || useSweeper;
             const bool entryCue = speak || (useSweeper && sweeperPlacement->currentData().toInt() != 2);
-            sweeperFolder->setEnabled(useSweeper);
-            browseSweeper->setEnabled(useSweeper);
             sweeperPlacement->setEnabled(useSweeper);
             introDelay->setEnabled(entryCue);
             voiceVolume->setEnabled(useVoiceMix);
@@ -261,25 +265,27 @@ public:
             introText->setEnabled(speak);
             outroText->setEnabled(speak);
             testVoice->setEnabled(speak);
-            testSweeper->setEnabled(useSweeper && QFileInfo(sweeperFolder->text()).isDir());
+            testSweeper->setEnabled(useSweeper);
             const QFileInfo sourceInfo(folder->text());
             const bool sourceValid = orderedList ? (sourceInfo.isFile()
                     && sourceInfo.suffix().compare("list", Qt::CaseInsensitive) == 0)
                 : sourceInfo.isDir();
             save->setEnabled(sourceValid
                 && (orderedList || songsPerTurn->hasAcceptableInput())
+                && (orderedList || !avoidArtistRepeats->isChecked()
+                    || artistRepeatDistance->hasAcceptableInput())
                 && (!enabled->isChecked() || seconds->hasAcceptableInput())
-                && (!useSweeper || QFileInfo(sweeperFolder->text()).isDir())
                 && (!entryCue || introDelay->hasAcceptableInput())
                 && (!useVoiceMix || recovery->hasAcceptableInput()));
         };
         connect(enabled, &QCheckBox::toggled, this, validate);
+        connect(avoidArtistRepeats, &QCheckBox::toggled, this, validate);
         connect(announcementsEnabled, &QCheckBox::toggled, this, validate);
         connect(sweeperEnabled, &QCheckBox::toggled, this, validate);
         connect(sweeperPlacement, &QComboBox::currentIndexChanged, this, validate);
-        connect(sweeperFolder, &QLineEdit::textChanged, this, validate);
         connect(seconds, &QLineEdit::textChanged, this, validate);
         connect(songsPerTurn, &QLineEdit::textChanged, this, validate);
+        connect(artistRepeatDistance, &QLineEdit::textChanged, this, validate);
         connect(introDelay, &QLineEdit::textChanged, this, validate);
         connect(recovery, &QLineEdit::textChanged, this, validate);
         connect(folder, &QLineEdit::textChanged, this, validate);
@@ -308,18 +314,54 @@ public:
             item->setMixSettings(enabled->isChecked(), seconds->text().toDouble());
             if (!orderedList)
                 item->setSongsPerTurn(songsPerTurn->text().toInt());
+            if (!orderedList) {
+                item->setAvoidArtistRepeats(avoidArtistRepeats->isChecked());
+                item->setArtistRepeatDistance(artistRepeatDistance->text().toInt());
+            }
             item->setAnnouncementsEnabled(announcementsEnabled->isChecked());
             const int placement = sweeperPlacement->currentData().toInt();
-            item->setSweeper(sweeperEnabled->isChecked(), sweeperFolder->text(),
-                             placement != 2, placement != 1);
+            item->setSweeper(sweeperEnabled->isChecked(), placement != 2, placement != 1);
             item->setAnnouncementVolumePercent(voiceVolume->value());
             item->setAnnouncementMusicVolumePercent(musicVolume->value());
             item->setAnnouncementRecoverySeconds(recovery->text().toDouble());
             item->setAnnouncementTexts(introText->text(), outroText->text(),
                                        introDelay->text().toInt());
+            if (auto *contents=qobject_cast<PlannerContents*>(item->parentWidget())) {
+                emit contents->contentModified();
+                emit contents->contentsModified();
+            } else if (auto *contents=qobject_cast<ContentsPlayer*>(item->parentWidget())) {
+                emit contents->contentsModified();
+            }
             close();
         });
+        struct ActiveAudioPreview {
+            QPointer<MediaManager> music;
+            QPointer<MediaManager> clip;
+            QPointer<QTimer> recoveryTimer;
+        };
+        auto previewState = std::make_shared<ActiveAudioPreview>();
+        const auto stopPreviousPreview = [previewState]() {
+            const QPointer<MediaManager> music = previewState->music;
+            const QPointer<MediaManager> clip = previewState->clip;
+            const QPointer<QTimer> recoveryTimer = previewState->recoveryTimer;
+            previewState->music.clear();
+            previewState->clip.clear();
+            previewState->recoveryTimer.clear();
+            if (recoveryTimer) {
+                recoveryTimer->stop();
+                recoveryTimer->deleteLater();
+            }
+            if (music) {
+                music->stop();
+                music->deleteLater();
+            }
+            if (clip) {
+                clip->stop();
+                clip->deleteLater();
+            }
+        };
         const auto previewClipWithMusic = [=](const QString &clipPath, const QString &titleText) {
+            stopPreviousPreview();
             QString musicPath = item->playbackPath();
             if (musicPath.isEmpty() || !QFileInfo::exists(musicPath)) {
                 QStringList availableTracks = item->isOrderedList()
@@ -373,42 +415,34 @@ public:
             musicPreview->setVolume(initialMusicGain);
             clipPreview->setVolume(masterGain * voiceVolume->value() / 100.0f);
             auto *recoveryTimer = new QTimer(this);
+            previewState->music = musicPreview;
+            previewState->clip = clipPreview;
+            previewState->recoveryTimer = recoveryTimer;
             recoveryTimer->setInterval(25);
             auto recoveryClock = std::make_shared<QElapsedTimer>();
             connect(clipPreview, &MediaManager::playbackFinished, this,
                     [=]() {
+                if (previewState->clip != clipPreview) return;
                 if (recoveryMs <= 100) {
-                    musicPreview->stop();
-                    clipPreview->stop();
-                    musicPreview->deleteLater();
-                    clipPreview->deleteLater();
-                    recoveryTimer->deleteLater();
+                    stopPreviousPreview();
                     return;
                 }
                 recoveryClock->restart();
                 recoveryTimer->start();
             });
             connect(recoveryTimer, &QTimer::timeout, this, [=]() {
+                if (previewState->recoveryTimer != recoveryTimer) return;
                 const float progress = qBound(0.0f,
                     float(recoveryClock->elapsed()) / float(recoveryMs), 1.0f);
                 musicPreview->setVolume(initialMusicGain
                     + (normalMusicGain - initialMusicGain) * progress);
                 if (progress >= 1.0f) {
-                    recoveryTimer->stop();
-                    musicPreview->stop();
-                    clipPreview->stop();
-                    musicPreview->deleteLater();
-                    clipPreview->deleteLater();
-                    recoveryTimer->deleteLater();
+                    stopPreviousPreview();
                 }
             });
             connect(clipPreview, &MediaManager::playbackError, this, [=](const QString &) {
-                recoveryTimer->stop();
-                musicPreview->stop();
-                clipPreview->stop();
-                musicPreview->deleteLater();
-                clipPreview->deleteLater();
-                recoveryTimer->deleteLater();
+                if (previewState->clip != clipPreview) return;
+                stopPreviousPreview();
             });
             musicPreview->play();
             clipPreview->play();
@@ -422,7 +456,13 @@ public:
             previewClipWithMusic(item->introAnnouncementPath(), tr("Test cached voice"));
         });
         connect(testSweeper, &Button::clicked, this, [=]() {
-            const QFileInfoList sweepers = QDir(sweeperFolder->text()).entryInfoList(
+            const QString commonFolder = AudioSettings::sweeperFolder();
+            if (!QFileInfo(commonFolder).isDir()) {
+                QMessageBox::information(this, tr("Test sweeper"),
+                    tr("Choose a common sweeper folder in Tools > General options first."));
+                return;
+            }
+            const QFileInfoList sweepers = QDir(commonFolder).entryInfoList(
                 MediaManager::supportedAudioNameFilters(), QDir::Files | QDir::Readable,
                 QDir::Name);
             if (sweepers.isEmpty()) {

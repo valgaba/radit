@@ -484,6 +484,7 @@ void ScheduleSlot::setPlaying(bool playing)
         m_upcomingBlinkTimer->stop();
     }
     updateHeaderAppearance();
+    emit playingChanged(m_playing);
 }
 
 bool ScheduleSlot::eventFilter(QObject *watched, QEvent *event)

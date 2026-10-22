@@ -47,6 +47,7 @@ public:
     void setPlaying(bool playing);
 
 signals:
+    void playingChanged(bool playing);
     void closeRequested(ScheduleSlot *slot);
     void entryTimeChanged();
     void accentColorChanged();

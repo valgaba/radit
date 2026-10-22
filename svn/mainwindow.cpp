@@ -56,6 +56,7 @@
 #include "widgets/TabPlayer.h"
 #include "widgets/Player.h"
 #include "widgets/ElevenLabsSettingsDialog.h"
+#include "widgets/GeneralOptionsDialog.h"
 #include "widgets/EmissionLogFrame.h"
 
 
@@ -115,6 +116,13 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
        QMenu *vistasMenu = menubar->addMenu(tr("&View"));
 
        QMenu *toolsMenu = menubar->addMenu(tr("&Tools"));
+       QAction *generalOptions = toolsMenu->addAction(tr("General options..."));
+       generalOptions->setObjectName("GeneralOptionsAction");
+       connect(generalOptions, &QAction::triggered, this, [this]() {
+           GeneralOptionsDialog dialog(this);
+           dialog.exec();
+       });
+       toolsMenu->addSeparator();
        QMenu *aiVoicesMenu = toolsMenu->addMenu(tr("AI voices (experimental)"));
        QAction *aiVoiceSettings = aiVoicesMenu->addAction(tr("Configure AI voices..."));
        aiVoiceSettings->setObjectName("ConfigureAIVoicesAction");

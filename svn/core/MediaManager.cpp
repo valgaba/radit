@@ -1349,6 +1349,35 @@ AudioFileMetadata MediaManager::readAudioFileMetadata(const QString &filePath)
     return metadata;
 }
 
+QString MediaManager::readAudioFileArtist(const QString &filePath)
+{
+    const DWORD previousDevice=BASS_GetDevice();
+    struct DeviceGuard {
+        DWORD device;
+        ~DeviceGuard() { if (device!=DWORD(-1)) BASS_SetDevice(device); }
+    } deviceGuard{previousDevice};
+    if (!initializeDecoder())
+        return {};
+#ifdef Q_OS_WIN
+    const HSTREAM stream=BASS_StreamCreateFile(FALSE,filePath.utf16(),0,0,
+                                                BASS_STREAM_DECODE|BASS_UNICODE);
+#else
+    const QByteArray path=filePath.toUtf8();
+    const HSTREAM stream=BASS_StreamCreateFile(FALSE,path.constData(),0,0,BASS_STREAM_DECODE);
+#endif
+    if (!stream)
+        return {};
+    AudioFileMetadata metadata;
+    readId3v2Tags(reinterpret_cast<const BYTE *>(BASS_ChannelGetTags(stream,BASS_TAG_ID3V2)),metadata);
+    if (metadata.artist.isEmpty()) {
+        if (const auto *tag=reinterpret_cast<const TAG_ID3 *>(BASS_ChannelGetTags(stream,BASS_TAG_ID3)))
+            metadata.artist=QString::fromLocal8Bit(tag->artist,
+                int(boundedLength(tag->artist,sizeof(tag->artist)))).trimmed();
+    }
+    BASS_StreamFree(stream);
+    return metadata.artist.trimmed();
+}
+
 bool MediaManager::writeAudioFileMetadata(const QString &filePath,
                                           const AudioFileMetadata &metadata,
                                           QString *error)

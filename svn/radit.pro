@@ -16,6 +16,7 @@ SOURCES += \
     core/SpanishTranslator.cpp \
     core/LocutionPack.cpp \
     widgets/ElevenLabsSettingsDialog.cpp \
+    widgets/GeneralOptionsDialog.cpp \
     widgets/EmissionLogFrame.cpp \
     widgets/Id3TagsDialog.cpp \
     core/ElevenLabsTts.cpp \
@@ -78,6 +79,7 @@ HEADERS += \
     core/SpanishTranslator.h \
     core/LocutionPack.h \
     widgets/ElevenLabsSettingsDialog.h \
+    widgets/GeneralOptionsDialog.h \
     widgets/EmissionLogFrame.h \
     widgets/Id3TagsDialog.h \
     core/ElevenLabsTts.h \
@@ -92,6 +94,7 @@ HEADERS += \
     core/WeatherService.h \
     core/SystemLocation.h \
     core/config.h \
+    core/AudioSettings.h \
     core/io.h \
     mainwindow.h \
     widgets/AudioItem.h \

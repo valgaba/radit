@@ -107,6 +107,7 @@ public:
                                       const std::shared_ptr<std::atomic_int> &progress = nullptr);
 
     static double readFileDuration(const QString &filePath);
+    static QString readAudioFileArtist(const QString &filePath);
     static AudioFileMetadata readAudioFileMetadata(const QString &filePath);
     static bool writeAudioFileMetadata(const QString &filePath,
                                        const AudioFileMetadata &metadata,

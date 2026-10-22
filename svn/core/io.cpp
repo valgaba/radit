@@ -82,6 +82,10 @@ QJsonArray saveItems(QLayout *layout)
         object["mixSeconds"] = item->mixSeconds();
         if (auto *folder = qobject_cast<AudioItemFolderMaxi*>(item)) {
             object["songsPerTurn"] = folder->songsPerTurn();
+            if (!folder->isOrderedList()) {
+                object["avoidArtistRepeats"] = folder->avoidsArtistRepeats();
+                object["artistRepeatDistance"] = folder->artistRepeatDistance();
+            }
             object["introAnnouncement"] = folder->introAnnouncement();
             object["outroAnnouncement"] = folder->outroAnnouncement();
             object["announcementDelaySeconds"] = folder->announcementDelaySeconds();
@@ -90,7 +94,6 @@ QJsonArray saveItems(QLayout *layout)
             object["announcementMusicVolumePercent"] = folder->announcementMusicVolumePercent();
             object["announcementRecoverySeconds"] = folder->announcementRecoverySeconds();
             object["sweeperEnabled"] = folder->sweeperEnabled();
-            object["sweeperFolder"] = folder->sweeperFolderPath();
             object["sweeperAtEntry"] = folder->sweeperAtEntry();
             object["sweeperAtExit"] = folder->sweeperAtExit();
         }
@@ -139,6 +142,8 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
                 }
             } else {
                 folderItem->setFolderPath(path);
+                folderItem->setAvoidArtistRepeats(object["avoidArtistRepeats"].toBool(false));
+                folderItem->setArtistRepeatDistance(object["artistRepeatDistance"].toInt(3));
             }
             folderItem->setSongsPerTurn(object["songsPerTurn"].toInt(1));
             folderItem->setAnnouncementTexts(object["introAnnouncement"].toString(),
@@ -149,7 +154,6 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             folderItem->setAnnouncementMusicVolumePercent(object["announcementMusicVolumePercent"].toInt(8));
             folderItem->setAnnouncementRecoverySeconds(object["announcementRecoverySeconds"].toDouble(1.0));
             folderItem->setSweeper(object["sweeperEnabled"].toBool(false),
-                                   object["sweeperFolder"].toString(),
                                    object["sweeperAtEntry"].toBool(true),
                                    object["sweeperAtExit"].toBool(true));
         }

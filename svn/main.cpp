@@ -15,7 +15,8 @@
 {
     QApplication a(argc, argv);
 
-    QFile file("radit.qss");
+    QFile file(QDir(QCoreApplication::applicationDirPath())
+                   .filePath(QStringLiteral("radit.qss")));
     file.open(QFile::ReadOnly);
    // QString styleSheet = QLatin1String(file.readAll());
     QString styleSheet = QString::fromUtf8(file.readAll());  // Usa fromUtf8() para mejor compatibilidad

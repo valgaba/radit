@@ -1283,7 +1283,8 @@ QMenu::separator{
 #Cast Frame#framebarra,
 #MeteoClock Frame#framebarra,
 #Planner Frame#framebarra,
-#FolderPropertiesFrame Frame#framebarra {
+#FolderPropertiesFrame Frame#framebarra,
+#GeneralOptionsDialog Frame#framebarra {
     background-color: #4e4d7a;
     border: none;
 }
@@ -1293,7 +1294,8 @@ QMenu::separator{
 #Cast QLabel#PanelTitle,
 #MeteoClock QLabel#PanelTitle,
 #Planner QLabel#PanelTitle,
-#FolderPropertiesFrame QLabel#PanelTitle {
+#FolderPropertiesFrame QLabel#PanelTitle,
+#GeneralOptionsDialog QLabel#PanelTitle {
     font-size: 14px;
     color: #8a8d96;
     background: transparent;
@@ -1811,6 +1813,27 @@ Frame#FolderPropertiesFrame { background-color: #181e2c; border: 1px solid #333b
 #FolderPropertiesFrame QPushButton:pressed { background-color: #1d2230; }
 #FolderPropertiesFrame QPushButton:disabled, #FolderPropertiesFrame QLineEdit:disabled { color: #686b74; border-color: #333b4f; }
 
+/* General options dialog. */
+QDialog#GeneralOptionsDialog { background-color: #181e2c; border: 1px solid #333b4f; }
+#GeneralOptionsDialog QLabel {
+    background: transparent; border: none; color: #8a8d96; font-size: 12px;
+}
+#GeneralOptionsDialog QLineEdit {
+    background-color: #252b39; border: 1px solid #535b6a;
+    padding: 2px; min-height: 20px; color: #80A4AE; font-size: 12px;
+    selection-background-color: #4e4d7a; selection-color: white;
+}
+#GeneralOptionsDialog QLineEdit:focus { border-color: #80A4AE; }
+#GeneralOptionsDialog QPushButton {
+    padding: 2px 6px; border: 1px solid #686b74;
+    background-color: #262c3b; color: #80A4AE; font-size: 12px;
+}
+#GeneralOptionsDialog QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
+#GeneralOptionsDialog QPushButton:pressed { background-color: #1d2230; }
+#GeneralOptionsDialog QPushButton:disabled, #GeneralOptionsDialog QLineEdit:disabled {
+    color: #686b74; border-color: #333b4f;
+}
+
 /* Audio file properties. */
 Frame#FilePropertiesFrame { background-color: #181e2c; border: 1px solid #333b4f; }
 #FilePropertiesFrame QLabel#FilePropertyName {
@@ -1882,7 +1905,14 @@ Frame#MeteoClockPropertiesFrame { background-color: #181e2c; border: 1px solid #
 }
 #EmissionLogFrame QPushButton:hover { border-color: #80A4AE; background-color: #30384b; }
 #EmissionLogFrame QPushButton:pressed { background-color: #1d2230; }
+#EmissionLogFrame QPushButton#EmissionLogClearButton { color: #d27474; }
+#EmissionLogFrame QPushButton#EmissionLogClearButton:hover { border-color: #d27474; background-color: #30384b; }
 #RaditModuleCloseButton {
     border: none; background: transparent; padding: 0;
 }
 #RaditModuleCloseButton:hover { background: transparent; }
+#EmissionLogFrame QPushButton#RaditModuleCloseButton,
+#EmissionLogFrame QPushButton#RaditModuleCloseButton:hover,
+#EmissionLogFrame QPushButton#RaditModuleCloseButton:pressed {
+    border: none; background: transparent; padding: 0;
+}

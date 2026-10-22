@@ -16,14 +16,15 @@ AudioItemFolderPlanner::AudioItemFolderPlanner(const AudioItemFolderMaxi &source
 {
     setMixSettings(source.mixEnabled(), source.mixSeconds());
     setSongsPerTurn(source.songsPerTurn());
+    setAvoidArtistRepeats(source.avoidsArtistRepeats());
+    setArtistRepeatDistance(source.artistRepeatDistance());
     setAnnouncementTexts(source.introAnnouncement(), source.outroAnnouncement(),
                          source.announcementDelaySeconds());
     setAnnouncementsEnabled(source.announcementsEnabled());
     setAnnouncementVolumePercent(source.announcementVolumePercent());
     setAnnouncementMusicVolumePercent(source.announcementMusicVolumePercent());
     setAnnouncementRecoverySeconds(source.announcementRecoverySeconds());
-    setSweeper(source.sweeperEnabled(), source.sweeperFolderPath(),
-               source.sweeperAtEntry(), source.sweeperAtExit());
+    setSweeper(source.sweeperEnabled(), source.sweeperAtEntry(), source.sweeperAtExit());
     setIsPurge(source.isPurge());
     setIsPlayNext(source.isPlayNext());
     setIsLoop(source.isLoop());
