@@ -19,8 +19,7 @@
 ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent,
                                                      bool disabled, bool editing,
                                                      const QString &name,
-                                                     bool waitForStandbyTrackEnd,
-                                                     bool useSchedulerSweeper)
+                                                     bool waitForStandbyTrackEnd)
     : QDialog(parent)
 {
     setObjectName("ScheduleSlotOptionsDialog");
@@ -28,7 +27,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     setWindowModality(Qt::WindowModal);
     setModal(true);
     setWindowTitle(tr("Schedule slot options"));
-    resize(430, 260);
+    resize(400, 220);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -85,21 +84,6 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     m_waitForStandbyTrackEnd->setChecked(waitForStandbyTrackEnd);
     m_waitForStandbyTrackEnd->setToolTip(tr("Wait only while Standby is playing. An active ScheduleSlot is never delayed."));
     form->addRow(QString(),m_waitForStandbyTrackEnd);
-    m_useSchedulerSweeper=new QCheckBox(tr("Use a scheduler sweeper before this event"),content);
-    m_useSchedulerSweeper->setObjectName("ScheduleSlotSweeperCheckBox");
-    m_useSchedulerSweeper->setChecked(useSchedulerSweeper);
-    m_useSchedulerSweeper->setToolTip(tr("Uses the common sweeper folder configured in Planner options."));
-    form->addRow(QString(),m_useSchedulerSweeper);
-    connect(m_waitForStandbyTrackEnd,&QCheckBox::toggled,m_useSchedulerSweeper,
-            [this](bool checked) {
-        if (checked)
-            m_useSchedulerSweeper->setChecked(false);
-    });
-    connect(m_useSchedulerSweeper,&QCheckBox::toggled,m_waitForStandbyTrackEnd,
-            [this](bool checked) {
-        if (checked)
-            m_waitForStandbyTrackEnd->setChecked(false);
-    });
     contentLayout->addLayout(form);
 
     auto *buttons = new QHBoxLayout;
@@ -139,9 +123,4 @@ bool ScheduleSlotOptionsDialog::isDisabled() const
 bool ScheduleSlotOptionsDialog::waitsForStandbyTrackEnd() const
 {
     return m_waitForStandbyTrackEnd->isChecked();
-}
-
-bool ScheduleSlotOptionsDialog::usesSchedulerSweeper() const
-{
-    return m_useSchedulerSweeper->isChecked();
 }

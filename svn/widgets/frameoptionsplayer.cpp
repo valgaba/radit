@@ -19,15 +19,6 @@
 #include <QLabel>
 #include <QSlider>
 #include <QSignalBlocker>
-#include <QFileDialog>
-#include <QFileInfo>
-#include <QDir>
-#include <QAbstractSpinBox>
-#include <QApplication>
-#include <QKeyEvent>
-#include <QLineEdit>
-#include <QMessageBox>
-#include <QSpinBox>
 #include <cmath>
 
 #include "widgets/frameoptionsplayer.h"
@@ -42,13 +33,9 @@
 FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
 
     const bool showCueDevice=qobject_cast<Planner *>(parent)==nullptr;
-    m_isPlannerOptions=!showCueDevice;
     this->setObjectName("FrameOptionsPlayer"); //para qss
-    this->setWindowFlags((m_isPlannerOptions ? Qt::Tool : Qt::Popup)
-                         | Qt::FramelessWindowHint);
-    if (m_isPlannerOptions)
-        QApplication::instance()->installEventFilter(this);
-    this->setFixedSize(showCueDevice ? 350 : 430, showCueDevice ? 250 : 400);
+    this->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+    this->setFixedSize(350, showCueDevice ? 250 : 220);
 
     layout = new QVBoxLayout(this);  // layout general
     layout->setContentsMargins(0, 0, 0, 0);
@@ -158,82 +145,6 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
     volumeLabel->setFont(font);
     volumeLabel->setBuddy(volumeSlider);
     layoutcenter->addRow(volumeLabel, volumeRow);
-    if (!showCueDevice) {
-        auto *sectionSpacer=new QWidget(framecenter);
-        sectionSpacer->setFixedHeight(9);
-        layoutcenter->addRow(sectionSpacer);
-
-        auto *sweeperTitle=new Label(framecenter);
-        sweeperTitle->setText(tr("Scheduler sweepers"));
-        sweeperTitle->setFont(font);
-        layoutcenter->addRow(sweeperTitle);
-
-        auto *planner=qobject_cast<Planner *>(parent);
-        auto *folderRow=new QWidget(framecenter);
-        auto *folderLayout=new QHBoxLayout(folderRow);
-        folderLayout->setContentsMargins(0,0,0,0);
-        folderLayout->setSpacing(5);
-        schedulerSweeperFolder=new QLineEdit(
-            planner ? planner->schedulerSweeperFolder() : QString(),folderRow);
-        schedulerSweeperFolder->setObjectName("PlannerSchedulerSweeperFolder");
-        schedulerSweeperFolder->setStyleSheet(
-            "QLineEdit { color:#80A4AE; background:#282f40; border:1px solid #535b6a;"
-            " min-height:20px; padding:2px 5px; }"
-            "QLineEdit:focus { border-color:#80A4AE; }");
-        schedulerSweeperFolder->setPlaceholderText(tr("Select a folder"));
-        auto *browse=new Button(folderRow);
-        browse->setText(tr("Browse…"));
-        browse->setFixedWidth(74);
-        folderLayout->addWidget(schedulerSweeperFolder,1);
-        folderLayout->addWidget(browse);
-        auto *folderLabel=new Label(framecenter);
-        folderLabel->setText(tr("Common sweeper folder"));
-        folderLabel->setFont(font);
-        layoutcenter->addRow(folderLabel,folderRow);
-
-        schedulerSweeperMaximumWindow=new QSpinBox(framecenter);
-        schedulerSweeperMaximumWindow->setRange(1,600);
-        schedulerSweeperMaximumWindow->setButtonSymbols(QAbstractSpinBox::NoButtons);
-        schedulerSweeperMaximumWindow->setSuffix(tr(" s"));
-        schedulerSweeperMaximumWindow->setStyleSheet(
-            "QSpinBox { color:#80A4AE; background:#282f40; border:1px solid #535b6a;"
-            " min-height:20px; padding:2px 5px; }"
-            "QSpinBox:focus { border-color:#80A4AE; }");
-        schedulerSweeperMaximumWindow->setValue(
-            planner ? planner->schedulerSweeperMaxWindowSeconds() : 60);
-        auto *windowLabel=new Label(framecenter);
-        windowLabel->setText(tr("Maximum time to fill"));
-        windowLabel->setFont(font);
-        layoutcenter->addRow(windowLabel,schedulerSweeperMaximumWindow);
-
-        schedulerSweeperAllowedOverrun=new QSpinBox(framecenter);
-        schedulerSweeperAllowedOverrun->setRange(0,30);
-        schedulerSweeperAllowedOverrun->setButtonSymbols(QAbstractSpinBox::NoButtons);
-        schedulerSweeperAllowedOverrun->setSuffix(tr(" s"));
-        schedulerSweeperAllowedOverrun->setStyleSheet(
-            "QSpinBox { color:#80A4AE; background:#282f40; border:1px solid #535b6a;"
-            " min-height:20px; padding:2px 5px; }"
-            "QSpinBox:focus { border-color:#80A4AE; }");
-        schedulerSweeperAllowedOverrun->setValue(
-            planner ? planner->schedulerSweeperOverrunSeconds() : 3);
-        schedulerSweeperAllowedOverrun->setToolTip(
-            tr("Allow the event to start this many seconds late."));
-        auto *overrunLabel=new Label(framecenter);
-        overrunLabel->setText(tr("Allowed event delay"));
-        overrunLabel->setFont(font);
-        layoutcenter->addRow(overrunLabel,schedulerSweeperAllowedOverrun);
-
-        connect(browse,&QPushButton::clicked,this,[this]() {
-            const QString currentFolder=schedulerSweeperFolder->text();
-            QWidget *dialogParent=parentWidget() ? parentWidget()->window() : nullptr;
-            m_folderDialogOpen=true;
-            const QString selected=QFileDialog::getExistingDirectory(
-                dialogParent,tr("Select common sweeper folder"),currentFolder);
-            m_folderDialogOpen=false;
-            if (!selected.isEmpty())
-                schedulerSweeperFolder->setText(QDir::toNativeSeparators(selected));
-        });
-    }
     connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         auto *player = qobject_cast<Player *>(parentWidget());
         auto *planner = qobject_cast<Planner *>(parentWidget());
@@ -307,19 +218,6 @@ FrameOptionsPlayer::FrameOptionsPlayer(QWidget *parent):Frame(parent){
                m_volumeCommitted = true;
                emit player->configurationChanged();
            } else if (planner) {
-               const QString folder=schedulerSweeperFolder->text().trimmed();
-               if (!folder.isEmpty() && !QFileInfo(folder).isDir()) {
-                   QMessageBox::warning(this,tr("Scheduler sweepers"),
-                                        tr("The common sweeper folder does not exist."));
-                   return;
-               }
-               if (!planner->setSchedulerSweeperSettings(folder,
-                       schedulerSweeperMaximumWindow->value(),
-                       schedulerSweeperAllowedOverrun->value())) {
-                   QMessageBox::warning(this,tr("Scheduler sweepers"),
-                                        tr("The common sweeper folder does not exist."));
-                   return;
-               }
                planner->setDevicePlay(selectedPlay);
                m_volumeCommitted = true;
                emit planner->configurationChanged();
@@ -423,13 +321,6 @@ void FrameOptionsPlayer::showEvent(QShowEvent *event) {
         const int value = qRound(m_previousVolume * 100);
         volumeSlider->setValue(value);
         volumeValue->setText(QString::number(value) + " %");
-        if (schedulerSweeperFolder) {
-            schedulerSweeperFolder->setText(planner->schedulerSweeperFolder());
-            schedulerSweeperMaximumWindow->setValue(
-                planner->schedulerSweeperMaxWindowSeconds());
-            schedulerSweeperAllowedOverrun->setValue(
-                planner->schedulerSweeperOverrunSeconds());
-        }
     }
 }
 
@@ -442,22 +333,6 @@ void FrameOptionsPlayer::hideEvent(QHideEvent *event)
             planner->setVolume(m_previousVolume);
     }
     Frame::hideEvent(event);
-}
-
-bool FrameOptionsPlayer::eventFilter(QObject *watched, QEvent *event)
-{
-    if (m_isPlannerOptions && isVisible() && !m_folderDialogOpen) {
-        if (event->type()==QEvent::MouseButtonPress) {
-            auto *clicked=qobject_cast<QWidget *>(watched);
-            if (clicked && clicked!=this && !isAncestorOf(clicked))
-                hide();
-        } else if (event->type()==QEvent::KeyPress) {
-            auto *keyEvent=static_cast<QKeyEvent *>(event);
-            if (keyEvent->key()==Qt::Key_Escape)
-                hide();
-        }
-    }
-    return Frame::eventFilter(watched,event);
 }
 
 float FrameOptionsPlayer::committedVolume() const
