@@ -38,7 +38,7 @@ public:
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowTitle(orderedList ? tr("Audio list properties") : tr("Audio folder properties"));
         setWindowIcon(QIcon(":/icons/properties.svg"));
-        resize(540, orderedList ? 520 : 570);
+        resize(540, orderedList ? 550 : 600);
         auto *root = new QVBoxLayout(this);
         root->setContentsMargins(0, 0, 0, 0);
         root->setSpacing(0);
@@ -111,6 +111,12 @@ public:
         if (!orderedList) {
             form->addRow(avoidArtistRepeats);
             form->addRow(tr("Minimum spacing between artists (songs)"), artistRepeatDistance);
+        } else {
+            // These controls are not part of list properties. Hide them explicitly:
+            // they are parented to this dialog, so otherwise their default geometry
+            // can leave the artist-spacing editor floating over the form.
+            avoidArtistRepeats->hide();
+            artistRepeatDistance->hide();
         }
         auto *enabled = new QCheckBox(tr("Mix before the audio ends"), this);
         enabled->setObjectName("MixEnabled");
@@ -139,6 +145,13 @@ public:
             : (item->sweeperAtExit() ? 2 : 0);
         sweeperPlacement->setCurrentIndex(placementIndex);
         form->addRow(tr("Sweeper placement"), sweeperPlacement);
+        auto *sweeperEverySongs = new QLineEdit(
+            QString::number(item->sweeperEveryNSongs()), this);
+        sweeperEverySongs->setObjectName("FolderSweeperEverySongs");
+        sweeperEverySongs->setValidator(new QIntValidator(1, 50, sweeperEverySongs));
+        sweeperEverySongs->setToolTip(
+            tr("Play a sweeper once every N tracks; 1 means every track."));
+        form->addRow(tr("Sweeper frequency (songs)"), sweeperEverySongs);
         auto *announcementsEnabled = new QCheckBox(tr("Enable voice announcements"), this);
         announcementsEnabled->setObjectName("FolderAnnouncementsEnabled");
         announcementsEnabled->setChecked(item->announcementsEnabled());
@@ -221,10 +234,6 @@ public:
         outroText->setToolTip(tr("Use [artist], [title] and [album] for the ID3 artist, track title and album."));
         form->addRow(tr("Closing announcement"), outroText);
 
-        auto *variables = new Label(this);
-        variables->setText(tr("Available fields: [artist], [title], [album]. Audio tags such as [excited] require Eleven v3. Closing announcement: 10 seconds before the end."));
-        variables->setWordWrap(true);
-        form->addRow(QString(), variables);
         layout->addLayout(form);
         auto *buttons = new QHBoxLayout;
         buttons->setSpacing(8);
@@ -258,6 +267,7 @@ public:
             const bool useVoiceMix = speak || useSweeper;
             const bool entryCue = speak || (useSweeper && sweeperPlacement->currentData().toInt() != 2);
             sweeperPlacement->setEnabled(useSweeper);
+            sweeperEverySongs->setEnabled(useSweeper);
             introDelay->setEnabled(entryCue);
             voiceVolume->setEnabled(useVoiceMix);
             musicVolume->setEnabled(useVoiceMix);
@@ -276,6 +286,7 @@ public:
                     || artistRepeatDistance->hasAcceptableInput())
                 && (!enabled->isChecked() || seconds->hasAcceptableInput())
                 && (!entryCue || introDelay->hasAcceptableInput())
+                && (!useSweeper || sweeperEverySongs->hasAcceptableInput())
                 && (!useVoiceMix || recovery->hasAcceptableInput()));
         };
         connect(enabled, &QCheckBox::toggled, this, validate);
@@ -283,6 +294,7 @@ public:
         connect(announcementsEnabled, &QCheckBox::toggled, this, validate);
         connect(sweeperEnabled, &QCheckBox::toggled, this, validate);
         connect(sweeperPlacement, &QComboBox::currentIndexChanged, this, validate);
+        connect(sweeperEverySongs, &QLineEdit::textChanged, this, validate);
         connect(seconds, &QLineEdit::textChanged, this, validate);
         connect(songsPerTurn, &QLineEdit::textChanged, this, validate);
         connect(artistRepeatDistance, &QLineEdit::textChanged, this, validate);
@@ -321,6 +333,7 @@ public:
             item->setAnnouncementsEnabled(announcementsEnabled->isChecked());
             const int placement = sweeperPlacement->currentData().toInt();
             item->setSweeper(sweeperEnabled->isChecked(), placement != 2, placement != 1);
+            item->setSweeperEveryNSongs(sweeperEverySongs->text().toInt());
             item->setAnnouncementVolumePercent(voiceVolume->value());
             item->setAnnouncementMusicVolumePercent(musicVolume->value());
             item->setAnnouncementRecoverySeconds(recovery->text().toDouble());

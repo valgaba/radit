@@ -316,11 +316,24 @@ QString AudioItemFolderMaxi::resolvedOutroAnnouncement() const
 
 void AudioItemFolderMaxi::setSweeper(bool enabled, bool atEntry, bool atExit)
 {
+    if (m_sweeperEnabled != enabled)
+        m_sweeperSongsSinceLast = 0;
     m_sweeperEnabled = enabled;
     m_sweeperAtEntry = atEntry;
     m_sweeperAtExit = atExit;
     m_sweeperIntroAudioPath.clear();
     m_sweeperOutroAudioPath.clear();
+    m_sweeperDueForCurrentTrack = false;
+}
+
+void AudioItemFolderMaxi::setSweeperEveryNSongs(int songs)
+{
+    const int boundedSongs=qBound(1,songs,50);
+    if (m_sweeperEveryNSongs==boundedSongs)
+        return;
+    m_sweeperEveryNSongs=boundedSongs;
+    m_sweeperSongsSinceLast=0;
+    m_sweeperDueForCurrentTrack=false;
 }
 
 bool AudioItemFolderMaxi::prepareAnnouncementAudio()
@@ -332,8 +345,10 @@ bool AudioItemFolderMaxi::prepareAnnouncementAudio()
     const QString outro = m_announcementsEnabled ? resolvedOutroAnnouncement() : QString();
     m_sweeperIntroAudioPath.clear();
     m_sweeperOutroAudioPath.clear();
+    m_sweeperDueForCurrentTrack=m_sweeperEnabled
+        && m_sweeperSongsSinceLast+1>=m_sweeperEveryNSongs;
     const QString commonSweeperFolder = AudioSettings::sweeperFolder();
-    if (m_sweeperEnabled && QFileInfo(commonSweeperFolder).isDir()) {
+    if (m_sweeperDueForCurrentTrack && QFileInfo(commonSweeperFolder).isDir()) {
         if (m_sweeperAtEntry)
             m_sweeperIntroAudioPath=nextRandomSweeper(commonSweeperFolder);
         if (m_sweeperAtExit)
@@ -899,6 +914,13 @@ bool AudioItemFolderMaxi::loadPreparedPlayback(MediaManager *manager)
     const bool loaded=manager->loadFile(m_currentTrack);
     m_trackPrepared=false;
     if (!loaded) return false;
+    if (m_sweeperEnabled) {
+        if (m_sweeperDueForCurrentTrack)
+            m_sweeperSongsSinceLast=0;
+        else
+            ++m_sweeperSongsSinceLast;
+    }
+    m_sweeperDueForCurrentTrack=false;
     if (!m_orderedList) {
         setSecond(manager->getDuration());
         setTiempoFile(second());
@@ -975,6 +997,7 @@ AudioItemMaxi *AudioItemFolderMaxi::copy(QWidget *newParent) const
     item->setAnnouncementMusicVolumePercent(m_announcementMusicVolumePercent);
     item->setAnnouncementRecoverySeconds(m_announcementRecoverySeconds);
     item->setSweeper(m_sweeperEnabled, m_sweeperAtEntry, m_sweeperAtExit);
+    item->setSweeperEveryNSongs(m_sweeperEveryNSongs);
     item->setIsPurge(isPurge()); item->setIsPlayNext(isPlayNext());
     item->setIsLoop(isLoop()); item->setIsSelect(isSelect()); item->setColor(color());
     item->copyFolderStateFrom(*this);

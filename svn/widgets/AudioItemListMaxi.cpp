@@ -17,6 +17,7 @@ AudioItemListMaxi::AudioItemListMaxi(const AudioItemListMaxi &source, QWidget *p
     setAnnouncementMusicVolumePercent(source.announcementMusicVolumePercent());
     setAnnouncementRecoverySeconds(source.announcementRecoverySeconds());
     setSweeper(source.sweeperEnabled(), source.sweeperAtEntry(), source.sweeperAtExit());
+    setSweeperEveryNSongs(source.sweeperEveryNSongs());
     setIsPurge(source.isPurge());
     setIsPlayNext(source.isPlayNext());
     setIsLoop(source.isLoop());

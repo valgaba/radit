@@ -112,6 +112,8 @@ QString SpanishTranslator::translate(const char *context, const char *sourceText
         {QStringLiteral("Enable sweeper (random station ID)"),QStringLiteral("Activar pisador (identificación aleatoria)")},
         {QStringLiteral("Sweeper folder"),QStringLiteral("Carpeta de pisadores")},
         {QStringLiteral("Sweeper placement"),QStringLiteral("Ubicación del pisador")},
+        {QStringLiteral("Sweeper frequency (songs)"),QStringLiteral("Cada cuántas canciones")},
+        {QStringLiteral("Play a sweeper once every N tracks; 1 means every track."),QStringLiteral("Reproduce un pisador cada N canciones; 1 significa en cada canción.")},
         {QStringLiteral("Entry and exit"),QStringLiteral("Entrada y salida")},
         {QStringLiteral("Entry"),QStringLiteral("Entrada")},
         {QStringLiteral("Exit"),QStringLiteral("Salida")},

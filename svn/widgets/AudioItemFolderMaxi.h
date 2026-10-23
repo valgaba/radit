@@ -64,7 +64,9 @@ public:
     QString sweeperOutroAudioPath() const { return m_sweeperOutroAudioPath; }
     bool sweeperAtEntry() const { return m_sweeperAtEntry; }
     bool sweeperAtExit() const { return m_sweeperAtExit; }
+    int sweeperEveryNSongs() const { return m_sweeperEveryNSongs; }
     void setSweeper(bool enabled, bool atEntry = true, bool atExit = true);
+    void setSweeperEveryNSongs(int songs);
     AudioItemMaxi *copy(QWidget *newParent) const override;
     bool preparePlayback() override;
     bool isPreparingPlayback() const override { return m_waitingForScan || m_announcementPreparing; }
@@ -123,6 +125,9 @@ private:
     bool m_sweeperEnabled = false;
     bool m_sweeperAtEntry = true;
     bool m_sweeperAtExit = true;
+    int m_sweeperEveryNSongs = 1;
+    int m_sweeperSongsSinceLast = 0;
+    bool m_sweeperDueForCurrentTrack = false;
     QString m_sweeperIntroAudioPath, m_sweeperOutroAudioPath;
     bool m_announcementPreparing = false;
     bool m_trackPrepared = false;

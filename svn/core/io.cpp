@@ -96,6 +96,7 @@ QJsonArray saveItems(QLayout *layout)
             object["sweeperEnabled"] = folder->sweeperEnabled();
             object["sweeperAtEntry"] = folder->sweeperAtEntry();
             object["sweeperAtExit"] = folder->sweeperAtExit();
+            object["sweeperEveryNSongs"] = folder->sweeperEveryNSongs();
         }
         if (auto *meteo = qobject_cast<AudioItemMeteoClockMaxi*>(item)) {
             object["announceTime"] = meteo->announcesTime();
@@ -156,6 +157,7 @@ void loadJsonItems(ContentsBase *contents, const QJsonArray &items,
             folderItem->setSweeper(object["sweeperEnabled"].toBool(false),
                                    object["sweeperAtEntry"].toBool(true),
                                    object["sweeperAtExit"].toBool(true));
+            folderItem->setSweeperEveryNSongs(object["sweeperEveryNSongs"].toInt(1));
         }
         item->setMixSettings(object["mixEnabled"].toBool(), object["mixSeconds"].toDouble(3.0));
         if (meteo) {
@@ -282,6 +284,9 @@ bool validItems(const QJsonArray &items, LoadingDialog *loading = nullptr)
         if (item.contains("sweeperFolder") && !item["sweeperFolder"].isString()) return false;
         if (item.contains("sweeperAtEntry") && !item["sweeperAtEntry"].isBool()) return false;
         if (item.contains("sweeperAtExit") && !item["sweeperAtExit"].isBool()) return false;
+        if (item.contains("sweeperEveryNSongs") && (!item["sweeperEveryNSongs"].isDouble()
+            || item["sweeperEveryNSongs"].toInt(-1) < 1
+            || item["sweeperEveryNSongs"].toInt(-1) > 50)) return false;
         if (item.contains("secondStart") && (!item["secondStart"].isDouble()
             || item["secondStart"].toDouble() < 0
             || !std::isfinite(item["secondStart"].toDouble()))) return false;
