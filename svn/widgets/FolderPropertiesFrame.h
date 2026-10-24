@@ -36,7 +36,12 @@ public:
         setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
         setWindowModality(Qt::WindowModal);
         setAttribute(Qt::WA_DeleteOnClose);
-        setWindowTitle(orderedList ? tr("Audio list properties") : tr("Audio folder properties"));
+        const QString itemName = item->nameFile().trimmed().isEmpty()
+            ? QFileInfo(item->folderPath()).fileName() : item->nameFile().trimmed();
+        const QString propertiesTitle = orderedList ? tr("Audio list properties")
+                                                    : tr("Audio folder properties");
+        setWindowTitle(itemName.isEmpty() ? propertiesTitle
+                                          : QStringLiteral("%1 — %2").arg(propertiesTitle, itemName));
         setWindowIcon(QIcon(":/icons/properties.svg"));
         resize(540, orderedList ? 550 : 600);
         auto *root = new QVBoxLayout(this);
@@ -52,6 +57,7 @@ public:
         auto *title = new Label(m_titleBar);
         title->setObjectName("PanelTitle");
         title->setText(windowTitle());
+        title->setToolTip(itemName);
         title->setAttribute(Qt::WA_TransparentForMouseEvents);
         barLayout->addWidget(title);
         barLayout->addStretch();

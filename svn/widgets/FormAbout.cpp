@@ -156,10 +156,11 @@ FormAbout::FormAbout(QWidget *parent) : Frame(parent)
 
 void FormAbout::checkLatestDownload()
 {
-    // The website's fixed download URL points to this stable release and asset.
+    // The website's fixed download URLs point to this stable release. Select the
+    // package for the running platform before reading its publication timestamp.
     // Read the asset's updated_at value so older installed builds can show when a
-    // newer ZIP became available, without treating the tag's original release date
-    // as the date of every subsequent binary upload.
+    // newer binary became available, without treating the tag's original release
+    // date as the date of every subsequent binary upload.
     const QUrl url(QStringLiteral("https://api.github.com/repos/valgaba/radit/releases/tags/radit-1.0.0"));
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Radit"));
@@ -184,10 +185,15 @@ void FormAbout::checkLatestDownload()
 
         const QJsonArray assets = document.object().value(QStringLiteral("assets")).toArray();
         QJsonObject selectedAsset;
+#ifdef Q_OS_LINUX
+        const QString downloadAssetName = QStringLiteral("Radit_1_0_0.AppImage");
+#else
+        const QString downloadAssetName = QStringLiteral("radit_1_0_0.zip");
+#endif
         for (const QJsonValue &value : assets) {
             const QJsonObject asset = value.toObject();
             const QString name = asset.value(QStringLiteral("name")).toString();
-            if (name.compare(QStringLiteral("radit_1_0_0.zip"), Qt::CaseInsensitive) == 0) {
+            if (name.compare(downloadAssetName, Qt::CaseInsensitive) == 0) {
                 selectedAsset = asset;
                 break;
             }
@@ -204,8 +210,13 @@ void FormAbout::checkLatestDownload()
 
         QString downloadVersion = QStringLiteral("1.0.0");
         const QString assetName = selectedAsset.value(QStringLiteral("name")).toString();
+#ifdef Q_OS_LINUX
+        const QRegularExpression versionPattern(QStringLiteral("^Radit_(\\d+)_(\\d+)_(\\d+)\\.AppImage$"),
+                                                QRegularExpression::CaseInsensitiveOption);
+#else
         const QRegularExpression versionPattern(QStringLiteral("^radit_(\\d+)_(\\d+)_(\\d+)\\.zip$"),
                                                 QRegularExpression::CaseInsensitiveOption);
+#endif
         const QRegularExpressionMatch match = versionPattern.match(assetName);
         if (match.hasMatch())
             downloadVersion = QStringLiteral("%1.%2.%3").arg(match.captured(1), match.captured(2), match.captured(3));

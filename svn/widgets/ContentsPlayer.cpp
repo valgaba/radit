@@ -905,6 +905,15 @@ void ContentsPlayer::applyColor(const QColor &color)
         emit contentsModified();
 }
 
+void ContentsPlayer::showPropertiesForContextItem()
+{
+    QWidget *widget = childAt(mousePos);
+    while (widget && !qobject_cast<AudioItemMaxi*>(widget))
+        widget = widget->parentWidget();
+    if (auto *item = qobject_cast<AudioItemMaxi*>(widget))
+        item->triggerProperties();
+}
+
 
 void ContentsPlayer::loadItems(){
 

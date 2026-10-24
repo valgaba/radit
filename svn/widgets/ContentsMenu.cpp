@@ -168,6 +168,8 @@ void ContentsMenu::connectActions() {
     connect(saveasAction, &QAction::triggered, player, &ContentsPlayer::saveAsItems);
     connect(refreshDurationsAction, &QAction::triggered,
             player, &ContentsPlayer::refreshAudioDurations);
+    connect(propertiesAction, &QAction::triggered,
+            player, &ContentsPlayer::showPropertiesForContextItem);
 
 
 

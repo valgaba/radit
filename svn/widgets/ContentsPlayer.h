@@ -61,6 +61,7 @@ public:
     void saveItems();
     void saveAsItems();
     void refreshAudioDurations();
+    void showPropertiesForContextItem();
     QString listFileName() const { return m_listFileName; }
     void setListFileName(const QString &filename) { m_listFileName = filename; }
 
