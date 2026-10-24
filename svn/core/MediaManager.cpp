@@ -36,6 +36,8 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include "core/MediaManager.h"
 #include <bass.h>
 
@@ -51,6 +53,7 @@ struct MediaManager::Backend
     int inputDevice = -1;
     DWORD inputRate = 0;
     DWORD inputChannels = 0;
+    bool inputSampleFloat = true;
     QMutex inputMutex;
     bool collectRecording = false;
     bool recording = false;
@@ -72,15 +75,33 @@ struct MediaManager::Backend
         if (!backend->collectRecording)
             return TRUE;
         // El callback de BASS no accede a QProcess ni a los widgets de Qt.
-        if (backend->recordingData.size() + length > 4 * 1024 * 1024) {
+        const DWORD outputLength = backend->inputSampleFloat
+            ? length : (length / sizeof(std::int16_t)) * sizeof(float);
+        if (backend->recordingData.size() + outputLength > 4 * 1024 * 1024) {
             backend->overflow = true;
             return TRUE;
         }
         const qsizetype offset = backend->recordingData.size();
-        backend->recordingData.append(static_cast<const char *>(buffer), length);
-        auto *samples = reinterpret_cast<float *>(backend->recordingData.data() + offset);
-        for (DWORD i = 0; i < length / sizeof(float); ++i)
-            samples[i] *= backend->inputGain;
+        if (backend->inputSampleFloat) {
+            backend->recordingData.append(static_cast<const char *>(buffer), length);
+            for (DWORD i = 0; i < length / sizeof(float); ++i) {
+                float sample;
+                std::memcpy(&sample, backend->recordingData.constData() + offset + i * sizeof(sample), sizeof(sample));
+                sample *= backend->inputGain;
+                std::memcpy(backend->recordingData.data() + offset + i * sizeof(sample), &sample, sizeof(sample));
+            }
+        } else {
+            const auto *samples = static_cast<const BYTE *>(buffer);
+            const DWORD count = length / sizeof(std::int16_t);
+            backend->recordingData.resize(offset + count * sizeof(float));
+            for (DWORD i = 0; i < count; ++i) {
+                std::int16_t pcm;
+                std::memcpy(&pcm, samples + i * sizeof(pcm), sizeof(pcm));
+                const float sample = (pcm / 32768.0f) * backend->inputGain;
+                std::memcpy(backend->recordingData.data() + offset + i * sizeof(sample), &sample, sizeof(sample));
+            }
+            length = count * sizeof(float);
+        }
         backend->recordingBytes += length;
         return TRUE;
     }
@@ -576,13 +597,48 @@ bool MediaManager::startInput(int deviceId)
     }
     int error = ready ? 0 : BASS_ErrorGetCode();
     if (ready) {
-        // Formato nativo: también admite micrófonos mono. Callback cada 20 ms.
+#ifdef Q_OS_LINUX
+        // Algunos controladores ALSA no aceptan el formato nativo solicitado con 0/0.
+        // Probar frecuencias y formatos explícitos habituales, incluyendo PCM mono.
+        BASS_RECORDINFO recordInfo = {};
+        BASS_RecordGetInfo(&recordInfo);
+        const DWORD rates[] = {recordInfo.freq, 44100, 48000, 22050};
+        QSet<DWORD> triedRates;
+        for (DWORD rate : rates) {
+            if (!rate || triedRates.contains(rate))
+                continue;
+            triedRates.insert(rate);
+            for (DWORD channels : {DWORD(2), DWORD(1)}) {
+                for (bool sampleFloat : {true, false}) {
+                    // Set before starting: BASS may invoke the callback immediately.
+                    m_backend->inputSampleFloat = sampleFloat;
+                    const DWORD format = sampleFloat ? BASS_SAMPLE_FLOAT : 0;
+                    m_backend->inputStream = BASS_RecordStart(
+                        rate, channels, MAKELONG(format, 20),
+                        Backend::InputCallback, m_backend.get());
+                    if (m_backend->inputStream)
+                        break;
+                    error = BASS_ErrorGetCode();
+                }
+                if (m_backend->inputStream)
+                    break;
+            }
+            if (m_backend->inputStream)
+                break;
+        }
+        if (!m_backend->inputStream) {
+            releaseInputDevice(deviceId);
+        }
+#else
+        // Mantener el modo nativo de captura en Windows, donde ya funciona correctamente.
+        m_backend->inputSampleFloat = true;
         m_backend->inputStream = BASS_RecordStart(0, 0, MAKELONG(BASS_SAMPLE_FLOAT, 20),
-                                                Backend::InputCallback, m_backend.get());
+                                                  Backend::InputCallback, m_backend.get());
         if (!m_backend->inputStream) {
             error = BASS_ErrorGetCode();
             releaseInputDevice(deviceId);
         }
+#endif
     }
     if (previous != static_cast<DWORD>(-1))
         BASS_RecordSetDevice(previous);

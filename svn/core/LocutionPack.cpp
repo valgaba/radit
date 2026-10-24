@@ -7,9 +7,110 @@
 #include <QProcessEnvironment>
 #include <QTimer>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
+#include <QRegularExpression>
+#include <QSet>
 #include <QHash>
 #include <QDateTime>
+#ifdef Q_OS_LINUX
+#include <minizip/unzip.h>
+#endif
+
+#ifdef Q_OS_LINUX
+namespace {
+QString extractLinuxVoicePack(const QString &path, const QString &destination)
+{
+    static const QRegularExpression accepted(
+        QStringLiteral("(?:^|/)(?:time/(?:HRS[0-9]{2}(?:_O)?|MIN[0-9]{2})"
+                       "|temperature/TMPN?[0-9]{3}|humidity/HUM[0-9]{3})\\.mp3$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QByteArray encodedPath = QFile::encodeName(path);
+    unzFile archive = unzOpen64(encodedPath.constData());
+    if (!archive)
+        return QObject::tr("Invalid or unsupported ZIP voice pack.");
+
+    unz_global_info64 globalInfo{};
+    if (unzGetGlobalInfo64(archive, &globalInfo) != UNZ_OK || globalInfo.number_entry > 10000) {
+        unzClose(archive);
+        return QObject::tr("Invalid or unsupported ZIP voice pack.");
+    }
+
+    QSet<QString> seen;
+    qint64 totalBytes = 0;
+    int extracted = 0;
+    int result = globalInfo.number_entry ? unzGoToFirstFile(archive) : UNZ_END_OF_LIST_OF_FILE;
+    while (result == UNZ_OK) {
+        unz_file_info64 entryInfo{};
+        if (unzGetCurrentFileInfo64(archive, &entryInfo, nullptr, 0, nullptr, 0, nullptr, 0) != UNZ_OK
+            || entryInfo.size_filename > 4096) {
+            result = UNZ_BADZIPFILE;
+            break;
+        }
+
+        QByteArray filename(int(entryInfo.size_filename) + 1, '\0');
+        if (unzGetCurrentFileInfo64(archive, &entryInfo, filename.data(), unsigned(filename.size()),
+                                    nullptr, 0, nullptr, 0) != UNZ_OK) {
+            result = UNZ_BADZIPFILE;
+            break;
+        }
+
+        const QString name = QString::fromUtf8(filename.constData(), int(entryInfo.size_filename));
+        if (accepted.match(name).hasMatch()) {
+            const QString baseName = QFileInfo(name).fileName().toLower();
+            if (!entryInfo.uncompressed_size || entryInfo.uncompressed_size > 2 * 1024 * 1024
+                || totalBytes + qint64(entryInfo.uncompressed_size) > 64 * 1024 * 1024
+                || extracted >= 400 || seen.contains(baseName)) {
+                result = UNZ_BADZIPFILE;
+                break;
+            }
+            if (unzOpenCurrentFile(archive) != UNZ_OK) {
+                result = UNZ_BADZIPFILE;
+                break;
+            }
+
+            QByteArray data;
+            data.reserve(int(entryInfo.uncompressed_size));
+            char buffer[8192];
+            int bytesRead = 0;
+            do {
+                bytesRead = unzReadCurrentFile(archive, buffer, sizeof(buffer));
+                if (bytesRead > 0) {
+                    data.append(buffer, bytesRead);
+                    if (data.size() > int(entryInfo.uncompressed_size))
+                        break;
+                }
+            } while (bytesRead > 0);
+
+            const int closeResult = unzCloseCurrentFile(archive);
+            if (bytesRead < 0 || data.size() != int(entryInfo.uncompressed_size)
+                || closeResult != UNZ_OK) {
+                result = UNZ_BADZIPFILE;
+                break;
+            }
+
+            QSaveFile output(QDir(destination).filePath(baseName));
+            if (!output.open(QIODevice::WriteOnly) || output.write(data) != data.size()
+                || !output.commit()) {
+                unzClose(archive);
+                return QObject::tr("Unable to extract the ZIP voice pack.");
+            }
+            seen.insert(baseName);
+            totalBytes += qint64(entryInfo.uncompressed_size);
+            ++extracted;
+        }
+        result = unzGoToNextFile(archive);
+    }
+
+    const int closeResult = unzClose(archive);
+    if ((result != UNZ_END_OF_LIST_OF_FILE && result != UNZ_OK) || closeResult != UNZ_OK)
+        return QObject::tr("Invalid or unsupported ZIP voice pack.");
+    return {};
+}
+}
+#endif
 
 std::shared_ptr<LocutionPack> LocutionPack::open(const QString &path)
 {
@@ -77,8 +178,22 @@ try {
         m_timeout->start();
         m_process->start(QDir(qEnvironmentVariable("WINDIR","C:/Windows")).filePath("System32/WindowsPowerShell/v1.0/powershell.exe"),
             {"-NoLogo","-NoProfile","-NonInteractive","-WindowStyle","Hidden","-EncodedCommand",QString::fromLatin1(encoded)});
+#elif defined(Q_OS_LINUX)
+        const QString extractionError = extractLinuxVoicePack(path, m_directory.path());
+        if (!extractionError.isEmpty()) {
+            complete(extractionError);
+            return;
+        }
+        for (const char *name : {"hrs00.mp3", "hrs00_o.mp3", "min01.mp3", "tmp000.mp3", "hum000.mp3"}) {
+            if (clip(name).isEmpty()) {
+                complete(tr("The ZIP does not contain a MeteoClock voice pack."));
+                return;
+            }
+        }
+        m_ready = true;
+        complete({});
 #else
-        complete(tr("ZIP voice packs are currently supported on Windows."));
+        complete(tr("ZIP voice packs are not supported on this platform."));
 #endif
     });
 }

@@ -191,6 +191,11 @@ unix {
 
 }
 
+linux {
+    # Linux uses minizip to read MeteoClock voice packs without shell tools.
+    LIBS += -lminizip
+}
+
 
 
 #-------------------------------------------------------------
