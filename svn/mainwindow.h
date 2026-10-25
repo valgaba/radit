@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QSplitter>
 #include <QList>
+#include <QString>
 
 
 #include "core/MediaManager.h"
@@ -39,7 +40,11 @@ protected:
 
 private:
     void saveWindowInterface() const;
+    void saveWindowInterfacePreset(int preset) const;
+    void saveWindowInterfaceToGroup(const QString &groupName) const;
     void restoreWindowInterface();
+    bool restoreWindowInterfacePreset(int preset);
+    bool restoreWindowInterfaceFromGroup(const QString &groupName);
     bool m_quitDialogOpen = false;
     void restoreInterface();
     void applyWorkspacePreset(bool plannerView);

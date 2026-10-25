@@ -7,6 +7,11 @@
 #include <QPointer>
 #include <QSet>
 #include <QElapsedTimer>
+#include <QFutureWatcher>
+#include <QPair>
+#include <QVector>
+#include <memory>
+#include <atomic>
 #include "widgets/frame.h"
 
 class ContentsPlayer;
@@ -106,6 +111,16 @@ private:
     bool m_userIsSeeking = false;
     bool m_standbyBlinkPhase = false;
     bool m_standbyFileModified = false;
+    QFutureWatcher<QVector<QPair<QString, double>>> *m_transitionIndexWatcher = nullptr;
+    std::shared_ptr<std::atomic_bool> m_transitionIndexCancel;
+    QString m_transitionIndexFolder;
+    QString m_transitionIndexScanPath;
+    QVector<QPair<QString, double>> m_transitionClips;
+    QString m_lastTransitionClipPath;
+    QElapsedTimer m_transitionIndexAge;
+    bool m_transitionIndexReady = false;
+    bool m_transitionIndexScanInProgress = false;
+    bool m_transitionClipWaitingForSlot = false;
     double m_positionDuration = 0.0;
     double m_currentPlaybackPosition = 0.0;
     double m_currentPlaybackDuration = 0.0;
@@ -122,6 +137,10 @@ private:
     void startStandbyIfNeeded();
     void ensureStandbyPlayback();
     void checkSchedule();
+    void ensureTransitionClipIndex();
+    QString selectTransitionClip(bool markSelected = true, double afterSeconds = 0.0);
+    bool shouldUseTransitionClip(double afterSeconds = 0.0);
+    bool finishTransitionClip();
     void cancelStandbyTrackWait();
     void finishStandbyTrackWait();
     void startScheduleSlot(ScheduleSlot *slot, int crossfadeDurationMs = -1);

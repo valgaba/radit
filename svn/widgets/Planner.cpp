@@ -22,6 +22,7 @@
 #include "widgets/vumeter.h"
 #include "widgets/slider.h"
 #include "core/io.h"
+#include "core/AudioSettings.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -72,10 +73,13 @@
 #include <QFileInfo>
 #include <QSettings>
 #include <QDir>
+#include <QDirIterator>
+#include <QRandomGenerator>
 #include <QCoreApplication>
 #include <QLineEdit>
 #include <QTimeEdit>
 #include <QAbstractSpinBox>
+#include <limits>
 #include "widgets/scrollbar.h"
 #include <functional>
 #include <cmath>
@@ -718,6 +722,7 @@ public:
         const int secondsAfterMidnight=time.hour()*3600+time.minute()*60+time.second();
         ScheduleSlot *slot=addSlot(time.toString("HH:mm:ss"),secondsAfterMidnight);
         slot->setName(options.name());
+        slot->setUseTransitionClipBefore(options.usesTransitionClipBefore());
         m_dayContents.append(slot->contents());
         markDocumentModified();
         if (m_focusSlot)
@@ -850,6 +855,7 @@ public:
                     ? slot->accentColor().name(QColor::HexArgb) : QString()},
                 {"disabled",slot->isScheduleDisabled()}, {"priority",slot->isPriority()},
                 {"waitForStandbyTrackEnd",slot->waitsForStandbyTrackEnd()},
+                {"useTransitionClipBefore",slot->usesTransitionClipBefore()},
                 {"contentsVisible",slot->contentsVisible()},
                 {"standbyListPath",slot->standbyListPath()},
                 {"items",Io::serializeItems(slot->contents()->layout)}
@@ -888,6 +894,7 @@ public:
             slot->setScheduleDisabled(object.value("disabled").toBool());
             slot->setPriority(object.value("priority").toBool());
             slot->setStandbyTrackWait(object.value("waitForStandbyTrackEnd").toBool());
+            slot->setUseTransitionClipBefore(object.value("useTransitionClipBefore").toBool(false));
             slot->setStandbyListPath(object.value("standbyListPath").toString());
             if (!slot->isStandbyListChangeEvent()) {
                 m_dayContents.append(slot->contents());
@@ -1004,13 +1011,15 @@ private:
             ScheduleSlotOptionsDialog options(currentTime,window(),
                                                editedSlot->isScheduleDisabled(),true,
                                                editedSlot->name(),
-                                               editedSlot->waitsForStandbyTrackEnd());
+                                               editedSlot->waitsForStandbyTrackEnd(),
+                                               editedSlot->usesTransitionClipBefore());
             if (options.exec()==QDialog::Accepted) {
                 const QTime time=options.entryTime();
                 editedSlot->setEntryTime(time.hour()*3600+time.minute()*60+time.second());
                 editedSlot->setName(options.name());
                 editedSlot->setScheduleDisabled(options.isDisabled());
                 editedSlot->setStandbyTrackWait(options.waitsForStandbyTrackEnd());
+                editedSlot->setUseTransitionClipBefore(options.usesTransitionClipBefore());
                 markDocumentModified();
             }
         });
@@ -1138,6 +1147,7 @@ private:
         copy->setAccentColor(source->accentColor());
         copy->setScheduleDisabled(source->isScheduleDisabled());
         copy->setStandbyTrackWait(source->waitsForStandbyTrackEnd());
+        copy->setUseTransitionClipBefore(source->usesTransitionClipBefore());
         copy->setStandbyListPath(source->standbyListPath());
         QVBoxLayout *sourceLayout=source->contents()->layout;
         for (int index=0; index<sourceLayout->count(); ++index) {
@@ -1861,6 +1871,8 @@ public:
                     || !slot.value("disabled").isBool() || !slot.value("priority").isBool()
                     || (slot.contains("waitForStandbyTrackEnd")
                         && !slot.value("waitForStandbyTrackEnd").isBool())
+                    || (slot.contains("useTransitionClipBefore")
+                        && !slot.value("useTransitionClipBefore").isBool())
                     || !slot.value("contentsVisible").isBool()
                     || !slot.value("standbyListPath").isString() || !slot.value("items").isArray()
                     || (!color.isEmpty() && !QColor(color).isValid())
@@ -2017,6 +2029,41 @@ public:
                 return interval.slot;
         }
         return nullptr;
+    }
+
+    QDateTime nextScheduleStartAfter(const QDateTime &now) const
+    {
+        QDateTime nearest;
+        for (int dayOffset=0; dayOffset<=1; ++dayOffset) {
+            const QDate date=now.date().addDays(dayOffset);
+            const int dayIndex=qBound(0,date.dayOfWeek()-1,6);
+            auto *day=static_cast<PlannerDayPage*>(m_pages->widget(dayIndex));
+            if (!day)
+                continue;
+            for (const PlannerSlotInterval &interval : day->slotIntervals(false)) {
+                ScheduleSlot *slot=interval.slot;
+                if (!slot || slot->isScheduleDisabled() || slot->isStandbyListChangeEvent()
+                    || !slot->contents() || !slot->contents()->layout
+                    || slot->contents()->layout->count()==0)
+                    continue;
+                bool hasPlayableItem=false;
+                for (int index=0;index<slot->contents()->layout->count();++index) {
+                    auto *item=qobject_cast<AudioItemMaxi*>(
+                        slot->contents()->layout->itemAt(index)->widget());
+                    if (item && item->isEnabledForPlayback()) {
+                        hasPlayableItem=true;
+                        break;
+                    }
+                }
+                if (!hasPlayableItem)
+                    continue;
+                const QDateTime candidate(date,QTime(0,0).addSecs(interval.startSeconds));
+                if (candidate<=now || (nearest.isValid() && candidate>=nearest))
+                    continue;
+                nearest=candidate;
+            }
+        }
+        return nearest;
     }
 
     void showDate(const QDate &date)
@@ -2432,6 +2479,25 @@ Planner::Planner(QWidget *parent) : Frame(parent)
     m_standbyEngine=new Player(this);
     m_scheduleEngineA=new Player(this);
     m_scheduleEngineB=new Player(this);
+    m_transitionIndexWatcher=new QFutureWatcher<QVector<QPair<QString,double>>>(this);
+    connect(m_transitionIndexWatcher,&QFutureWatcher<QVector<QPair<QString,double>>>::finished,
+            this,[this]() {
+        const QVector<QPair<QString,double>> results=m_transitionIndexWatcher->result();
+        const bool cancelled=m_transitionIndexCancel && m_transitionIndexCancel->load();
+        if (!cancelled && m_transitionIndexScanPath==m_transitionIndexFolder) {
+            m_transitionClips=results;
+            m_transitionIndexReady=true;
+            m_transitionIndexAge.restart();
+        }
+        m_transitionIndexScanInProgress=false;
+        m_transitionIndexScanPath.clear();
+        m_transitionIndexCancel.reset();
+        ensureTransitionClipIndex();
+    });
+    m_standbyEngine->setScheduleTransitionCallbacks(
+        [this]() { return selectTransitionClip(); },
+        [this](double afterSeconds) { return shouldUseTransitionClip(afterSeconds); },
+        [this]() { return finishTransitionClip(); });
     for (Player *engine : {m_standbyEngine,m_scheduleEngineA,m_scheduleEngineB}) {
         engine->hide();
         engine->setDevicePlay(m_devicePlay);
@@ -2777,6 +2843,7 @@ void Planner::setDevicePlay(int device)
 void Planner::startPlayback()
 {
     if (m_running) return;
+    ensureTransitionClipIndex();
     m_standbyResumeTimer->stop();
     const QDate today=QDate::currentDate();
     m_lastObservedDate=today;
@@ -2790,6 +2857,7 @@ void Planner::startPlayback()
         QDateTime::currentDateTime(),true,true);
     m_triggeredSlots.clear();
     m_pendingStartSlot.clear();
+    m_transitionClipWaitingForSlot=false;
     m_currentPlaybackPosition=0.0;
     m_currentPlaybackDuration=0.0;
     m_triggeredDate=QDate::currentDate().toString("yyyyMMdd");
@@ -2829,6 +2897,7 @@ void Planner::stopPlayback()
     m_activeScheduleSlot.clear();
     m_pendingScheduleSlot.clear();
     m_pendingStartSlot.clear();
+    m_transitionClipWaitingForSlot=false;
     cancelPendingScheduleStart();
     m_running=false;
     m_standbyStartAttempted=false;
@@ -2899,6 +2968,110 @@ void Planner::refreshAfterContentLoad()
     updateStandbyBarTitle();
     updateStandbyBarAppearance();
     updateRemainingTimeLabel();
+}
+
+void Planner::ensureTransitionClipIndex()
+{
+    const QString configuredFolder=AudioSettings::scheduleTransitionsEnabled()
+        ? AudioSettings::scheduleTransitionFolder().trimmed() : QString();
+    QString folder=configuredFolder;
+    if (!folder.isEmpty()) {
+        const QFileInfo info(folder);
+        folder=QDir::cleanPath(info.canonicalFilePath().isEmpty()
+                                   ? info.absoluteFilePath() : info.canonicalFilePath());
+    }
+    if (folder!=m_transitionIndexFolder) {
+        if (m_transitionIndexCancel)
+            m_transitionIndexCancel->store(true);
+        m_transitionIndexFolder=folder;
+        m_transitionClips.clear();
+        m_transitionIndexReady=false;
+        m_lastTransitionClipPath.clear();
+    }
+    if (folder.isEmpty() || !QFileInfo(folder).isDir()) {
+        m_transitionClips.clear();
+        m_transitionIndexReady=false;
+        return;
+    }
+    if (m_transitionIndexScanInProgress || (m_transitionIndexWatcher
+                                             && m_transitionIndexWatcher->isRunning()))
+        return;
+    if (m_transitionIndexReady && m_transitionIndexAge.isValid()
+        && m_transitionIndexAge.elapsed()<300000)
+        return;
+
+    m_transitionIndexScanPath=folder;
+    m_transitionIndexCancel=std::make_shared<std::atomic_bool>(false);
+    const auto cancel=m_transitionIndexCancel;
+    const QStringList filters=MediaManager::supportedAudioNameFilters();
+    m_transitionIndexScanInProgress=true;
+    m_transitionIndexWatcher->setFuture(QtConcurrent::run([folder,filters,cancel]() {
+        QVector<QPair<QString,double>> clips;
+        QDirIterator iterator(folder,filters,QDir::Files | QDir::Readable | QDir::NoSymLinks);
+        while (iterator.hasNext() && !cancel->load()) {
+            const QString path=iterator.next();
+            const double duration=MediaManager::readFileDuration(path);
+            if (std::isfinite(duration) && duration>0.0)
+                clips.append({QFileInfo(path).absoluteFilePath(),duration});
+        }
+        return clips;
+    }));
+}
+
+QString Planner::selectTransitionClip(bool markSelected, double afterSeconds)
+{
+    ensureTransitionClipIndex();
+    if (!m_transitionIndexReady || m_transitionClips.isEmpty() || !m_running
+        || m_activeScheduleEngine || m_pendingScheduleSlot || m_waitingForStandbySlot)
+        return {};
+    auto *weekTabs=static_cast<PlannerWeekTabs*>(m_weekTabs);
+    if (!weekTabs)
+        return {};
+    const QDateTime now=QDateTime::currentDateTime().addMSecs(
+        qMax<qint64>(0,qRound64(afterSeconds*1000.0)));
+    const QDateTime nextStart=weekTabs->nextScheduleStartAfter(now);
+    if (!nextStart.isValid())
+        return {};
+    const ScheduleSlot *nextSlot=weekTabs->slotStartingAt(nextStart);
+    if (!nextSlot || !nextSlot->usesTransitionClipBefore()
+        || nextSlot->waitsForStandbyTrackEnd())
+        return {};
+    const double gap=now.msecsTo(nextStart)/1000.0;
+    if (gap<=0.0 || gap>AudioSettings::minimumStandbyTrackSeconds())
+        return {};
+    const double maximumDelay=AudioSettings::scheduleTransitionLateToleranceSeconds();
+    double bestDuration=std::numeric_limits<double>::max();
+    QVector<QString> choices;
+    for (const auto &clip : m_transitionClips) {
+        if (clip.first.isEmpty() || !QFileInfo(clip.first).isFile()
+            || clip.second<gap || clip.second>gap+maximumDelay+0.10)
+            continue;
+        if (clip.second<bestDuration-0.50) {
+            bestDuration=clip.second;
+            choices.clear();
+        }
+        if (clip.second<=bestDuration+0.50)
+            choices.append(clip.first);
+    }
+    if (choices.isEmpty())
+        return {};
+    if (choices.size()>1 && !m_lastTransitionClipPath.isEmpty())
+        choices.removeAll(m_lastTransitionClipPath);
+    const QString selected=choices.at(QRandomGenerator::global()->bounded(choices.size()));
+    if (markSelected)
+        m_lastTransitionClipPath=selected;
+    return selected;
+}
+
+bool Planner::shouldUseTransitionClip(double afterSeconds)
+{
+    return !selectTransitionClip(false,afterSeconds).isEmpty();
+}
+
+bool Planner::finishTransitionClip()
+{
+    checkSchedule();
+    return m_activeScheduleEngine || (m_fadeTimer && m_fadeTimer->isActive());
 }
 
 void Planner::markDocumentModified()
@@ -3093,6 +3266,7 @@ void Planner::checkSchedule()
         m_triggeredSlots.clear();
         m_triggeredDate=dayKey;
         m_pendingStartSlot.clear();
+        m_transitionClipWaitingForSlot=false;
     }
     ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now);
     // The 250 ms timer can be delayed briefly by audio decoding or a busy UI.
@@ -3112,12 +3286,23 @@ void Planner::checkSchedule()
             || m_waitingForStandbySlot->entrySecond()!=m_waitingStandbyEntrySecond)) {
         if (m_pendingStartSlot==m_waitingForStandbySlot)
             m_pendingStartSlot.clear();
+        m_transitionClipWaitingForSlot=false;
         cancelStandbyTrackWait();
+    }
+    if (m_pendingStartSlot && m_pendingStartSlot->isScheduleDisabled()) {
+        m_pendingStartSlot.clear();
+        m_transitionClipWaitingForSlot=false;
     }
     if (m_pendingStartSlot && m_waitingForStandbySlot!=m_pendingStartSlot
         && !m_pendingStartSlot->isStandbyListChangeEvent()
-        && weekTabs->slotContaining(now)!=m_pendingStartSlot)
-        m_pendingStartSlot.clear();
+        && weekTabs->slotContaining(now)!=m_pendingStartSlot) {
+        const QDateTime scheduledStart(now.date(),QTime(0,0).addSecs(m_pendingStartSlot->entrySecond()));
+        const bool waitingForTransitionClip=m_standbyEngine
+            && m_standbyEngine->isScheduleTransitionClipPlaying()
+            && now<=scheduledStart.addSecs(AudioSettings::scheduleTransitionLateToleranceSeconds());
+        if (!waitingForTransitionClip && !m_transitionClipWaitingForSlot)
+            m_pendingStartSlot.clear();
+    }
 
     if (m_pendingStartSlot) {
         ScheduleSlot *slot=m_pendingStartSlot;
@@ -3154,6 +3339,14 @@ void Planner::checkSchedule()
                 }
             }
             if (!voicePackLoading) {
+                if (m_standbyEngine && m_standbyEngine->isScheduleTransitionClipPlaying()) {
+                    const QDateTime scheduledStart(now.date(),QTime(0,0).addSecs(slot->entrySecond()));
+                    if (now<=scheduledStart.addSecs(
+                            AudioSettings::scheduleTransitionLateToleranceSeconds())) {
+                        m_transitionClipWaitingForSlot=true;
+                        return;
+                    }
+                }
                 const bool canWaitForStandbyTrack=slot->waitsForStandbyTrackEnd()
                     && !m_activeScheduleEngine && !m_pendingScheduleSlot
                     && !m_fadeTimer->isActive() && m_standbyEngine
@@ -3167,6 +3360,7 @@ void Planner::checkSchedule()
                 }
                 m_triggeredSlots.insert(key);
                 m_pendingStartSlot.clear();
+                m_transitionClipWaitingForSlot=false;
                 startScheduleSlot(slot);
             }
         }
@@ -3288,6 +3482,8 @@ void Planner::startPendingScheduleCrossfade(Player *engine)
     if (!engine->getCurrentItem())
         return;
     Player *from=m_pendingScheduleFrom;
+    if (!from && m_standbyEngine && m_standbyEngine->getCurrentItem())
+        from=m_standbyEngine;
     const int action=m_pendingScheduleFadeAction;
     const int duration=m_pendingScheduleFadeDurationMs;
     m_pendingScheduleEngine.clear();

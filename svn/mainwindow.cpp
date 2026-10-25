@@ -296,6 +296,30 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent){
     connect(m_plannerViewAction,&QAction::triggered,this,[this]() {
         applyWorkspacePreset(true);
     });
+    QMenu *interfacePresetsMenu=vistasMenu->addMenu(tr("Interface presets"));
+    for (int preset=1;preset<=5;++preset) {
+        QMenu *presetMenu=interfacePresetsMenu->addMenu(tr("Preset %1").arg(preset));
+        QAction *savePresetAction=presetMenu->addAction(tr("Save current interface"));
+        presetMenu->addSeparator();
+        QAction *loadPresetAction=presetMenu->addAction(tr("Load interface"));
+        connect(savePresetAction,&QAction::triggered,this,[this,preset]() {
+            saveWindowInterfacePreset(preset);
+        });
+        connect(loadPresetAction,&QAction::triggered,this,[this,preset]() {
+            restoreWindowInterfacePreset(preset);
+        });
+        const QString presetGroup=QStringLiteral("InterfacePresets/Preset%1").arg(preset);
+        const QString interfaceFile=QDir(QCoreApplication::applicationDirPath())
+                                        .filePath(QStringLiteral("interface.ini"));
+        QSettings presetSettings(interfaceFile,QSettings::IniFormat);
+        loadPresetAction->setEnabled(
+            presetSettings.contains(presetGroup+QStringLiteral("/splitterPrincipal")));
+        connect(presetMenu,&QMenu::aboutToShow,this,[loadPresetAction,presetGroup,interfaceFile]() {
+            QSettings settings(interfaceFile,QSettings::IniFormat);
+            loadPresetAction->setEnabled(
+                settings.contains(presetGroup+QStringLiteral("/splitterPrincipal")));
+        });
+    }
     vistasMenu->addSeparator();
 
     const auto addPanelAction = [this, vistasMenu](const QString &text, QWidget *panel) {
@@ -468,9 +492,22 @@ void MainWindow::applyWorkspacePreset(bool plannerView)
 
 void MainWindow::saveWindowInterface() const
 {
+    saveWindowInterfaceToGroup(QStringLiteral("Interface"));
+}
+
+void MainWindow::saveWindowInterfacePreset(int preset) const
+{
+    if (preset<1 || preset>5)
+        return;
+    saveWindowInterfaceToGroup(QStringLiteral("InterfacePresets/Preset%1").arg(preset));
+}
+
+void MainWindow::saveWindowInterfaceToGroup(const QString &groupName) const
+{
     const QString filename = QDir(QCoreApplication::applicationDirPath()).filePath("interface.ini");
     QSettings settings(filename, QSettings::IniFormat);
-    settings.beginGroup("Interface");
+    settings.beginGroup(groupName);
+    settings.setValue("windowGeometry", saveGeometry());
     settings.setValue("splitterPrincipal", splitterprincipal->saveState());
     settings.setValue("splitterTop", splittertop->saveState());
     settings.setValue("splitterDown", splitterdown->saveState());
@@ -482,8 +519,6 @@ void MainWindow::saveWindowInterface() const
     const auto saveVisibility = [&settings,this](const QSplitter *splitter) {
         for (int index = 0; index < splitter->count(); ++index) {
             const QWidget *panel = splitter->widget(index);
-            if (panel==m_emissionLogFrame)
-                continue;
             if (!panel->objectName().isEmpty())
                 settings.setValue("visible/" + panel->objectName(), !panel->isHidden());
         }
@@ -496,9 +531,28 @@ void MainWindow::saveWindowInterface() const
 
 void MainWindow::restoreWindowInterface()
 {
+    restoreWindowInterfaceFromGroup(QStringLiteral("Interface"));
+}
+
+bool MainWindow::restoreWindowInterfacePreset(int preset)
+{
+    if (preset<1 || preset>5)
+        return false;
+    return restoreWindowInterfaceFromGroup(
+        QStringLiteral("InterfacePresets/Preset%1").arg(preset));
+}
+
+bool MainWindow::restoreWindowInterfaceFromGroup(const QString &groupName)
+{
     const QString filename = QDir(QCoreApplication::applicationDirPath()).filePath("interface.ini");
     QSettings settings(filename, QSettings::IniFormat);
-    settings.beginGroup("Interface");
+    settings.beginGroup(groupName);
+    if (!settings.contains("splitterPrincipal")) {
+        settings.endGroup();
+        return false;
+    }
+    if (settings.contains("windowGeometry"))
+        restoreGeometry(settings.value("windowGeometry").toByteArray());
     if (settings.contains("splitterPrincipal"))
         splitterprincipal->restoreState(settings.value("splitterPrincipal").toByteArray());
     if (settings.contains("splitterTop"))
@@ -509,8 +563,6 @@ void MainWindow::restoreWindowInterface()
     const auto restoreVisibility = [&settings,this](QSplitter *splitter) {
         for (int index = 0; index < splitter->count(); ++index) {
             QWidget *panel = splitter->widget(index);
-            if (panel==m_emissionLogFrame)
-                continue;
             const QString key = "visible/" + panel->objectName();
             if (!panel->objectName().isEmpty() && settings.contains(key))
                 panel->setVisible(settings.value(key).toBool());
@@ -518,12 +570,14 @@ void MainWindow::restoreWindowInterface()
     };
     restoreVisibility(splittertop);
     restoreVisibility(splitterdown);
+    clearWorkspacePresetSelection();
     const QString workspacePreset=settings.value("workspacePreset").toString();
     if (workspacePreset==QLatin1String("planner"))
         m_plannerViewAction->setChecked(true);
     else if (workspacePreset==QLatin1String("studio"))
         m_studioViewAction->setChecked(true);
     settings.endGroup();
+    return true;
 }
 
 MainWindow::~MainWindow(){

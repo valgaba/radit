@@ -9,6 +9,7 @@
 #include <QPointer>
 #include <QElapsedTimer>
 #include <QStringList>
+#include <functional>
 
 #include "widgets/button.h"
 #include "widgets/label.h"
@@ -97,6 +98,13 @@ private:
     int m_sequenceIndex = -1;
     QPointer<AudioItemFolderMaxi> m_folderTurnItem;
     int m_folderTurnTracksStarted = 0;
+    std::function<QString()> m_scheduleTransitionClipSelector;
+    std::function<bool(double)> m_scheduleTransitionShouldReplaceNext;
+    std::function<bool()> m_scheduleTransitionClipFinishedHandler;
+    QPointer<AudioItemMaxi> m_scheduleTransitionClipItem;
+    QPointer<AudioItemMaxi> m_scheduleTransitionResumeItem;
+    QPointer<AudioItemFolderMaxi> m_scheduleTransitionResumeFolder;
+    int m_scheduleTransitionResumeFolderTracksStarted = 0;
     float m_outgoingLeft = -120.0f, m_outgoingRight = -120.0f;
     void bindMediaManager();
     bool startPreparedItem(AudioItemMaxi *item);
@@ -118,6 +126,9 @@ private:
     void resumePlaybackLimit();
     bool playSequenceFrom(int index);
     void advanceSequence();
+    bool startScheduleTransitionClip(const QString &path, AudioItemMaxi *resumeItem = nullptr);
+    void finishScheduleTransitionClip(const QString &result = QStringLiteral("Completed"),
+                                     const QString &details = {});
     void markFolderTrackStarted(AudioItemMaxi *item);
 
 
@@ -181,6 +192,10 @@ public:
     ContentsBase *sequentialContents() const;
     int sequentialIndex() const { return m_sequenceIndex; }
     bool isCurrentItemLastInSequence() const;
+    void setScheduleTransitionCallbacks(std::function<QString()> clipSelector,
+                                        std::function<bool(double)> shouldReplaceNext = {},
+                                        std::function<bool()> clipFinishedHandler = {});
+    bool isScheduleTransitionClipPlaying() const;
 
 
     protected:

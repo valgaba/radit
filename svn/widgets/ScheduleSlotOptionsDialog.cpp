@@ -19,7 +19,8 @@
 ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, QWidget *parent,
                                                      bool disabled, bool editing,
                                                      const QString &name,
-                                                     bool waitForStandbyTrackEnd)
+                                                     bool waitForStandbyTrackEnd,
+                                                     bool useTransitionClipBefore)
     : QDialog(parent)
 {
     setObjectName("ScheduleSlotOptionsDialog");
@@ -27,7 +28,7 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     setWindowModality(Qt::WindowModal);
     setModal(true);
     setWindowTitle(tr("Schedule slot options"));
-    resize(400, 220);
+    resize(430, 255);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -84,6 +85,13 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
     m_waitForStandbyTrackEnd->setChecked(waitForStandbyTrackEnd);
     m_waitForStandbyTrackEnd->setToolTip(tr("Wait only while Standby is playing. An active ScheduleSlot is never delayed."));
     form->addRow(QString(),m_waitForStandbyTrackEnd);
+    m_useTransitionClipBefore = new QCheckBox(
+        tr("Use a transition clip before this event"), content);
+    m_useTransitionClipBefore->setObjectName("ScheduleSlotUseTransitionClipBefore");
+    m_useTransitionClipBefore->setChecked(useTransitionClipBefore);
+    m_useTransitionClipBefore->setToolTip(
+        tr("When enabled, Radit may play a transition clip before this event. Otherwise, it starts at the scheduled time."));
+    form->addRow(QString(), m_useTransitionClipBefore);
     contentLayout->addLayout(form);
 
     auto *buttons = new QHBoxLayout;
@@ -123,4 +131,9 @@ bool ScheduleSlotOptionsDialog::isDisabled() const
 bool ScheduleSlotOptionsDialog::waitsForStandbyTrackEnd() const
 {
     return m_waitForStandbyTrackEnd->isChecked();
+}
+
+bool ScheduleSlotOptionsDialog::usesTransitionClipBefore() const
+{
+    return m_useTransitionClipBefore->isChecked();
 }

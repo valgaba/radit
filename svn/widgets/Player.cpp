@@ -24,6 +24,7 @@
 #include "widgets/vumeter.h"
 #include "widgets/contentsbase.h"
 #include "widgets/AudioItemFolderMaxi.h"
+#include "widgets/AudioItemFileMaxi.h"
 #include "widgets/AudioItemMeteoClockMaxi.h"
 #include <cmath>
 #include <algorithm>
@@ -457,6 +458,10 @@ void Player::bindMediaManager()
      });
      connect(mediamanager, &MediaManager::playbackError, this, [this, manager](const QString &message) {
          if (manager != mediamanager) return;
+         if (m_scheduleTransitionClipItem && currentItem==m_scheduleTransitionClipItem) {
+             finishScheduleTransitionClip(tr("Error"),message);
+             return;
+         }
          finishEmission(tr("Error"),message);
          if (m_stopSequenceAtTrackEnd && m_sequenceContents) {
              stopSequentialPlayback();
@@ -476,6 +481,10 @@ void Player::bindMediaManager()
        connect(mediamanager, &MediaManager::playbackFinished,
                this, [this, manager]() {
            if (manager != mediamanager) return;
+           if (m_scheduleTransitionClipItem && currentItem==m_scheduleTransitionClipItem) {
+               finishScheduleTransitionClip();
+               return;
+           }
            finishEmission(tr("Completed"));
            finishMix(true);
 
@@ -489,9 +498,19 @@ void Player::bindMediaManager()
                if (auto *folder=qobject_cast<AudioItemFolderMaxi*>(currentItem)) {
                    if (!folder->isLoop() && m_folderTurnItem==folder
                        && m_folderTurnTracksStarted < folder->songsPerTurn()) {
+                       if (m_scheduleTransitionClipSelector) {
+                           const QString clip=m_scheduleTransitionClipSelector();
+                           if (!clip.isEmpty() && startScheduleTransitionClip(clip,folder))
+                               return;
+                       }
                        playItem(folder);
                        return;
                    }
+               }
+               if (m_scheduleTransitionClipSelector) {
+                   const QString clip=m_scheduleTransitionClipSelector();
+                   if (!clip.isEmpty() && startScheduleTransitionClip(clip))
+                       return;
                }
                m_folderTurnItem.clear();
                m_folderTurnTracksStarted=0;
@@ -868,6 +887,74 @@ bool Player::isCurrentItemLastInSequence() const
     return true;
 }
 
+void Player::setScheduleTransitionCallbacks(std::function<QString()> clipSelector,
+                                            std::function<bool(double)> shouldReplaceNext,
+                                            std::function<bool()> clipFinishedHandler)
+{
+    m_scheduleTransitionClipSelector=std::move(clipSelector);
+    m_scheduleTransitionShouldReplaceNext=std::move(shouldReplaceNext);
+    m_scheduleTransitionClipFinishedHandler=std::move(clipFinishedHandler);
+}
+
+bool Player::isScheduleTransitionClipPlaying() const
+{
+    return m_scheduleTransitionClipItem && currentItem==m_scheduleTransitionClipItem;
+}
+
+bool Player::startScheduleTransitionClip(const QString &path, AudioItemMaxi *resumeItem)
+{
+    if (path.isEmpty() || !m_sequenceContents)
+        return false;
+    auto *clip=new AudioItemFileMaxi(this);
+    clip->hide();
+    clip->setFilePath(path);
+    clip->setNameFile(QFileInfo(path).completeBaseName());
+    clip->setToolTip(path);
+    m_scheduleTransitionClipItem=clip;
+    m_scheduleTransitionResumeItem=resumeItem;
+    m_scheduleTransitionResumeFolder=m_folderTurnItem;
+    m_scheduleTransitionResumeFolderTracksStarted=m_folderTurnTracksStarted;
+    playItem(clip);
+    if (currentItem==clip)
+        return true;
+    m_scheduleTransitionClipItem.clear();
+    m_scheduleTransitionResumeItem.clear();
+    m_scheduleTransitionResumeFolder.clear();
+    clip->deleteLater();
+    return false;
+}
+
+void Player::finishScheduleTransitionClip(const QString &result, const QString &details)
+{
+    AudioItemMaxi *clip=m_scheduleTransitionClipItem;
+    AudioItemMaxi *resumeItem=m_scheduleTransitionResumeItem;
+    AudioItemFolderMaxi *resumeFolder=m_scheduleTransitionResumeFolder;
+    const int resumeFolderTracks=m_scheduleTransitionResumeFolderTracksStarted;
+    m_scheduleTransitionClipItem.clear();
+    m_scheduleTransitionResumeItem.clear();
+    m_scheduleTransitionResumeFolder.clear();
+    m_scheduleTransitionResumeFolderTracksStarted=0;
+    finishEmission(result,details);
+    stopMain();
+    if (clip)
+        clip->deleteLater();
+    if (m_scheduleTransitionClipFinishedHandler
+        && m_scheduleTransitionClipFinishedHandler()) {
+        stopSequentialPlayback();
+        return;
+    }
+    if (!m_sequenceContents)
+        return;
+    if (resumeItem && m_sequenceContents->layout
+        && m_sequenceContents->layout->indexOf(resumeItem)>=0) {
+        m_folderTurnItem=resumeFolder;
+        m_folderTurnTracksStarted=resumeFolderTracks;
+        playItem(resumeItem);
+        return;
+    }
+    advanceSequence();
+}
+
 void Player::stopSequentialPlayback()
 {
     m_stopSequenceAtTrackEnd=false;
@@ -882,6 +969,14 @@ void Player::stopSequentialPlayback()
     m_preparingPlaybackItem.clear();
     if (currentItem)
         stopMain();
+    if (m_scheduleTransitionClipItem) {
+        AudioItemMaxi *clip=m_scheduleTransitionClipItem;
+        m_scheduleTransitionClipItem.clear();
+        clip->deleteLater();
+    }
+    m_scheduleTransitionResumeItem.clear();
+    m_scheduleTransitionResumeFolder.clear();
+    m_scheduleTransitionResumeFolderTracksStarted=0;
 }
 
 bool Player::stopSequentialPlaybackAtTrackEnd()
@@ -997,6 +1092,11 @@ bool Player::tryItemMix(const AudioFrame &frame)
         || !mediamanager->isPlaying()) return false;
     const double remaining = m_duration - frame.position;
     if (remaining <= 0.02) return false;
+    if (m_sequenceContents && m_scheduleTransitionShouldReplaceNext
+        && m_scheduleTransitionShouldReplaceNext(remaining)) {
+        m_mixAttempted=true;
+        return false;
+    }
     const double mixSeconds=source->mixSeconds();
 
     // Look slightly ahead of the configured mix duration so a natural quiet/fade
