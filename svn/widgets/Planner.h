@@ -95,6 +95,7 @@ private:
     QPointer<ScheduleSlot> m_pendingStartSlot;
     QPointer<ScheduleSlot> m_waitingForStandbySlot;
     int m_waitingStandbyEntrySecond = -1;
+    QDate m_waitingStandbyOccurrenceDate;
     QTimer *m_clockTimer = nullptr;
     QTimer *m_fadeTimer = nullptr;
     QTimer *m_standbyResumeTimer = nullptr;

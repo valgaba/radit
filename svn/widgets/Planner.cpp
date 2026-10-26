@@ -237,7 +237,7 @@ class StandbyListEventDialog final : public QDialog
 {
 public:
     StandbyListEventDialog(const QTime &time, const QString &path, bool disabled = false,
-                           QWidget *parent = nullptr)
+                           bool waitForStandbyTrackEnd = false, QWidget *parent = nullptr)
         : QDialog(parent)
     {
         setObjectName("StandbyListEventDialog");
@@ -245,7 +245,7 @@ public:
         setWindowModality(Qt::WindowModal);
         setModal(true);
         setWindowTitle(tr("Standby list event"));
-        resize(410,185);
+        resize(410,210);
         setStyleSheet(QStringLiteral(
             "QDialog#StandbyListEventDialog { background:#181e2c; border:1px solid #77859a; }"
             "QDialog#StandbyListEventDialog QLabel { color:#8a8d96; background:transparent; }"
@@ -310,6 +310,13 @@ public:
         m_disabled->setObjectName("StandbyEventDisabledCheckBox");
         m_disabled->setChecked(disabled);
         form->addWidget(m_disabled,2,1,1,2);
+        m_waitForStandbyTrackEnd=new QCheckBox(
+            tr("Wait for the current Standby track to finish"),body);
+        m_waitForStandbyTrackEnd->setObjectName("StandbyEventWaitForTrackCheckBox");
+        m_waitForStandbyTrackEnd->setChecked(waitForStandbyTrackEnd);
+        m_waitForStandbyTrackEnd->setToolTip(
+            tr("Wait only while Standby is playing. An active ScheduleSlot is never delayed."));
+        form->addWidget(m_waitForStandbyTrackEnd,3,1,1,2);
         connect(browse,&QPushButton::clicked,this,[this]() {
             const QString selected=QFileDialog::getOpenFileName(
                 this,tr("Choose a Standby file"),m_path->text(),
@@ -340,11 +347,13 @@ public:
     QTime entryTime() const { return m_time->time(); }
     QString listPath() const { return m_path->text(); }
     bool isDisabled() const { return m_disabled->isChecked(); }
+    bool waitsForStandbyTrackEnd() const { return m_waitForStandbyTrackEnd->isChecked(); }
 
 private:
     QTimeEdit *m_time = nullptr;
     QLineEdit *m_path = nullptr;
     QCheckBox *m_disabled = nullptr;
+    QCheckBox *m_waitForStandbyTrackEnd = nullptr;
 };
 
 void showPopupBelow(QWidget *anchor, QWidget *popup)
@@ -691,7 +700,8 @@ public:
         }
         if (chosen==addStandbyEventAction) {
             const int scheduledSecond=qBound(0,clickedSecond,24*60*60-1);
-            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(scheduledSecond),QString(),false,window());
+            StandbyListEventDialog eventOptions(QTime(0,0).addSecs(scheduledSecond),
+                                                QString(),false,false,window());
             if (eventOptions.exec()!=QDialog::Accepted)
                 return;
             const QTime time=eventOptions.entryTime();
@@ -704,6 +714,7 @@ public:
             ScheduleSlot *event=addSlot(time.toString("HH:mm:ss"),second);
             event->setStandbyListPath(eventOptions.listPath());
             event->setScheduleDisabled(eventOptions.isDisabled());
+            event->setStandbyTrackWait(eventOptions.waitsForStandbyTrackEnd());
             event->setAccentColor(QColor("#3C5C8A"));
             markDocumentModified();
             if (m_focusSlot) m_focusSlot(event);
@@ -992,7 +1003,8 @@ private:
             const QTime currentTime=QTime(0,0).addSecs(editedSlot->entrySecond());
             if (editedSlot->isStandbyListChangeEvent()) {
                 StandbyListEventDialog options(currentTime,editedSlot->standbyListPath(),
-                                               editedSlot->isScheduleDisabled(),window());
+                                               editedSlot->isScheduleDisabled(),
+                                               editedSlot->waitsForStandbyTrackEnd(),window());
                 if (options.exec()==QDialog::Accepted) {
                     const QTime time=options.entryTime();
                     const int second=time.hour()*3600+time.minute()*60+time.second();
@@ -1004,6 +1016,7 @@ private:
                     editedSlot->setEntryTime(second);
                     editedSlot->setStandbyListPath(options.listPath());
                     editedSlot->setScheduleDisabled(options.isDisabled());
+                    editedSlot->setStandbyTrackWait(options.waitsForStandbyTrackEnd());
                     markDocumentModified();
                 }
                 return;
@@ -2533,6 +2546,7 @@ Planner::Planner(QWidget *parent) : Frame(parent)
         connect(engine,&Player::playbackProgressChanged,this,
                 [this,engine](double position,double duration,bool seekable) {
             if (engine==m_standbyEngine && m_waitingForStandbySlot
+                && !m_waitingForStandbySlot->isStandbyListChangeEvent()
                 && duration>0.0) {
                 auto *item=m_standbyEngine->getCurrentItem();
                 if (item && item->mixEnabled()) {
@@ -2881,6 +2895,7 @@ void Planner::stopPlayback()
     if (!m_running) return;
     m_standbyResumeTimer->stop();
     cancelStandbyTrackWait();
+    m_pendingStandbyListPath.clear();
     if (m_activeScheduleSlot)
         m_activeScheduleSlot->setPlaying(false);
     if (m_pendingScheduleSlot)
@@ -3262,10 +3277,14 @@ void Planner::checkSchedule()
     const QString dayKey=now.date().toString("yyyyMMdd");
     const bool dateChanged=m_triggeredDate!=dayKey;
     if (dateChanged) {
-        cancelStandbyTrackWait();
         m_triggeredSlots.clear();
         m_triggeredDate=dayKey;
-        m_pendingStartSlot.clear();
+        // A delayed event belongs to the day it was scheduled, but must remain
+        // pending if the current Standby track crosses midnight.
+        if (m_waitingForStandbySlot)
+            m_pendingStartSlot=m_waitingForStandbySlot;
+        else
+            m_pendingStartSlot.clear();
         m_transitionClipWaitingForSlot=false;
     }
     ScheduleSlot *dueSlot=weekTabs->slotStartingAt(now);
@@ -3289,6 +3308,12 @@ void Planner::checkSchedule()
         m_transitionClipWaitingForSlot=false;
         cancelStandbyTrackWait();
     }
+    // The track-finished signal normally completes a delayed event. Recover on
+    // the Planner tick too if the playback sequence has already stopped but
+    // that signal was missed during an engine transition.
+    if (m_waitingForStandbySlot && m_standbyEngine
+        && !m_standbyEngine->sequentialContents())
+        finishStandbyTrackWait();
     if (m_pendingStartSlot && m_pendingStartSlot->isScheduleDisabled()) {
         m_pendingStartSlot.clear();
         m_transitionClipWaitingForSlot=false;
@@ -3314,6 +3339,19 @@ void Planner::checkSchedule()
             .arg(slot->entrySecond());
         if (!m_triggeredSlots.contains(key) && m_waitingForStandbySlot!=slot) {
             if (slot->isStandbyListChangeEvent()) {
+                const bool canWaitForStandbyTrack=slot->waitsForStandbyTrackEnd()
+                    && !m_activeScheduleEngine && !m_pendingScheduleEngine
+                    && !m_pendingScheduleSlot && !m_fadeTimer->isActive()
+                    && m_standbyEngine && m_standbyEngine->getCurrentItem()
+                    && !m_standbyEngine->isScheduleTransitionClipPlaying()
+                    && m_standbyEngine->sequentialContents();
+                if (canWaitForStandbyTrack
+                    && m_standbyEngine->stopSequentialPlaybackAtTrackEnd()) {
+                    m_waitingForStandbySlot=slot;
+                    m_waitingStandbyEntrySecond=slot->entrySecond();
+                    m_waitingStandbyOccurrenceDate=now.date();
+                    return;
+                }
                 QString error;
                 applyStandbyListChange(slot->standbyListPath(),&error);
                 m_triggeredSlots.insert(key);
@@ -3356,6 +3394,7 @@ void Planner::checkSchedule()
                     && m_standbyEngine->stopSequentialPlaybackAtTrackEnd()) {
                     m_waitingForStandbySlot=slot;
                     m_waitingStandbyEntrySecond=slot->entrySecond();
+                    m_waitingStandbyOccurrenceDate=now.date();
                     return;
                 }
                 m_triggeredSlots.insert(key);
@@ -3376,18 +3415,23 @@ void Planner::cancelStandbyTrackWait()
         m_standbyEngine->cancelStopSequentialPlaybackAtTrackEnd();
     m_waitingForStandbySlot.clear();
     m_waitingStandbyEntrySecond=-1;
+    m_waitingStandbyOccurrenceDate=QDate();
 }
 
 void Planner::finishStandbyTrackWait()
 {
     QPointer<ScheduleSlot> slot=m_waitingForStandbySlot;
     const int expectedEntrySecond=m_waitingStandbyEntrySecond;
+    const QDate occurrenceDate=m_waitingStandbyOccurrenceDate;
     if (!slot) {
+        m_waitingStandbyEntrySecond=-1;
+        m_waitingStandbyOccurrenceDate=QDate();
         ensureStandbyPlayback();
         return;
     }
     m_waitingForStandbySlot.clear();
     m_waitingStandbyEntrySecond=-1;
+    m_waitingStandbyOccurrenceDate=QDate();
     if (!m_running || slot->isScheduleDisabled()
         || slot->entrySecond()!=expectedEntrySecond) {
         if (m_pendingStartSlot==slot)
@@ -3396,7 +3440,8 @@ void Planner::finishStandbyTrackWait()
         return;
     }
 
-    const QString dayKey=QDate::currentDate().toString("yyyyMMdd");
+    const QString dayKey=(occurrenceDate.isValid() ? occurrenceDate : QDate::currentDate())
+                             .toString("yyyyMMdd");
     const QString key=QStringLiteral("%1-%2-%3")
         .arg(dayKey)
         .arg(quintptr(slot.data()),0,16)
@@ -3404,6 +3449,14 @@ void Planner::finishStandbyTrackWait()
     m_triggeredSlots.insert(key);
     if (m_pendingStartSlot==slot)
         m_pendingStartSlot.clear();
+    if (slot->isStandbyListChangeEvent()) {
+        QString error;
+        applyStandbyListChange(slot->standbyListPath(),&error);
+        if (!error.isEmpty())
+            QMessageBox::warning(this,tr("Change standby list"),error);
+        ensureStandbyPlayback();
+        return;
+    }
     startScheduleSlot(slot);
 }
 
