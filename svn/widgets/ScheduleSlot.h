@@ -42,7 +42,7 @@ public:
     void setScheduleDisabled(bool disabled);
     void setPriority(bool priority);
     void setStandbyTrackWait(bool enabled);
-    void setUseTransitionClipBefore(bool enabled) { m_useTransitionClipBefore = enabled; }
+    void setUseTransitionClipBefore(bool enabled);
     void setContentsVisible(bool visible);
     void setStandbyListPath(const QString &path);
     void setUpcoming(bool upcoming);

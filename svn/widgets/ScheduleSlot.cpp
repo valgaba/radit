@@ -434,10 +434,25 @@ void ScheduleSlot::setPriority(bool priority)
 
 void ScheduleSlot::setStandbyTrackWait(bool enabled)
 {
-    if (m_waitForStandbyTrackEnd==enabled)
+    const bool transitionChanged=enabled && m_useTransitionClipBefore;
+    if (m_waitForStandbyTrackEnd==enabled && !transitionChanged)
         return;
     m_waitForStandbyTrackEnd=enabled;
+    if (enabled)
+        m_useTransitionClipBefore=false;
     updateTimingIndicator();
+}
+
+void ScheduleSlot::setUseTransitionClipBefore(bool enabled)
+{
+    const bool waitChanged=enabled && m_waitForStandbyTrackEnd;
+    if (m_useTransitionClipBefore==enabled && !waitChanged)
+        return;
+    m_useTransitionClipBefore=enabled;
+    if (enabled) {
+        m_waitForStandbyTrackEnd=false;
+        updateTimingIndicator();
+    }
 }
 
 void ScheduleSlot::updateTimingIndicator()

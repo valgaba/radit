@@ -904,8 +904,10 @@ public:
             slot->setAccentColor(colorText.isEmpty() ? QColor() : QColor(colorText));
             slot->setScheduleDisabled(object.value("disabled").toBool());
             slot->setPriority(object.value("priority").toBool());
-            slot->setStandbyTrackWait(object.value("waitForStandbyTrackEnd").toBool());
-            slot->setUseTransitionClipBefore(object.value("useTransitionClipBefore").toBool(false));
+            const bool waitForStandby=object.value("waitForStandbyTrackEnd").toBool();
+            const bool useTransition=object.value("useTransitionClipBefore").toBool(false);
+            slot->setStandbyTrackWait(waitForStandby);
+            slot->setUseTransitionClipBefore(useTransition && !waitForStandby);
             slot->setStandbyListPath(object.value("standbyListPath").toString());
             if (!slot->isStandbyListChangeEvent()) {
                 m_dayContents.append(slot->contents());

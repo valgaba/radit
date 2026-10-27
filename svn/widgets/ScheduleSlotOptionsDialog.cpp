@@ -83,15 +83,24 @@ ScheduleSlotOptionsDialog::ScheduleSlotOptionsDialog(const QTime &initialTime, Q
         tr("Wait for the current Standby track to finish"),content);
     m_waitForStandbyTrackEnd->setObjectName("ScheduleSlotWaitForStandbyTrack");
     m_waitForStandbyTrackEnd->setChecked(waitForStandbyTrackEnd);
-    m_waitForStandbyTrackEnd->setToolTip(tr("Wait only while Standby is playing. An active ScheduleSlot is never delayed."));
+    m_waitForStandbyTrackEnd->setToolTip(
+        tr("Wait for the current Standby track to finish. This option replaces transition clips."));
     form->addRow(QString(),m_waitForStandbyTrackEnd);
     m_useTransitionClipBefore = new QCheckBox(
         tr("Use a transition clip before this event"), content);
     m_useTransitionClipBefore->setObjectName("ScheduleSlotUseTransitionClipBefore");
-    m_useTransitionClipBefore->setChecked(useTransitionClipBefore);
+    m_useTransitionClipBefore->setChecked(useTransitionClipBefore && !waitForStandbyTrackEnd);
     m_useTransitionClipBefore->setToolTip(
-        tr("When enabled, Radit may play a transition clip before this event. Otherwise, it starts at the scheduled time."));
+        tr("Play a transition clip to fill the gap before this event. This replaces waiting for Standby."));
     form->addRow(QString(), m_useTransitionClipBefore);
+    connect(m_waitForStandbyTrackEnd,&QCheckBox::toggled,this,[this](bool enabled) {
+        if (enabled)
+            m_useTransitionClipBefore->setChecked(false);
+    });
+    connect(m_useTransitionClipBefore,&QCheckBox::toggled,this,[this](bool enabled) {
+        if (enabled)
+            m_waitForStandbyTrackEnd->setChecked(false);
+    });
     contentLayout->addLayout(form);
 
     auto *buttons = new QHBoxLayout;
